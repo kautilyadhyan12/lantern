@@ -9,8 +9,11 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers import output, run, tool
+
 # Built at runtime so this file never contains a literal key for detect-secrets to flag.
 FAKE_AWS_KEY = "AKIA" + "Z7Q3" + "EXAMPLEKEY12"
+PRE_COMMIT = [sys.executable, "-m", "pre_commit"]
 
 
 @pytest.fixture
@@ -28,46 +31,24 @@ def scratch(repo_root: Path) -> Iterator[Path]:
         shutil.rmtree(path)
 
 
-def _run(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        args,
-        cwd=cwd,
-        capture_output=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=300,
-        check=False,
-    )
-
-
 def _hook(repo_root: Path, hook_id: str, *files: Path) -> subprocess.CompletedProcess[str]:
-    args = [sys.executable, "-m", "pre_commit", "run", hook_id, "--files", *map(str, files)]
-    return _run(args, repo_root)
-
-
-def _output(result: subprocess.CompletedProcess[str]) -> str:
-    return result.stdout + result.stderr
+    return run([*PRE_COMMIT, "run", hook_id, "--files", *map(str, files)], cwd=repo_root)
 
 
 @pytest.mark.ac("S0.1-AC4")
 def test_config_validates(repo_root: Path) -> None:
-    result = _run(
-        [sys.executable, "-m", "pre_commit", "validate-config", ".pre-commit-config.yaml"],
-        repo_root,
-    )
-    assert result.returncode == 0, _output(result)
+    result = run([*PRE_COMMIT, "validate-config", ".pre-commit-config.yaml"], cwd=repo_root)
+    assert result.returncode == 0, output(result)
 
 
 @pytest.mark.ac("S0.1-AC4")
 def test_installs_into_git_repo(repo_root: Path, tmp_path: Path) -> None:
-    git = shutil.which("git")
-    assert git is not None
     config = repo_root / ".pre-commit-config.yaml"
     assert config.is_file(), ".pre-commit-config.yaml missing"
-    subprocess.run([git, "init", "-q", str(tmp_path)], check=True)
+    run([tool("git"), "init", "-q", str(tmp_path)], cwd=tmp_path, check=True)
     shutil.copy(config, tmp_path / ".pre-commit-config.yaml")
-    result = _run([sys.executable, "-m", "pre_commit", "install"], tmp_path)
-    assert result.returncode == 0, _output(result)
+    result = run([*PRE_COMMIT, "install"], cwd=tmp_path)
+    assert result.returncode == 0, output(result)
     hook = tmp_path / ".git" / "hooks" / "pre-commit"
     assert hook.is_file()
     assert "pre-commit" in hook.read_text(encoding="utf-8")
@@ -82,10 +63,10 @@ def test_ruff_hook_fails_on_lint_error_and_passes_clean(repo_root: Path, scratch
 
     failed = _hook(repo_root, "ruff-check", bad)
     assert failed.returncode != 0
-    assert "F821" in _output(failed)
+    assert "F821" in output(failed)
 
     passed = _hook(repo_root, "ruff-check", good)
-    assert passed.returncode == 0, _output(passed)
+    assert passed.returncode == 0, output(passed)
 
 
 @pytest.mark.ac("S0.1-AC4")
@@ -97,10 +78,10 @@ def test_mypy_hook_runs(repo_root: Path, scratch: Path) -> None:
 
     failed = _hook(repo_root, "mypy", bad)
     assert failed.returncode != 0
-    assert "Incompatible types in assignment" in _output(failed)
+    assert "Incompatible types in assignment" in output(failed)
 
     passed = _hook(repo_root, "mypy", good)
-    assert passed.returncode == 0, _output(passed)
+    assert passed.returncode == 0, output(passed)
 
 
 @pytest.mark.ac("S0.1-AC4")
@@ -112,10 +93,10 @@ def test_detect_secrets_hook_flags_secret(repo_root: Path, scratch: Path) -> Non
 
     flagged = _hook(repo_root, "detect-secrets", leaky)
     assert flagged.returncode != 0
-    assert "AWS Access Key" in _output(flagged)
+    assert "AWS Access Key" in output(flagged)
 
     passed = _hook(repo_root, "detect-secrets", clean)
-    assert passed.returncode == 0, _output(passed)
+    assert passed.returncode == 0, output(passed)
 
 
 @pytest.mark.ac("S0.1-AC4")
@@ -123,5 +104,5 @@ def test_fixture_signature_hook_runs(repo_root: Path, scratch: Path) -> None:
     anything = scratch / "anything.txt"
     anything.write_text("x\n", encoding="utf-8")
     result = _hook(repo_root, "fixture-signatures", anything)
-    assert result.returncode == 0, _output(result)
-    assert "Passed" in _output(result), "hook must execute, not be skipped"
+    assert result.returncode == 0, output(result)
+    assert "Passed" in output(result), "hook must execute, not be skipped"

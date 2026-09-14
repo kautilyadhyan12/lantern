@@ -96,7 +96,7 @@ def test_lc001_allowed(source: str) -> None:
     assert _rules(source) == []
 
 
-# --- LC002: `# type: ignore` without a trailing reason -------------------------------------
+# --- LC002: type-ignore comments without a trailing reason ---------------------------------
 
 LC002_BAD = [
     "x: int = y  # type: ignore\n",
@@ -125,7 +125,7 @@ def test_lc002_allowed(source: str) -> None:
     assert _rules(source) == []
 
 
-# --- LC003: `# noqa` without a trailing reason ----------------------------------------------
+# --- LC003: noqa comments without a trailing reason ----------------------------------------
 
 LC003_BAD = [
     "import os  # noqa\n",
@@ -151,6 +151,14 @@ def test_lc003_noqa_without_reason_flagged(source: str) -> None:
 @pytest.mark.parametrize("source", LC003_OK)
 def test_lc003_allowed(source: str) -> None:
     assert _rules(source) == []
+
+
+@pytest.mark.ac("S0.1-AC5")
+def test_chained_directives_share_trailing_reason() -> None:
+    assert _rules("x = y  # type: ignore[misc]  # noqa: E501  # long generated URL\n") == []
+    assert _rules("x = y  # type: ignore[misc]  # noqa: E501\n") == ["LC002", "LC003"]
+    reasons = lint_custom.parse_suppressions("# noqa: E501  # why # type: ignore")
+    assert [(s.kind, s.reason) for s in reasons] == [("noqa", "why"), ("type-ignore", "")]
 
 
 # --- LC004: pytest skip / xfail without an issue URL ----------------------------------------

@@ -6,7 +6,7 @@ from lantern import cli
 from lantern.config import Settings
 from lantern.db import migrate
 
-SAMPLE_SECRET = "sample-" + "pw-9f2c"
+SAMPLE_SECRET = "sample-" + "pw-9f2c"  # pragma: allowlist secret
 
 
 def _url(drivername: str, password: str | None = None) -> str:
@@ -17,9 +17,10 @@ def _url(drivername: str, password: str | None = None) -> str:
 
 @pytest.mark.ac("S0.1-AC3")
 def test_settings_rejects_non_asyncpg_url(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("LANTERN_DATABASE_URL", _url("postgresql+psycopg2"))
-    with pytest.raises(ValidationError, match="asyncpg"):
+    monkeypatch.setenv("LANTERN_DATABASE_URL", _url("postgresql+psycopg2", SAMPLE_SECRET))
+    with pytest.raises(ValidationError, match="asyncpg") as exc:
         Settings(_env_file=None)
+    assert SAMPLE_SECRET not in str(exc.value), "validation errors must not echo the password"
 
 
 @pytest.mark.ac("S0.1-AC3")

@@ -41,7 +41,7 @@ def test_ruff_config(pyproject: dict[str, object]) -> None:
     assert _get(pyproject, "tool.ruff.target-version") == "py312"
     select = _get(pyproject, "tool.ruff.lint.select")
     assert isinstance(select, list)
-    assert RUFF_SELECT <= set(select), f"missing rule families: {RUFF_SELECT - set(select)}"
+    assert set(select) >= RUFF_SELECT, f"missing rule families: {RUFF_SELECT - set(select)}"
 
 
 @pytest.mark.ac("S0.1-AC2")

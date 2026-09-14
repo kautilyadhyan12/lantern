@@ -1,0 +1,44 @@
+# All hooks are local and run the tool versions pinned in uv.lock via `uv run`, so
+# `pre-commit install` needs no network access. Install with `make hooks`.
+default_install_hook_types: [pre-commit]
+
+repos:
+  - repo: local
+    hooks:
+      - id: end-of-file-fixer
+        name: fix end of files
+        entry: uv run end-of-file-fixer
+        language: system
+        types: [text]
+      - id: trailing-whitespace
+        name: trim trailing whitespace
+        entry: uv run trailing-whitespace-fixer
+        language: system
+        types: [text]
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --fix
+        language: system
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format
+        language: system
+        types_or: [python, pyi]
+      - id: mypy
+        name: mypy (changed files)
+        entry: uv run mypy
+        language: system
+        types: [python]
+        require_serial: true
+      - id: detect-secrets
+        name: detect-secrets
+        entry: uv run detect-secrets-hook --baseline .secrets.baseline
+        language: system
+        exclude: ^uv\.lock$
+      - id: fixture-signatures
+        name: fixture signatures
+        entry: uv run python scripts/check_fixture_signatures.py
+        language: system
+        pass_filenames: false
+        always_run: true

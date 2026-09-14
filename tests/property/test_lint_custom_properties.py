@@ -38,8 +38,13 @@ SNIPPETS = [
 ]
 
 
+def _not_a_directive(text: str) -> bool:
+    lowered = text.lower()
+    return "noqa" not in lowered and "type:" not in lowered
+
+
 @pytest.mark.ac("S0.1-AC5")
-@given(directive=st.sampled_from(sorted(DIRECTIVES)), reason=line_text)
+@given(directive=st.sampled_from(sorted(DIRECTIVES)), reason=line_text.filter(_not_a_directive))
 def test_suppression_reason_required(directive: str, reason: str) -> None:
     parsed = lint_custom.parse_suppression(f"# {directive}  # {reason}")
     assert parsed is not None

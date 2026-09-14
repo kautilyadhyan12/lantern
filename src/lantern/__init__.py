@@ -1,7 +1,5 @@
 """Lantern: AI-orchestrated OSINT investigation platform."""
 
+from importlib.metadata import version
 
-def __getattr__(name: str) -> str:
-    if name == "__version__":
-        raise NotImplementedError("S0.1: lantern.__version__ not implemented yet")
-    raise AttributeError(name)
+__version__: str = version("lantern")

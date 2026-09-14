@@ -8,6 +8,7 @@ REQUIRED_HOOKS = {
     "ruff-check": "uv run ruff check",
     "ruff-format": "uv run ruff format",
     "mypy": "uv run mypy",
+    # pragma: allowlist nextline secret
     "detect-secrets": "uv run detect-secrets-hook --baseline .secrets.baseline",
     "fixture-signatures": "uv run python scripts/check_fixture_signatures.py",
 }
