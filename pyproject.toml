@@ -1,0 +1,40 @@
+[project]
+name = "lantern"
+version = "0.1.0"
+description = "AI-orchestrated OSINT investigation platform"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.20.0",
+    "asyncpg>=0.31.0",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+    "sqlalchemy[asyncio]>=2.0.52",
+    "structlog>=26.1.0",
+]
+
+[project.scripts]
+lantern = "lantern.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.13,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "bandit>=1.9.4",
+    "detect-secrets>=1.5.0",
+    "diff-cover>=10.5.1",
+    "hypothesis>=6.168.0",
+    "mutmut>=3.8.0",
+    "mypy>=2.3.1",
+    "pip-audit>=2.10.1",
+    "pre-commit>=4.6.2",
+    "pre-commit-hooks>=6.0.0",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
+    "pyyaml>=6.0.3",
+    "ruff>=0.16.7",
+    "types-pyyaml>=6.0.12.20260906",
+]
