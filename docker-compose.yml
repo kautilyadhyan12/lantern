@@ -1,0 +1,24 @@
+# Lantern stack. S0.1 ships the database only; api/worker/scheduler/web arrive in S0.9/S0.10.
+name: lantern
+
+services:
+  db:
+    image: pgvector/pgvector:0.8.6-pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-lantern}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (see .env.example)}
+      POSTGRES_DB: ${POSTGRES_DB:-lantern}
+    ports:
+      # Loopback only. 5432 is often taken by a local Postgres install, hence the default.
+      - "127.0.0.1:${LANTERN_DB_PORT:-5434}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  db-data:

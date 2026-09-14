@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+dist/
+
+# Tool caches and reports
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+mutants/
+.test-tmp/
+
+# Local proof stamps
+.prove/
+
+# Secrets: never commit real env files
+.env
+.env.*
+!.env.example
+
+# Generated artefacts
+artifacts/
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Web
+node_modules/
+web/dist/
