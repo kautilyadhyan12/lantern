@@ -26,13 +26,13 @@ from typing import Final
 from scripts.hooks.hookio import HookInputError, Violation, allow, block, read_hook_input
 
 RULES: Final[Mapping[str, str]] = {
-    "GB001": "destructive git: history, remotes and the working tree are not disposable",
-    "GB002": "`rm -rf`: delete precisely, or let `git clean -n` show you first",
-    "GB003": "`pip install`: this project installs dependencies with `uv add`",
-    "GB004": "piping a download into a shell",
-    "GB005": "protected evidence path: write it through the sanctioned script",
-    "GB006": "LANTERN_RECORD_FIXTURES belongs to scripts/record_fixture.py",
-    "GB007": "the t3-reviewer subagent may only run read-only inspection commands",
+    "GB001": "destructive git command refused",
+    "GB002": "recursive force delete refused",
+    "GB003": "pip install refused; use `uv add <pkg>`",
+    "GB004": "download piped into a shell refused",
+    "GB005": "write to a protected path refused; use the script that owns it",
+    "GB006": "LANTERN_RECORD_FIXTURES refused; only scripts/record_fixture.py may set it",
+    "GB007": "command not on the t3-reviewer allow-list",
 }
 
 PROTECTED_WRITE_PREFIXES: Final[tuple[str, ...]] = (
@@ -181,18 +181,18 @@ def _git_violation(words: Sequence[str]) -> Violation | None:
     destructive: Mapping[str, tuple[bool, str]] = {
         "push": (
             any(f == "-f" or f.startswith("--force") for f in flags),
-            "`git push --force` rewrites a branch other people may hold",
+            "`git push --force`",
         ),
-        "reset": ("--hard" in flags, "`git reset --hard` throws away uncommitted work"),
+        "reset": ("--hard" in flags, "`git reset --hard`"),
         "clean": (
             any(_is_force_flag(f) for f in flags),
-            "`git clean -f` deletes untracked files for good",
+            "`git clean -f`",
         ),
         "checkout": (
             any(f in {"-f", "--force"} for f in flags),
-            "`git checkout --force` discards local changes",
+            "`git checkout --force`",
         ),
-        "restore": ("." in rest, "`git restore .` discards local changes"),
+        "restore": ("." in rest, "`git restore .`"),
     }
     fires, detail = destructive.get(subcommand, (False, ""))
     return Violation("GB001", detail) if fires else None
@@ -211,7 +211,7 @@ def _is_recursive_force(words: Sequence[str]) -> bool:
 
 def _rm_violation(words: Sequence[str]) -> Violation | None:
     if _name(words[0]) == "rm" and _is_recursive_force(words[1:]):
-        return Violation("GB002", f"`{' '.join(words[:3])}` deletes a tree irreversibly")
+        return Violation("GB002", f"`{' '.join(words[:3])}`")
     return None
 
 
@@ -226,7 +226,7 @@ def _pip_violation(words: Sequence[str]) -> Violation | None:
         or (first == "uv" and second == "pip")
     )
     if uses_pip:
-        return Violation("GB003", f"`{' '.join(words[:3])}`: add dependencies with `uv add`")
+        return Violation("GB003", f"`{' '.join(words[:3])}`")
     return None
 
 
@@ -265,7 +265,11 @@ def check_segment(
     if agent_type == T3_REVIEWER_AGENT:
         if _t3_allowed(words):
             return None
-        return Violation("GB007", f"`{' '.join(words[:3])}` is not on the reviewer's allow-list")
+        return Violation(
+            "GB007",
+            f"`{' '.join(words[:3])}` is not on the allow-list "
+            "(git diff/log/show/status/rev-parse, uv run pytest/ruff/mypy)",
+        )
 
     if _records_fixtures(env) and not _is_sanctioned(words):
         return Violation("GB006", f"{RECORD_FIXTURES_VAR} set for `{' '.join(words[:3])}`")
@@ -282,7 +286,7 @@ def check_command(command: str, *, agent_type: str | None = None) -> Violation |
         return None
     segments = split_segments(command)
     if agent_type != T3_REVIEWER_AGENT and _pipes_a_download_into_a_shell(segments):
-        return Violation("GB004", "a downloaded script would run unread")
+        return Violation("GB004", "a downloaded script would be run unread")
     for segment in segments:
         env, words = strip_env_assignments(segment)
         violation = check_segment(words, env, agent_type=agent_type)
@@ -312,10 +316,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         hook = read_hook_input()
         violation = check_command(hook.command, agent_type=hook.agent_type)
     except HookInputError as exc:
-        return block(f"guard_bash: refusing the call — {exc}")
+        return block(f"guard_bash: refusing the call: {exc}")
     if violation is None:
         return allow()
-    return block(f"guard_bash: {violation.rule} {RULES[violation.rule]} — {violation.detail}")
+    return block(f"guard_bash: {violation.rule} {RULES[violation.rule]}: {violation.detail}")
 
 
 if __name__ == "__main__":

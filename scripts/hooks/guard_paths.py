@@ -83,7 +83,7 @@ def check_path(path: str, *, cwd: Path, root: Path) -> Violation | None:
 
     name = PurePosixPath(_posix(text).rstrip("/") or "/").name
     if _is_env_file(name):
-        return Violation("GP002", f"{name} holds secrets and is edited by hand only")
+        return Violation("GP002", f"{name} is a secrets file; edit it outside this session")
 
     relative = relative_to_repo(text, cwd=cwd, root=root)
     if relative is None:
@@ -91,7 +91,7 @@ def check_path(path: str, *, cwd: Path, root: Path) -> Violation | None:
     inside = relative.as_posix()
     for prefix in PROTECTED_PREFIXES:
         if inside == prefix or inside.startswith(f"{prefix}/"):
-            return Violation("GP001", f"{inside} is written by its own script, never by hand")
+            return Violation("GP001", f"{inside} is a protected path; use the script that owns it")
     return None
 
 
@@ -102,7 +102,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         hook = read_hook_input()
     except HookInputError as exc:
-        return block(f"guard_paths: refusing the call — {exc}")
+        return block(f"guard_paths: refusing the call: {exc}")
 
     root = repo_root(args.root)
     violation = check_path(hook.file_path, cwd=hook.cwd, root=root)
