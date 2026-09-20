@@ -20,12 +20,14 @@ def run(
     env: Mapping[str, str] | None = None,
     timeout: float = 300,
     check: bool = False,
+    stdin_text: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run a command with an argv list (never a shell), capturing UTF-8 output."""
     return subprocess.run(  # noqa: S603  # argv lists built by tests from fixed tool names
         list(args),
         cwd=cwd,
         env=env,
+        input=stdin_text,
         capture_output=True,
         encoding="utf-8",
         errors="replace",
