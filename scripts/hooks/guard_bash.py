@@ -12,15 +12,20 @@ Refuses, with exit code 2 and a reason on stderr:
 
 Everything else is allowed: this is a safety net against mistakes, not a sandbox. Reading a
 protected path stays allowed (T3 must read proofs); only write-shaped commands are refused.
-The command is tokenised, never executed, and each `&&`/`||`/`;`/`|` segment — including the inside
-of a `$(...)` substitution — is checked on its own, so chaining launders nothing.
+
+Three properties the rules depend on, each of which was a hole once:
+  * the command is tokenised, never executed, and every `&&`/`||`/`;`/`|`/newline segment is judged
+    on its own, including the inside of a `$(...)` substitution, so chaining launders nothing;
+  * the reviewer's allow-list only *narrows* what it may run — every other rule still applies to it;
+  * "sanctioned" is decided by the program actually being run, not by a script's name appearing
+    somewhere in the words, so `cp scripts/prove.py docs/proofs/…` sanctions nothing.
 """
 
 import argparse
 import posixpath
 import re
 import shlex
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from typing import Final
 
 from scripts.hooks.hookio import HookInputError, Violation, allow, block, read_hook_input
@@ -41,13 +46,20 @@ PROTECTED_WRITE_PREFIXES: Final[tuple[str, ...]] = (
     "docs/reviews",
     ".prove",
 )
+# Programs allowed to write the protected trees, matched against the program actually invoked.
 SANCTIONED_WRITERS: Final[tuple[str, ...]] = (
     "scripts/record_fixture.py",
     "scripts/prove.py",
     "scripts/materialize_review_tests.py",
     "scripts/check_fixture_signatures.py",
 )
-SANCTIONED_MAKE_TARGETS: Final = frozenset({"prove", "t3", "mutate", "evals"})
+# Only these write the protected trees; `make mutate` and `make evals` write elsewhere.
+SANCTIONED_MAKE_TARGETS: Final = frozenset({"prove", "t3"})
+# GB006 keeps its own, narrower exemption: only the recorder may carry the recording switch.
+RECORD_FIXTURES_VAR: Final = "LANTERN_RECORD_FIXTURES"
+RECORDER: Final = "scripts/record_fixture.py"
+FALSEY: Final = frozenset({"", "0", "false", "no", "off"})
+
 WRITE_COMMANDS: Final[frozenset[str]] = frozenset(
     {"rm", "mv", "cp", "tee", "touch", "mkdir", "rmdir", "truncate", "dd", "ln", "install", "shred"}
 )
@@ -57,6 +69,12 @@ SEGMENT_SEPARATORS: Final = frozenset({"&&", "||", "|", "&", ";", ";;", "|&", "(
 DOWNLOADERS: Final = frozenset({"curl", "wget"})
 SHELLS: Final = frozenset({"sh", "bash", "zsh", "dash", "ksh", "fish"})
 PYTHONS: Final = frozenset({"python", "python3", "py"})
+# Words that stand in front of the program that is really being run.
+INTERPRETER_WRAPPERS: Final = frozenset({"uv", "run", "poetry", "pipx", "python", "python3", "py"})
+WRAPPER_VALUE_FLAGS: Final = frozenset({"--directory", "--project", "--python", "--with"})
+GIT_VALUE_FLAGS: Final = frozenset(
+    {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--super-prefix"}
+)
 
 T3_ALLOWED_PREFIXES: Final[tuple[tuple[str, ...], ...]] = (
     ("git", "diff"),
@@ -70,39 +88,69 @@ T3_ALLOWED_PREFIXES: Final[tuple[tuple[str, ...], ...]] = (
 )
 T3_REVIEWER_AGENT: Final = "t3-reviewer"
 
-RECORD_FIXTURES_VAR: Final = "LANTERN_RECORD_FIXTURES"
-FALSEY: Final = frozenset({"", "0", "false", "no", "off"})
-
 # `$(` and a backtick open a nested command and a newline ends one; turning all three into
 # separators makes each nested or following command a segment of its own, so `echo $(rm -rf /)`
 # is judged on the `rm`, not on the `echo`.
 SUBSTITUTION_RE: Final = re.compile(r"\$\(|`|\n")
-# A heredoc body is data, not commands: `cat << EOF` … `EOF` may hold apostrophes, quotes and
-# prose about dangerous commands. Bodies are removed before parsing; what surrounds them is not.
+# A heredoc body is data, not commands. Only a marker outside quotes opens one — text that merely
+# looks like `<<EOF` inside a quoted string does not, or `echo 'a <<EOF b'` would hide what follows.
 HEREDOC_RE: Final = re.compile(r"<<-?\s*(?P<quote>['\"]?)(?P<tag>[A-Za-z_][A-Za-z0-9_]*)(?P=quote)")
 ENV_ASSIGNMENT_RE: Final = re.compile(r"^(?P<name>[A-Za-z_][A-Za-z0-9_]*)=(?P<value>.*)$", re.S)
+OPERAND_NAME_RE: Final = re.compile(r"^(?P<name>[A-Za-z_-][A-Za-z0-9_-]*)=(?P<value>.+)$")
+
+
+def _unquoted_spans(text: str) -> Iterator[tuple[int, int]]:
+    """The (start, end) spans of `text` that lie outside single and double quotes."""
+    start, quote = 0, ""
+    for index, char in enumerate(text):
+        if quote:
+            if char == quote:
+                quote, start = "", index + 1
+        elif char in "'\"":
+            yield start, index
+            quote = char
+    if not quote:
+        yield start, len(text)
+
+
+def _heredoc_match(command: str) -> re.Match[str] | None:
+    """The first heredoc marker whose `<<` lies outside quotes.
+
+    The tag itself is often quoted (`<< 'EOF'`), so only the operator's position decides:
+    `cat << 'EOF'` opens a heredoc, `echo 'a <<EOF b'` does not.
+    """
+    if "<<" not in command:  # cheap exit: most commands carry no heredoc at all
+        return None
+    spans = list(_unquoted_spans(command))
+    for match in HEREDOC_RE.finditer(command):
+        if any(start <= match.start() < end for start, end in spans):
+            return match
+    return None
 
 
 def strip_heredocs(command: str) -> str:
     """Remove every heredoc body, keeping the commands around it.
 
-    `gh pr create --body-file - << 'EOF' … EOF && echo done` is judged on the `gh` call and on
-    the `echo`; the body in between is text the caller is writing, not a command it is running.
+    `gh pr create --body-file - << 'EOF' … EOF && echo done` is judged on the `gh` call and on the
+    `echo`; the body in between is text the caller is writing, not a command it is running. A
+    marker inside quotes does not open a heredoc, and a heredoc whose terminator never arrives is
+    refused rather than silently swallowing every command after it.
     """
     while True:
-        match = HEREDOC_RE.search(command)
+        match = _heredoc_match(command)
         if match is None:
             return command
         body_start = command.find("\n", match.end())
         # Whatever follows the marker on its own line is still part of the command
         # (`cat << EOF > out.json`), so it is kept; only the body below it goes.
-        if body_start == -1:  # the body never starts: nothing follows the marker line
+        if body_start == -1:
             return command[: match.start()] + command[match.end() :]
         marker_tail = command[match.end() : body_start]
         terminator = re.compile(rf"^[ \t]*{re.escape(match.group('tag'))}[ \t]*$", re.M)
         end = terminator.search(command, body_start + 1)
-        rest = command[end.end() :] if end else ""
-        command = command[: match.start()] + marker_tail + rest
+        if end is None:
+            raise HookInputError(f"heredoc <<{match.group('tag')} is never terminated")
+        command = command[: match.start()] + marker_tail + command[end.end() :]
 
 
 def split_segments(command: str) -> list[list[str]]:
@@ -143,17 +191,48 @@ def strip_env_assignments(segment: Sequence[str]) -> tuple[dict[str, str], list[
     return env, words
 
 
+def _clean(word: str) -> str:
+    return word.replace("\\", "/").strip("\"'")
+
+
 def _name(word: str) -> str:
     """Executable name of a command word: `/usr/bin/rm` and `C:\\git.exe` become `rm` and `git`."""
     return posixpath.basename(_clean(word)).removesuffix(".exe").lower()
 
 
-def _clean(word: str) -> str:
-    return word.replace("\\", "/").strip("\"'")
+def invoked_program(words: Sequence[str]) -> str:
+    """The program actually being run, seen through interpreter wrappers.
+
+    `uv run --directory D:/osint python scripts/record_fixture.py x` is the recorder;
+    `cp scripts/record_fixture.py docs/proofs/PROOF.md` is `cp`.
+    """
+    skip_next = False
+    for word in words:
+        if skip_next:
+            skip_next = False
+            continue
+        if word in WRAPPER_VALUE_FLAGS:
+            skip_next = True
+            continue
+        if word.startswith("-"):
+            continue
+        if _name(word) in INTERPRETER_WRAPPERS:
+            continue
+        return _clean(word)
+    return _clean(words[0]) if words else ""
+
+
+def _operand(word: str) -> str:
+    """The path part of an operand: `of=tests/fixtures/a.json` and `--out=x` give their values."""
+    text = _clean(word)
+    match = OPERAND_NAME_RE.match(text)
+    if match is None or "/" in match.group("name"):
+        return text
+    return match.group("value")
 
 
 def _hits_protected(word: str) -> bool:
-    text = _clean(word)
+    text = _operand(word)
     if not text:
         return False
     candidate = posixpath.normpath(text).lstrip("/")
@@ -166,68 +245,85 @@ def _flags(words: Sequence[str]) -> list[str]:
 
 
 def _is_sanctioned(words: Sequence[str]) -> bool:
-    cleaned = [_clean(word) for word in words]
-    if any(writer in word for word in cleaned for writer in SANCTIONED_WRITERS):
+    """True when the program being run is one of the scripts that owns the protected trees."""
+    program = invoked_program(words)
+    if any(program == writer or program.endswith(f"/{writer}") for writer in SANCTIONED_WRITERS):
         return True
-    return _name(words[0]) == "make" and any(word in SANCTIONED_MAKE_TARGETS for word in cleaned)
+    return _name(words[0]) == "make" and any(
+        _clean(word) in SANCTIONED_MAKE_TARGETS for word in words[1:]
+    )
+
+
+def _is_recorder(words: Sequence[str]) -> bool:
+    program = invoked_program(words)
+    return program == RECORDER or program.endswith(f"/{RECORDER}")
+
+
+def _git_subcommand(words: Sequence[str]) -> tuple[str, list[str]]:
+    """The git subcommand and its arguments, skipping git's own global options and their values."""
+    index = 1
+    while index < len(words):
+        word = words[index]
+        if word in GIT_VALUE_FLAGS:
+            index += 2
+            continue
+        if word.startswith("-"):
+            index += 1
+            continue
+        return word, list(words[index + 1 :])
+    return "", []
+
+
+def _is_force_flag(flag: str) -> bool:
+    """`--force`, `--force-with-lease`, `-f`, and bundled short forms such as `-fu` or `-fdx`."""
+    return flag.startswith("--force") if flag.startswith("--") else "f" in flag[1:]
+
+
+def _is_recursive_flag(flag: str) -> bool:
+    return flag in {"--recursive", "-R"} if flag.startswith("--") else "r" in flag[1:].lower()
 
 
 def _git_violation(words: Sequence[str]) -> Violation | None:
     if _name(words[0]) != "git":
         return None
-    rest = words[1:]
-    subcommand = next((word for word in rest if not word.startswith("-")), "")
+    subcommand, rest = _git_subcommand(words)
     flags = _flags(rest)
+    forced = any(_is_force_flag(flag) for flag in flags)
+    # A refspec beginning with `+` forces the update, with or without `--force`.
+    forced_refspec = any(word.startswith("+") for word in rest)
     destructive: Mapping[str, tuple[bool, str]] = {
-        "push": (
-            any(f == "-f" or f.startswith("--force") for f in flags),
-            "`git push --force`",
-        ),
+        "push": (forced or forced_refspec, "`git push` with force"),
         "reset": ("--hard" in flags, "`git reset --hard`"),
-        "clean": (
-            any(_is_force_flag(f) for f in flags),
-            "`git clean -f`",
-        ),
-        "checkout": (
-            any(f in {"-f", "--force"} for f in flags),
-            "`git checkout --force`",
-        ),
+        "clean": (forced, "`git clean -f`"),
+        "checkout": (forced, "`git checkout --force`"),
         "restore": ("." in rest, "`git restore .`"),
     }
     fires, detail = destructive.get(subcommand, (False, ""))
     return Violation("GB001", detail) if fires else None
 
 
-def _is_force_flag(flag: str) -> bool:
-    return flag == "--force" if flag.startswith("--") else "f" in flag[1:]
-
-
-def _is_recursive_force(words: Sequence[str]) -> bool:
-    flags = _flags(words)
-    recursive = any(f in {"--recursive", "-R"} or "r" in f[1:].lower() for f in flags)
-    force = any(f == "--force" or "f" in f[1:] for f in flags if not f.startswith("--force="))
-    return recursive and force
-
-
 def _rm_violation(words: Sequence[str]) -> Violation | None:
-    if _name(words[0]) == "rm" and _is_recursive_force(words[1:]):
+    if _name(words[0]) != "rm":
+        return None
+    flags = _flags(words[1:])
+    recursive = any(_is_recursive_flag(flag) for flag in flags)
+    forced = any(_is_force_flag(flag) for flag in flags)
+    if recursive and forced:
         return Violation("GB002", f"`{' '.join(words[:3])}`")
     return None
 
 
 def _pip_violation(words: Sequence[str]) -> Violation | None:
-    if "install" not in [_clean(word) for word in words[1:]]:
+    cleaned = [_clean(word) for word in words]
+    if "install" not in cleaned[1:]:
         return None
     first = _name(words[0])
-    second = _clean(words[1]) if len(words) > 1 else ""
-    uses_pip = (
-        first in {"pip", "pip3"}
-        or (first in PYTHONS and "-m" in words and "pip" in [_clean(w) for w in words])
-        or (first == "uv" and second == "pip")
+    second = cleaned[1] if len(cleaned) > 1 else ""
+    runs_pip_module = first in PYTHONS and any(
+        word == "pip" or (word.startswith("-m") and "pip" in word) for word in cleaned
     )
-    if uses_pip:
-        return Violation("GB003", f"`{' '.join(words[:3])}`")
-    return None
+    uses_pip = first.startswith("pip") or runs_pip_module or (first == "uv" and second == "pip")
+    return Violation("GB003", f"`{' '.join(words[:3])}`") if uses_pip else None
 
 
 def _protected_write(words: Sequence[str]) -> Violation | None:
@@ -235,13 +331,17 @@ def _protected_write(words: Sequence[str]) -> Violation | None:
         return None
     for index, word in enumerate(words[:-1]):
         if word in REDIRECTIONS and _hits_protected(words[index + 1]):
-            return Violation("GB005", f"redirecting output into {_clean(words[index + 1])}")
+            return Violation("GB005", f"redirecting output into {_operand(words[index + 1])}")
+    # `--junitxml=docs/reviews/x.json`: a protected path handed to a flag is an output path.
+    for word in words[1:]:
+        if word.startswith("-") and "=" in word and _hits_protected(word):
+            return Violation("GB005", f"{word.split('=', 1)[0]} would write {_operand(word)}")
     name = _name(words[0])
     edits_in_place = name in IN_PLACE_EDITORS and any(w.startswith("-i") for w in _flags(words))
     if name in WRITE_COMMANDS or edits_in_place:
-        targets = [w for w in words[1:] if not w.startswith("-") and _hits_protected(w)]
+        targets = [word for word in words[1:] if _hits_protected(word)]
         if targets:
-            return Violation("GB005", f"`{name}` would write {_clean(targets[0])}")
+            return Violation("GB005", f"`{name}` would write {_operand(targets[0])}")
     return None
 
 
@@ -257,21 +357,22 @@ def _records_fixtures(env: Mapping[str, str]) -> bool:
 def check_segment(
     segment: Sequence[str], env: Mapping[str, str], *, agent_type: str | None
 ) -> Violation | None:
-    """Judge one command segment; None means "nothing objectionable"."""
+    """Judge one command segment; None means "nothing objectionable".
+
+    The reviewer's allow-list narrows this list, it does not replace it: a command may be on the
+    allow-list and still be refused for redirecting into a protected path.
+    """
     words = list(segment)
     if not words:
         return None
 
-    if agent_type == T3_REVIEWER_AGENT:
-        if _t3_allowed(words):
-            return None
+    if agent_type == T3_REVIEWER_AGENT and not _t3_allowed(words):
         return Violation(
             "GB007",
             f"`{' '.join(words[:3])}` is not on the allow-list "
             "(git diff/log/show/status/rev-parse, uv run pytest/ruff/mypy)",
         )
-
-    if _records_fixtures(env) and not _is_sanctioned(words):
+    if _records_fixtures(env) and not _is_recorder(words):
         return Violation("GB006", f"{RECORD_FIXTURES_VAR} set for `{' '.join(words[:3])}`")
     for rule in (_rm_violation, _git_violation, _pip_violation, _protected_write):
         violation = rule(words)
@@ -285,7 +386,7 @@ def check_command(command: str, *, agent_type: str | None = None) -> Violation |
     if not command.strip():
         return None
     segments = split_segments(command)
-    if agent_type != T3_REVIEWER_AGENT and _pipes_a_download_into_a_shell(segments):
+    if _pipes_a_download_into_a_shell(segments):
         return Violation("GB004", "a downloaded script would be run unread")
     for segment in segments:
         env, words = strip_env_assignments(segment)

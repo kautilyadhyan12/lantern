@@ -6,6 +6,9 @@ Refuses, with exit code 2 and a reason on stderr:
   GP002 edits to any `.env` file except `.env.example` — that is where the recorder's signing key
         and the API keys live
 
+One exemption: a session running as the t3-reviewer may write its own review under docs/reviews/,
+because that is the one file the review process itself produces (ADR-0004).
+
 Everything else, `src/**` first of all, is allowed. Paths are normalised (relative to the session's
 working directory, `..` resolved, Windows separators folded) before comparison, so
 `src/../.env` and `tests\\fixtures\\a.json` are judged as what they are.
@@ -29,6 +32,8 @@ PROTECTED_PREFIXES: Final[tuple[str, ...]] = (
     ".github/workflows",
 )
 ENV_FILE_ALLOWED: Final = ".env.example"
+REVIEWER_TREE: Final = "docs/reviews"
+T3_REVIEWER_AGENT: Final = "t3-reviewer"
 
 DRIVE_RE: Final = re.compile(r"^[A-Za-z]:/")
 
@@ -75,7 +80,9 @@ def _is_env_file(name: str) -> bool:
     return name == ".env" or name.startswith(".env.")
 
 
-def check_path(path: str, *, cwd: Path, root: Path) -> Violation | None:
+def check_path(
+    path: str, *, cwd: Path, root: Path, agent_type: str | None = None
+) -> Violation | None:
     """Judge one edited path; None means "nothing objectionable"."""
     text = path.strip()
     if not text:
@@ -89,6 +96,8 @@ def check_path(path: str, *, cwd: Path, root: Path) -> Violation | None:
     if relative is None:
         return None
     inside = relative.as_posix()
+    if agent_type == T3_REVIEWER_AGENT and inside.startswith(f"{REVIEWER_TREE}/"):
+        return None  # the reviewer writes its own review there, and only there
     for prefix in PROTECTED_PREFIXES:
         if inside == prefix or inside.startswith(f"{prefix}/"):
             return Violation("GP001", f"{inside} is a protected path; use the script that owns it")
@@ -105,7 +114,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return block(f"guard_paths: refusing the call: {exc}")
 
     root = repo_root(args.root)
-    violation = check_path(hook.file_path, cwd=hook.cwd, root=root)
+    violation = check_path(hook.file_path, cwd=hook.cwd, root=root, agent_type=hook.agent_type)
     if violation is None:
         return allow()
     return block(f"guard_paths: {violation.rule} {violation.detail}")

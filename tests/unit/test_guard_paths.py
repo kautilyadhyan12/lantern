@@ -181,3 +181,40 @@ def test_main_fails_closed_on_anything_it_cannot_read(
     monkeypatch.setattr(sys, "stdin", io.StringIO(payload))
     assert guard_paths.main([]) == 2
     assert capsys.readouterr().err.strip()
+
+
+# --- the reviewer's one exemption (ADR-0004) ------------------------------------------------
+
+
+@pytest.mark.ac("S0.2-AC3")
+def test_the_reviewer_may_write_its_own_review_and_nothing_else(root: Path) -> None:
+    review = "docs/reviews/REVIEW-S0.2a.json"
+    assert guard_paths.check_path(review, cwd=root, root=root) is not None
+    assert guard_paths.check_path(review, cwd=root, root=root, agent_type="t3-reviewer") is None
+    for other in ("docs/proofs/PROOF-S0.2a.md", ".prove/stamp", "tests/fixtures/a.json", ".env"):
+        violation = guard_paths.check_path(other, cwd=root, root=root, agent_type="t3-reviewer")
+        assert violation is not None, f"{other} must stay protected from the reviewer too"
+
+
+@pytest.mark.ac("S0.2-AC3")
+def test_the_exemption_does_not_extend_to_other_agents(root: Path) -> None:
+    review = "docs/reviews/REVIEW-S0.2a.json"
+    for agent in (None, "test-auditor", "security-auditor", "t3-reviewer-lookalike"):
+        assert guard_paths.check_path(review, cwd=root, root=root, agent_type=agent) is not None
+
+
+@pytest.mark.ac("S0.2-AC3")
+def test_main_lets_the_reviewer_save_its_review(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    payload = json.dumps(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Write",
+            "tool_input": {"file_path": "docs/reviews/REVIEW-S0.2a.json"},
+            "cwd": str(root),
+            "agent_type": "t3-reviewer",
+        }
+    )
+    monkeypatch.setattr(sys, "stdin", io.StringIO(payload))
+    assert guard_paths.main(["--root", str(root)]) == 0

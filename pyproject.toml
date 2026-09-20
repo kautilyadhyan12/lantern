@@ -58,6 +58,8 @@ ignore = ["PLR2004", "TRY003", "EM101", "EM102"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "PLR", "ARG"]
+# Adversarial tests carry hostile text (RTL marks, non-breaking spaces) as their subject matter.
+"tests/review/**" = ["PLE2502", "RUF001", "RUF003"]
 
 [tool.mypy]
 strict = true
@@ -71,7 +73,8 @@ init_typed = true
 warn_required_dynamic_aliases = true
 
 [tool.pytest.ini_options]
-addopts = "-q --strict-markers -p no:cacheprovider"
+addopts = "-q --strict-markers -p no:cacheprovider --import-mode=importlib"
+pythonpath = ["."]
 markers = ["ac(id): acceptance criterion id", "live: hits real APIs", "slow"]
 testpaths = ["tests"]
 asyncio_mode = "auto"

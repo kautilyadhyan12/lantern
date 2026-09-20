@@ -62,6 +62,19 @@ BLOCKED: dict[str, str] = {
     "git status; git push --force": "GB001",
     "echo $(rm -rf /tmp/x)": "GB002",
     "true || pip install requests": "GB003",
+    # Holes found by the S0.2a T3 review (2026-09-20), each kept as a regression row.
+    "git push -fu origin main": "GB001",
+    "git checkout -fB main origin/main": "GB001",
+    "git -C . push --force": "GB001",
+    "cp scripts/prove.py docs/proofs/PROOF-S0.2a.md": "GB005",
+    "cat scripts/record_fixture.py > tests/fixtures/a.json": "GB005",
+    "dd if=/dev/zero of=tests/fixtures/search/basic.json": "GB005",
+    "uv run pytest --junitxml=docs/reviews/REVIEW-S0.2a.json": "GB005",
+    "LANTERN_RECORD_FIXTURES=1 make prove STORY=S0.2a": "GB006",
+    "LANTERN_RECORD_FIXTURES=1 uv run python scripts/prove.py S0.2a": "GB006",
+    # Answers to two questions the review raised (2026-09-20).
+    "git push origin +main": "GB001",
+    "LANTERN_RECORD_FIXTURES=1 make evals": "GB006",
 }
 
 ALLOWED: tuple[str, ...] = (
@@ -84,6 +97,9 @@ ALLOWED: tuple[str, ...] = (
     "rm -f .test-tmp/probe.py",
     "docker compose up -d --wait db",
     "echo done > .test-tmp/out.txt",
+    "git push origin main",
+    "make evals",
+    "make mutate STORY=S0.2a",
 )
 
 T3_ALLOWED: tuple[str, ...] = (
@@ -131,6 +147,37 @@ def test_t3_reviewer_blocks_everything_else(command: str) -> None:
     violation = guard_bash.check_command(command, agent_type=T3)
     assert violation is not None, f"{command!r} must be blocked for {T3}"
     assert violation.rule == "GB007"
+
+
+@pytest.mark.ac("S0.2-AC2")
+@pytest.mark.parametrize(
+    "command",
+    [
+        "git diff > .prove/stamp",
+        "git show HEAD > docs/proofs/PROOF-S0.2a.md",
+        "uv run pytest --junitxml=docs/reviews/REVIEW-S0.2a.json",
+    ],
+)
+def test_the_reviewer_allow_list_only_narrows(command: str) -> None:
+    """An allow-listed command still cannot forge a proof or a review."""
+    violation = guard_bash.check_command(command, agent_type=T3)
+    assert violation is not None, f"{command!r} must be blocked even for {T3}"
+    assert violation.rule == "GB005"
+
+
+@pytest.mark.ac("S0.2-AC2")
+def test_naming_a_sanctioned_script_does_not_sanction_the_command() -> None:
+    """Sanctioning follows the program being run, not a word appearing in the arguments."""
+    blocked = guard_bash.check_command("cp scripts/prove.py docs/proofs/PROOF-S0.2a.md")
+    assert blocked is not None
+    assert blocked.rule == "GB005"
+    assert guard_bash.invoked_program(["cp", "scripts/prove.py", "x"]) == "cp"
+    assert (
+        guard_bash.invoked_program(
+            ["uv", "run", "--directory", "D:/osint", "python", "scripts/record_fixture.py", "a"]
+        )
+        == "scripts/record_fixture.py"
+    )
 
 
 @pytest.mark.ac("S0.2-AC2")
@@ -262,8 +309,6 @@ HEREDOC_ALLOWED: tuple[str, ...] = (
     # Prose about dangerous commands is prose.
     "gh pr create --body-file - << 'EOF'\nrefuses `rm -rf` and `git push --force`\nEOF",
     "cat << EOF >> .test-tmp/out.txt\nrm -rf /\nEOF",
-    # An unterminated body (the whole rest of the command) is still only a body.
-    "cat << EOF\nit's unterminated",
 )
 
 
@@ -293,6 +338,40 @@ def test_strip_heredocs_keeps_the_command_line_and_drops_the_body() -> None:
 
 
 @pytest.mark.ac("S0.2-AC2")
+def test_an_unterminated_heredoc_is_refused_rather_than_swallowing_the_rest() -> None:
+    """Dropping everything after an unterminated marker would hide the commands that follow."""
+    with pytest.raises(HookInputError):
+        guard_bash.check_command("cat << EOF\nrm -rf /")
+
+
+@pytest.mark.ac("S0.2-AC2")
+def test_a_heredoc_marker_inside_quotes_does_not_open_a_heredoc() -> None:
+    """`echo 'a <<EOF b'` is one echo; the command after it must still be judged."""
+    violation = guard_bash.check_command("echo 'a <<EOF b'\nrm -rf /")
+    assert violation is not None
+    assert violation.rule == "GB002"
+
+
+@pytest.mark.ac("S0.2-AC2")
 def test_unbalanced_quotes_outside_a_heredoc_are_still_refused() -> None:
     with pytest.raises(HookInputError):
         guard_bash.check_command('cat << EOF\nbody\nEOF\necho "oops')
+
+
+@pytest.mark.ac("S0.2-AC2")
+def test_a_marker_with_nothing_after_it_is_not_a_heredoc() -> None:
+    """`cat << EOF` with no body at all: the marker goes, the command stays judged."""
+    assert guard_bash.strip_heredocs("cat << EOF") == "cat "
+    violation = guard_bash.check_command("rm -rf build << EOF")
+    assert violation is not None
+    assert violation.rule == "GB002"
+
+
+@pytest.mark.ac("S0.2-AC2")
+def test_git_global_options_are_skipped_before_the_subcommand() -> None:
+    assert guard_bash._git_subcommand(["git", "-C", ".", "push", "--force"]) == (
+        "push",
+        ["--force"],
+    )
+    assert guard_bash._git_subcommand(["git", "--no-pager", "log"]) == ("log", [])
+    assert guard_bash._git_subcommand(["git", "-C", "."]) == ("", [])

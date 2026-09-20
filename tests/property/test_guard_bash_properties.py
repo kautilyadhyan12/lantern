@@ -1,5 +1,6 @@
 """S0.2-AC2: properties of the Bash guard's command parser and its protected-write rule."""
 
+import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -18,6 +19,7 @@ ALLOWED_COMMANDS = st.sampled_from(
 )
 
 
+@pytest.mark.ac("S0.2-AC2")
 @given(SAFE_TEXT)
 def test_split_segments_never_raises_on_balanced_text(command: str) -> None:
     segments = guard_bash.split_segments(command)
@@ -25,6 +27,7 @@ def test_split_segments_never_raises_on_balanced_text(command: str) -> None:
     assert all(segment for segment in segments), "empty segments must be dropped"
 
 
+@pytest.mark.ac("S0.2-AC2")
 @given(WRITE_VERBS, PROTECTED, LEAF, GAP)
 def test_a_write_into_a_protected_tree_is_never_allowed(
     verb: str, protected: str, leaf: str, gap: str
@@ -33,6 +36,7 @@ def test_a_write_into_a_protected_tree_is_never_allowed(
     assert guard_bash.check_command(command) is not None
 
 
+@pytest.mark.ac("S0.2-AC2")
 @given(PROTECTED, LEAF, st.sampled_from([">", ">>"]))
 def test_redirection_into_a_protected_tree_is_never_allowed(
     protected: str, leaf: str, operator: str
@@ -40,6 +44,7 @@ def test_redirection_into_a_protected_tree_is_never_allowed(
     assert guard_bash.check_command(f"echo x {operator} {protected}/{leaf}") is not None
 
 
+@pytest.mark.ac("S0.2-AC2")
 @given(ALLOWED_COMMANDS, GAP, GAP)
 def test_allowed_commands_survive_surrounding_whitespace(
     command: str, before: str, after: str
@@ -47,6 +52,7 @@ def test_allowed_commands_survive_surrounding_whitespace(
     assert guard_bash.check_command(f"{before}{command}{after}") is None
 
 
+@pytest.mark.ac("S0.2-AC2")
 @given(SAFE_TEXT)
 def test_check_command_returns_a_known_rule_or_nothing(command: str) -> None:
     violation = guard_bash.check_command(command)
