@@ -73,14 +73,41 @@ T3_REVIEWER_AGENT: Final = "t3-reviewer"
 RECORD_FIXTURES_VAR: Final = "LANTERN_RECORD_FIXTURES"
 FALSEY: Final = frozenset({"", "0", "false", "no", "off"})
 
-# `$(` and a backtick open a nested command; turning them into separators makes the nested
-# command a segment of its own, so `echo $(rm -rf /)` is judged on the `rm`, not on the `echo`.
-SUBSTITUTION_RE: Final = re.compile(r"\$\(|`")
+# `$(` and a backtick open a nested command and a newline ends one; turning all three into
+# separators makes each nested or following command a segment of its own, so `echo $(rm -rf /)`
+# is judged on the `rm`, not on the `echo`.
+SUBSTITUTION_RE: Final = re.compile(r"\$\(|`|\n")
+# A heredoc body is data, not commands: `cat << EOF` … `EOF` may hold apostrophes, quotes and
+# prose about dangerous commands. Bodies are removed before parsing; what surrounds them is not.
+HEREDOC_RE: Final = re.compile(r"<<-?\s*(?P<quote>['\"]?)(?P<tag>[A-Za-z_][A-Za-z0-9_]*)(?P=quote)")
 ENV_ASSIGNMENT_RE: Final = re.compile(r"^(?P<name>[A-Za-z_][A-Za-z0-9_]*)=(?P<value>.*)$", re.S)
+
+
+def strip_heredocs(command: str) -> str:
+    """Remove every heredoc body, keeping the commands around it.
+
+    `gh pr create --body-file - << 'EOF' … EOF && echo done` is judged on the `gh` call and on
+    the `echo`; the body in between is text the caller is writing, not a command it is running.
+    """
+    while True:
+        match = HEREDOC_RE.search(command)
+        if match is None:
+            return command
+        body_start = command.find("\n", match.end())
+        # Whatever follows the marker on its own line is still part of the command
+        # (`cat << EOF > out.json`), so it is kept; only the body below it goes.
+        if body_start == -1:  # the body never starts: nothing follows the marker line
+            return command[: match.start()] + command[match.end() :]
+        marker_tail = command[match.end() : body_start]
+        terminator = re.compile(rf"^[ \t]*{re.escape(match.group('tag'))}[ \t]*$", re.M)
+        end = terminator.search(command, body_start + 1)
+        rest = command[end.end() :] if end else ""
+        command = command[: match.start()] + marker_tail + rest
 
 
 def split_segments(command: str) -> list[list[str]]:
     """Tokenise a command line into its `&&`/`||`/`;`/`|`-separated segments."""
+    command = strip_heredocs(command)
     lexer = shlex.shlex(SUBSTITUTION_RE.sub(" ; ", command), posix=True, punctuation_chars=True)
     lexer.whitespace_split = True
     lexer.escape = ""  # keep Windows paths (tests\fixtures\a.json) intact

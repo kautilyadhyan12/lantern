@@ -251,3 +251,48 @@ def test_main_fails_closed_on_anything_it_cannot_read(
     monkeypatch.setattr(sys, "stdin", io.StringIO(payload))
     assert guard_bash.main([]) == 2
     assert capsys.readouterr().err.strip()
+
+
+# --- heredocs: the body is data, the commands around it are not -----------------------------
+
+
+HEREDOC_ALLOWED: tuple[str, ...] = (
+    # An apostrophe or a quote inside the body must not make the command unparseable.
+    "cat > notes.md << 'EOF'\nit's fine, \"really\"\nEOF",
+    # Prose about dangerous commands is prose.
+    "gh pr create --body-file - << 'EOF'\nrefuses `rm -rf` and `git push --force`\nEOF",
+    "cat << EOF >> .test-tmp/out.txt\nrm -rf /\nEOF",
+    # An unterminated body (the whole rest of the command) is still only a body.
+    "cat << EOF\nit's unterminated",
+)
+
+
+@pytest.mark.ac("S0.2-AC2")
+@pytest.mark.parametrize("command", HEREDOC_ALLOWED)
+def test_heredoc_bodies_are_not_judged_as_commands(command: str) -> None:
+    assert guard_bash.check_command(command) is None
+
+
+@pytest.mark.ac("S0.2-AC2")
+def test_commands_around_a_heredoc_are_still_judged() -> None:
+    blocked = guard_bash.check_command("cat << EOF > a.txt\nhello\nEOF\nrm -rf /")
+    assert blocked is not None
+    assert blocked.rule == "GB002"
+    redirected = guard_bash.check_command("cat << EOF > tests/fixtures/a.json\n{}\nEOF")
+    assert redirected is not None
+    assert redirected.rule == "GB005"
+    chained = guard_bash.check_command("cat << 'EOF' | tee x\nbody\nEOF\n&& git push --force")
+    assert chained is not None
+    assert chained.rule == "GB001"
+
+
+@pytest.mark.ac("S0.2-AC2")
+def test_strip_heredocs_keeps_the_command_line_and_drops_the_body() -> None:
+    assert guard_bash.strip_heredocs("cat << EOF\nbody\nEOF\nls") == "cat \nls"
+    assert guard_bash.strip_heredocs("echo plain") == "echo plain"
+
+
+@pytest.mark.ac("S0.2-AC2")
+def test_unbalanced_quotes_outside_a_heredoc_are_still_refused() -> None:
+    with pytest.raises(HookInputError):
+        guard_bash.check_command('cat << EOF\nbody\nEOF\necho "oops')
