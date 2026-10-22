@@ -1,0 +1,19 @@
+[project]
+name = "lantern"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv]
+exclude-newer = "7 days"
+
+[tool.pytest.ini_options]
+addopts = "-q --strict-markers -p no:cacheprovider --import-mode=importlib"
+pythonpath = [".", "src"]
+testpaths = ["tests"]
+markers = [
+  "ac(id): acceptance criterion id",
+  "review: adversarial test written by the independent reviewer",
+  "live: calls real external APIs",
+  "slow: slow test",
+]

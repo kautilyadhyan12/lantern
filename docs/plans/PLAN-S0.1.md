@@ -189,3 +189,48 @@ Plan written 2026-10-22.
 - Read the plan, tests-first and implement skill instructions to describe bootstrap sequencing accurately. No tests, stubs, source code, project configuration, lockfile or scanner baseline have been written in this step.
 - Queried PyPI metadata/version upload times and OSV for 16 direct/build/transitive candidates; all returned no listed active advisories at query time. No claim of a fully resolved or audited transitive graph.
 - Recorded the Node policy conflict and requested a decision. User approval of this PLAN and an answer on Node policy remain pending. No dependency/runtime installation, RED run, make check, PROOF, REVIEW, merge or S0.2 work has occurred.
+
+
+### Tests-first started 2026-10-22
+
+The user said "go", approving the S0.1 plan. The Node cooldown question remains unanswered; this is not treated as permission for an exception. No Node changes or package installations have been made. This step is **in progress**, not complete.
+
+Drafted the planned test modules for all seven acceptance criteria, property strategies and assertions, plus minimal NotImplementedError signature stubs for the CLI, settings, migration boundary and custom linter. The initial pyproject contains only project identity, the seven-day uv cutoff and enough pytest configuration to collect src-layout stubs. Its temporary pythonpath includes src until the actual editable package is implemented. A minimal .gitignore excludes only test-created .venv and __pycache__ artifacts; full local-data rules remain RED.
+
+The system Python cannot import pytest, but PATH contains a pre-existing pytest 8.3.5 executable at /usr/local/py-utils/bin/pytest, backed by its own environment. It can run tests that do not need new dependencies. Hypothesis, Pydantic and pydantic-settings are not installed in that runner environment. Do not claim its version is the planned locked pytest 9.1.1, or install packages into this system tool environment.
+
+### RED run 2026-10-22 — partial, remaining modules pending
+
+Initial command:
+
+```sh
+uv run --no-sync --offline pytest tests/test_skeleton.py tests/test_tooling.py tests/test_hooks.py tests/test_workspace.py tests/test_readme.py -q --tb=line
+```
+
+The sandbox initially refused access to uv's cache; reran the same command with filesystem approval. uv created an empty local .venv but performed no dependency sync or installation. This first subset run exited 1 with 42 failing tests; pytest's doubled quiet setting omitted aggregate totals. After adding the minimal artifact ignore rules, reran with an explicit addopts override to obtain clear totals:
+
+```sh
+uv run --no-sync --offline pytest tests/test_skeleton.py tests/test_tooling.py tests/test_hooks.py tests/test_workspace.py tests/test_readme.py -q --tb=line -o 'addopts=--strict-markers -p no:cacheprovider --import-mode=importlib'
+```
+
+Actual final output: `40 failed, 12 passed in 0.37s`; exit code 1. Every failure in this subset was AssertionError or NotImplementedError. No import, syntax, collection or fixture-setup errors occurred. This is a partial RED result, not a successful check or full tests-first completion.
+
+| Group | Failing | Reason |
+|---|---:|---|
+| AC1 / skeleton | 10 | CLI placeholder raises; Python pin and Makefile are absent |
+| AC2 / tooling | 14 | Required lint, typing, coverage, console and packaging configuration is absent or incomplete |
+| AC4 / hooks | 5 | Hook configuration and installation target are absent |
+| AC6 / workspace | 8 | Full local-data/cache ignore rules and example settings are absent |
+| AC7 / README | 3 | Existing README contains only the project name |
+
+The 12 already-passing checks are legitimate regression guards for bootstrap infrastructure or shipped assets: src-layout placeholder imports (1); project name, Python requirement, pytest addopts/testpaths/marker definitions and seven-day uv cutoff (6); unchanged protected pack files, no tracked .env, existing container commands and the two minimal cache-ignore rules (5). They are explicitly not evidence that any AC is fully implemented. Each AC included in the partial run also has failing behavioral/configuration tests.
+
+Still required before completing tests-first:
+
+- Resolve the Node policy decision before any dependency installation, as the approved Risks section requires. The user has been asked asynchronously; no answer or default selection has been assumed.
+- Explain and recheck security advisories for the minimal runner dependencies; use uv add and the seven-day cutoff, audit the resolved graph and then install only eligible versions. The pre-existing runner was used without installing or updating it.
+- Run tests/test_config.py, tests/test_lint_custom.py and tests/e2e/test_database.py with the proper dependency environment, resolve any test-harness errors, and log their real RED output. These modules are drafted but have **not** been executed. No database image has been pulled, database started, or migration run.
+- Finish the offline socket guard in the test harness when pytest-socket is available; the current partial tests do not call any remote service, and uv is explicitly offline. Conftest makes child uv calls offline too.
+- Run the complete new suite and record the final counts before reporting tests-first complete. Implementation must not start before that step is reported.
+
+The S0.2 acceptance-ID checker does not exist yet. Under tests-first skill step 7, its absence is reported rather than implementing it early. Static inspection confirms test-module AC markers for AC1 through AC7; this is not a run of the future acceptance-ID checker. No PROOF or REVIEW file has been written, and make check has not been run.
