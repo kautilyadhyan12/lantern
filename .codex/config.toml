@@ -1,0 +1,8 @@
+# Lantern — Codex project settings (05_ENGINEERING_WORKFLOW.md §3.1).
+# Loaded only after you trust this project in Codex.
+model = "gpt-6.1-sol"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[sandbox_workspace_write]
+network_access = true

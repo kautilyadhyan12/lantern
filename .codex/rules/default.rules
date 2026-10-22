@@ -1,0 +1,88 @@
+# Lantern command rules (05_ENGINEERING_WORKFLOW.md §3.2).
+# "forbidden" blocks a command; "prompt" asks the user first.
+# Never use "allow" here: in Codex it means "run outside the sandbox without asking".
+# Story S0.3 checks every rule with `codex execpolicy check` and fixes any syntax the installed version rejects.
+
+prefix_rule(
+    pattern = ["git", "push", ["--force", "-f", "--force-with-lease"]],
+    decision = "forbidden",
+    justification = "Force pushes rewrite history. Push normally instead.",
+    match = ["git push --force", "git push -f origin story/S1.1"],
+)
+
+prefix_rule(
+    pattern = ["git", "push", "origin", ["main", "HEAD:main"]],
+    decision = "forbidden",
+    justification = "main changes only through a merged pull request. Push the story branch instead.",
+    match = ["git push origin main"],
+)
+
+prefix_rule(
+    pattern = ["git", "reset", "--hard"],
+    decision = "forbidden",
+    justification = "This throws away work. Use git stash or ask the user.",
+    match = ["git reset --hard HEAD~1"],
+)
+
+prefix_rule(
+    pattern = ["git", "clean"],
+    decision = "forbidden",
+    justification = "This deletes untracked files. Remove specific files instead, or ask the user.",
+    match = ["git clean -fdx"],
+)
+
+prefix_rule(
+    pattern = ["git", ["filter-branch", "filter-repo"]],
+    decision = "forbidden",
+    justification = "History rewriting is not allowed.",
+    match = ["git filter-branch --tree-filter x"],
+)
+
+prefix_rule(
+    pattern = ["git", "reflog", "expire"],
+    decision = "forbidden",
+    justification = "This destroys recovery information.",
+    match = ["git reflog expire --all"],
+)
+
+prefix_rule(
+    pattern = ["rm", ["-rf", "-fr"]],
+    decision = "forbidden",
+    justification = "Recursive forced deletion is not allowed. Delete specific files instead.",
+    match = ["rm -rf build"],
+)
+
+prefix_rule(
+    pattern = [["pip", "pip3"], "install"],
+    decision = "forbidden",
+    justification = "Add dependencies with `uv add <package>`.",
+    match = ["pip install requests"],
+)
+
+prefix_rule(
+    pattern = [["python", "python3"], "-m", "pip"],
+    decision = "forbidden",
+    justification = "Add dependencies with `uv add <package>`.",
+    match = ["python -m pip install requests"],
+)
+
+prefix_rule(
+    pattern = ["uv", "pip"],
+    decision = "forbidden",
+    justification = "Add dependencies with `uv add <package>`.",
+    match = ["uv pip install requests"],
+)
+
+prefix_rule(
+    pattern = ["gh", "pr", "merge"],
+    decision = "prompt",
+    justification = "Merging into main needs the user's yes.",
+    match = ["gh pr merge 12 --squash"],
+)
+
+prefix_rule(
+    pattern = ["gh", ["api", "repo", "secret"]],
+    decision = "prompt",
+    justification = "Account-level GitHub actions need the user's yes.",
+    match = ["gh api repos/x/y", "gh repo delete x"],
+)

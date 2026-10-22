@@ -1,0 +1,61 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["story", "reviewer_model", "head_sha", "verdict", "ac_status", "blockers", "spec_ambiguities", "notes", "adversarial_tests_file", "adversarial_results"],
+  "properties": {
+    "story": {"type": "string"},
+    "reviewer_model": {"type": "string"},
+    "head_sha": {"type": "string"},
+    "verdict": {"type": "string", "enum": ["APPROVE", "REQUEST_CHANGES"]},
+    "ac_status": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ac_id", "status", "evidence"],
+        "properties": {
+          "ac_id": {"type": "string"},
+          "status": {"type": "string", "enum": ["SATISFIED", "PARTIAL", "MISSING"]},
+          "evidence": {"type": "string"}
+        }
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "evidence", "fix_hint"],
+        "properties": {
+          "id": {"type": "string"},
+          "kind": {"type": "string", "enum": ["scope", "spec", "proof", "test", "security", "reference"]},
+          "evidence": {"type": "string"},
+          "fix_hint": {"type": "string"}
+        }
+      }
+    },
+    "spec_ambiguities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ac_id", "question"],
+        "properties": {
+          "ac_id": {"type": "string"},
+          "question": {"type": "string"}
+        }
+      }
+    },
+    "notes": {"type": "array", "items": {"type": "string"}},
+    "adversarial_tests_file": {"type": "string"},
+    "adversarial_results": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "failed"],
+      "properties": {
+        "passed": {"type": "integer"},
+        "failed": {"type": "integer"}
+      }
+    }
+  }
+}
