@@ -302,3 +302,73 @@ The 13 passing tests are the 12 justified bootstrap/shipped-asset guards describ
 Static AST inspection found 51 explicitly AC-decorated test functions covering AC1 through AC7. `scripts/check_acceptance_ids.py` is still absent because S0.2 builds it; the tests-first skill explicitly permits reporting that absence at this bootstrap stage. Its real command was not run and no substitute checker was added to the repository.
 
 Tests-first is now complete. No feature implementation, database start, migration, make check, PROOF, REVIEW or S0.2 work occurred. The next step is implementation under the existing approved plan; finish and report this step before starting it.
+
+
+### Implementation checkpoint 2026-10-22 — unfinished
+
+The user asked to continue. Applied the implement skill on story/M0-boot after the completed RED step. Implemented the argparse CLI, typed secret settings and driver validation, package-relative async Alembic baseline, local Compose database, Make targets, exact docs/05 tooling configuration, full local-data ignores, README, example settings and the custom AST/token-based linter. Wrote local hook configuration, but did not generate a scanner baseline or install hooks because the required packages are blocked below. Tests and their assertions have not been weakened or edited in this step.
+
+Before adding dependencies, explained the database, packaging, type/lint, async-test and hook tools. Rechecked the ten planned direct versions against PyPI distribution timestamps, yanked status and OSV; those direct packages passed. Resolved with uv add --no-sync, then checked all 50 registry packages before installing. That audit rejected two transitive packages:
+
+| Package selected under the seven-day cutoff | Advisory | Secure minimum checked | Earliest eligible wheel upload + seven days (UTC) |
+|---|---|---|---|
+| certifi 2026.7.22 | GHSA-6q48-6c7w-9gw2 / PYSEC-2026-4320; compromised emSign intermediates | 2026.10.19 | 2026-10-27 02:24:15.072385 |
+| virtualenv 21.14.7 | GHSA-43mp-35q3-x3fq, GHSA-c978-59m8-c77v, GHSA-cw65-gx24-rc82 | 21.14.9 | 2026-10-24 16:09:40.584722 |
+
+Primary references checked 2026-10-22:
+
+- https://github.com/certifi/python-certifi/security/advisories/GHSA-6q48-6c7w-9gw2
+- https://api.osv.dev/v1/vulns/GHSA-6q48-6c7w-9gw2
+- https://api.osv.dev/v1/vulns/GHSA-43mp-35q3-x3fq
+- https://api.osv.dev/v1/vulns/GHSA-c978-59m8-c77v
+- https://api.osv.dev/v1/vulns/GHSA-cw65-gx24-rc82
+- https://pypi.org/pypi/certifi/2026.10.19/json
+- https://pypi.org/pypi/virtualenv/21.14.9/json
+
+The certifi maintainer page mentions 2026.10.18, while current OSV/PyPI affected ranges include that version and specify 2026.10.19. Chose the conservative minimum 2026.10.19. Its version label says October 19, but its actual wheel upload was October 20; eligibility is calculated from the artifact timestamp, not the version label. OSV queries for certifi 2026.10.19 and virtualenv 21.14.9 returned no active advisories at query time. Their fixes are not yet seven days old. No exception was inferred: the user permitted immediate **Node** security updates only.
+
+Installed only the already-audited safe subset using:
+
+```sh
+uv lock
+uv sync --frozen --no-install-package certifi --no-install-package requests --no-install-package detect-secrets --no-install-package virtualenv --no-install-package pre-commit
+```
+
+This installed the database/runtime and available development tools, while explicitly excluding the vulnerable packages and their dependent tools. No baseline, hook installation, full dependency sync or full quality-gate success is claimed. A precise import-untyped suppression in db/migrate.py has its required reason: asyncpg does not ship type metadata, and only its PostgresError class is imported there.
+
+Added uv constraint-dependencies for certifi>=2026.10.19 and virtualenv>=21.14.9 so a normal refresh cannot silently select vulnerable releases. Discarded only the newly generated rejected lockfile and restored the last checked lockfile from commit 607349f. The rejected resolution remains only as a local /tmp diagnostic, not a committed dependency lock. The preserved lockfile is intentionally **not** the final complete project lock: fresh-clone/full install validation remains unfinished. README marks the setup as in progress.
+
+Ran uv lock with the security minimum constraints and the unchanged seven-day cutoff: exit 1, no solution, because the eligible virtualenv versions stop at 21.14.7. Did not follow uv's suggestion to override exclude-newer-package or narrow the mandated requires-python setting. Recheck metadata and advisories before resuming after the safe fixes become eligible; October 27 is an earliest possible completion date for this dependency issue, not a guarantee of a clean future resolver.
+
+Database verification:
+
+- Rechecked Docker Hub pg16 tag/digest and its October 1 upload timestamp; pulled the pinned manifest. make db exited 0 and the local container became healthy.
+- Actual server: PostgreSQL 16.15 (Debian 16.15-1.pgdg12+2), pgvector 0.8.7. Compared the PostgreSQL 16.15 security fixes against https://www.postgresql.org/support/security/ . This is not a whole-image vulnerability scan.
+- The five real local database tests passed, including baseline migration, repeat upgrade, package-relative execution and bounded unavailable-database guidance. No application tables were created.
+- make db-down exited 0 after verification. Its named data volume was kept; the database is stopped at this checkpoint. Run make db before resuming database tests.
+
+Actual verification on the partial implementation, always with dependency syncing disabled so blocked packages could not be installed:
+
+| Command / check | Actual result |
+|---|---|
+| UV_NO_SYNC=1 uv run --no-sync --offline pytest [six non-hook/non-e2e modules] -q --tb=line (with a single-quiet addopts override) | 105 passed in 13.44s |
+| UV_NO_SYNC=1 uv run --no-sync --offline pytest tests/e2e/test_database.py -q --tb=line (same addopts override) | 5 passed in 2.26s |
+| UV_NO_SYNC=1 uv run --no-sync --offline pytest tests -q --tb=line (same addopts override) | 3 failed, 112 passed in 4.83s; no skips/xfails |
+| uv run --no-sync --offline mypy --strict | Exit 0: no issues in 8 source files |
+| uv run --no-sync --offline python scripts/lint_custom.py | Exit 0 |
+| UV_NO_SYNC=1 make check | Exit 2 at the first ruff check; 84 lint/style findings remain, so subsequent steps were not run by make |
+
+The three failing tests are tests/test_hooks.py::test_expected_hooks_present (no generated baseline), ::test_make_hooks_installs (pre-commit intentionally not installed), and ::test_secret_scanner_detects_synthetic_token (no generated baseline). No fake baseline was written. Code formatting/lint cleanup remains as well; make check is **not green**. Current handwritten non-test files total approximately 387 lines before that cleanup; reassess the approved size cap before expanding beyond it. No PROOF, REVIEW, fresh-container rebuild, final fresh-clone sync, merge or S0.2 work has occurred.
+
+### Advisory test audit 2026-10-22
+
+Applied the read-only test-audit checklist. This is advisory and is not an independent T3 review.
+
+- Vacuous/weak test: tests/test_hooks.py::test_secret_scanner_detects_synthetic_token accepts any nonzero exit. Once a baseline exists, a missing/broken scanner could satisfy that assertion without detecting the fake token. Correcting a test requires user approval under implement skill step 3; asked asynchronously and have not changed it.
+- Proposed repair for that test: first run the same scanner command on a clean temporary file and require exit 0; then run it on the synthetic token file, require the scanner's detection exit code and require that file's path in the diagnostic. Preserve the existing fake-token requirement; no real credential or external verification request is needed. Verify the actual tool's documented behavior before editing.
+- Missing properties: none for the two pure interfaces listed in the approved Design section (the settings validator and lint_source). Their existing Hypothesis tests run. Helper functions added during implementation are exercised through lint_source.
+- Missing cases: tests/test_lint_custom.py::test_valid_python_never_raises generates a useful but limited set of programs; malformed-source CLI diagnostics and more complex alias/scope cases remain candidates for later hardening. tests/test_config.py::test_missing_or_malformed_url covers absent host, empty input and bad ports; whitespace-host/oversized cases would strengthen it. No test was changed or new requirement added during this audit.
+- Cassette issues: none; there is no HTTP/model adapter or recording in this story.
+- Notes: tests/test_skeleton.py::test_placeholder is an explicitly justified bootstrap regression guard. The Makefile fake-tool tests are complemented by actual commands; they are not the sole execution evidence. tests/test_workspace.py::test_development_commands_available checks the current workspace, not a clean rebuild; AC6 must remain incomplete until actual rebuild evidence exists.
+
+Implementation remains unfinished. The user's package cooldown is unchanged, the test-correction question is pending, and the unresolved quality checks are recorded above. Stop at the required test-correction approval point, save this checkpoint, and do not represent it as a completed implementation step.

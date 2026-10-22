@@ -1,0 +1,16 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
+    environment:
+      POSTGRES_USER: lantern
+      POSTGRES_PASSWORD: lantern-local-only
+      POSTGRES_DB: lantern
+    ports: ["127.0.0.1:${LANTERN_DB_PORT:-5434}:5432"]
+    volumes: ["database:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lantern -d lantern"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+volumes:
+  database:
