@@ -60,6 +60,7 @@ pick → `$plan` → `$tests-first` → `$implement` → `$prove` → `$review` 
 `uv sync` · `make db` · `make hooks` · `make check` · `make prove STORY=<ID>` · `make review STORY=<ID>` · `make evals` (M1+) · `make live` · `make smoke` (M1+)
 
 - Dependencies: `uv add <pkg>` only.
+- Supply chain: before adding any dependency, say why it is needed and check current security advisories for it. Never install a package version published less than 7 days ago (use uv's exclude-newer setting). Never add litellm. Keep the Node.js used by Codex on the latest patched LTS release. Never run gh auth login or use a personal access token in the codespace.
 - Cassettes: only through `scripts/record_fixture.py`. Use `tool <tool> <case> --args <json>` for one call, or `pytest <test ids>` to record what those tests are missing (HTTP and model). Never hand-write or edit anything under `tests/fixtures/`, `docs/proofs/` or `docs/reviews/`.
 
 ## Quality bar (`make check`; never lowered without a recorded decision)
