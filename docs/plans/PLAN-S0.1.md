@@ -163,7 +163,7 @@ Other checks and references:
 
 ## Risks and mitigations
 
-- **Open policy decision before any installation:** the latest Node LTS security patch is less than seven days old, while AGENTS.md says both to wait seven days for package versions and keep Node on the latest patched LTS. Asked the user whether Node security updates are exempt. Do not assume an exception or install it until answered. Proposed decision record if an exception is approved: `docs/adr/ADR-0001-node-security-update-cooldown.md`, clarifying that Node security patches install promptly while uv/Python dependencies retain their seven-day cutoff. This is a proposal only; no ADR or rule change is made in the plan step.
+- **Policy decision resolved by the user:** Node.js security updates may install immediately, only from official releases on nodejs.org. Everything else retains the seven-day wait, including ordinary Node releases and all Python/build/test/transitive dependencies. Recorded in AGENTS.md, docs/09 and `docs/adr/ADR-0001-node-security-update-cooldown.md`. The exception authorizes the official Node LTS security update without changing protected container/agent files or reinstalling unrelated npm packages. Earlier Log entries describe the historical pending decision and remain as the audit trail.
 - **Container reproducibility:** the existing universal container is deliberately unchanged under AC6 and installs tooling through mutable upstream endpoints. Its currently observed Node is stale. Update the runtime environment through the existing version manager after the policy decision, with normal filesystem approval if outside the workspace, and record verification. Do not silently edit the container, add CI, or alter agent configuration. If a clean rebuild cannot meet AC6 without changing protected files or the container, stop and propose a decision/AC change rather than mark the criterion passed.
 - **Supply chain:** check direct, transitive and build dependencies before adding; resolve only eligible distributions from PyPI, retain the lockfile and document candidate changes. Generate baseline/lock artifacts through their tools. No litellm, PATs, gh auth login, or paid installation steps. Hook tools run from uv's project environment, not downloaded remote hook repositories.
 - **Secrets/privacy:** only synthetic test credentials and placeholder examples are committed. Real settings come from environment variables. Do not print real environment values. No captured evidence, personal data, real `.env`, `.venv`, caches or `var/` enter Git. Scanner baselines must not legitimize real secrets.
@@ -225,7 +225,7 @@ Actual final output: `40 failed, 12 passed in 0.37s`; exit code 1. Every failure
 
 The 12 already-passing checks are legitimate regression guards for bootstrap infrastructure or shipped assets: src-layout placeholder imports (1); project name, Python requirement, pytest addopts/testpaths/marker definitions and seven-day uv cutoff (6); unchanged protected pack files, no tracked .env, existing container commands and the two minimal cache-ignore rules (5). They are explicitly not evidence that any AC is fully implemented. Each AC included in the partial run also has failing behavioral/configuration tests.
 
-Still required before completing tests-first:
+At the time of this partial run, still required before completing tests-first:
 
 - Resolve the Node policy decision before any dependency installation, as the approved Risks section requires. The user has been asked asynchronously; no answer or default selection has been assumed.
 - Explain and recheck security advisories for the minimal runner dependencies; use uv add and the seven-day cutoff, audit the resolved graph and then install only eligible versions. The pre-existing runner was used without installing or updating it.
@@ -234,3 +234,71 @@ Still required before completing tests-first:
 - Run the complete new suite and record the final counts before reporting tests-first complete. Implementation must not start before that step is reported.
 
 The S0.2 acceptance-ID checker does not exist yet. Under tests-first skill step 7, its absence is reported rather than implementing it early. Static inspection confirms test-module AC markers for AC1 through AC7; this is not a run of the future acceptance-ID checker. No PROOF or REVIEW file has been written, and make check has not been run.
+
+
+### Policy resolution and runner preparation 2026-10-22
+
+The user explicitly approved immediate Node.js security updates **only from official releases on nodejs.org**, and retained the seven-day wait for everything else. Recorded the exact exception in AGENTS.md and accepted ADR 0001, linked from docs/09. The pending-installation decision is resolved; earlier pending entries are historical.
+
+Rechecked nodejs.org's current LTS download page, 24.22.1 release notes and October security advisory. Downloaded the official Linux x64 archive and SHASUMS256.txt from https://nodejs.org/dist/v24.22.1/ using HTTPS; redirects outside nodejs.org were refused. Verified archive SHA256 `6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6` against the official checksum before extracting or switching runtimes. This was checksum verification, not an independent signature audit.
+
+With filesystem approval, installed Node v24.22.1 alongside the old version, selected it as the current/default runtime, and preserved the existing Codex package through a link to its original installation. Verified `node --version` -> `v24.22.1` and `codex --version` -> `codex-cli 0.163.0`. No npm package was separately installed or upgraded. The protected devcontainer, agent files and review schema remain unchanged. This updates the running workspace, not the container image definition; fresh rebuild verification remains work for implementation.
+
+Explained the minimum runner dependencies before adding them: pytest executes the tests, Hypothesis generates edge cases, Pydantic/pydantic-settings supply the required settings boundary, and pytest-socket prevents test internet access. Rechecked each direct candidate against version-specific PyPI metadata and OSV before adding. Used these commands to resolve without installation:
+
+```sh
+uv add --dev --no-sync pytest==9.1.1 hypothesis==6.169.4 pytest-socket==0.8.1
+uv add --no-sync pydantic==2.14.1 pydantic-settings==2.16.0
+```
+
+Before installation, checked all 16 registry packages in the resulting uv.lock against version-specific PyPI and OSV feeds, and checked every artifact listed in the lockfile against its PyPI upload time and yanked status. All were at least seven days old, non-yanked, and had no listed active advisories. Registry source was PyPI for every package; litellm was absent. Results at query time (not a guarantee against undiscovered issues):
+
+| Package | Version | Locked artifacts checked | Active listed advisories |
+|---|---|---:|---:|
+| annotated-types | 0.8.0 | 2 | 0 |
+| colorama | 0.4.6 | 2 | 0 |
+| hypothesis | 6.169.4 | 66 | 0 |
+| iniconfig | 2.3.1 | 2 | 0 |
+| packaging | 26.3 | 2 | 0 |
+| pluggy | 1.7.0 | 2 | 0 |
+| pydantic | 2.14.1 | 2 | 0 |
+| pydantic-core | 2.50.1 | 96 | 0 |
+| pydantic-settings | 2.16.0 | 2 | 0 |
+| pygments | 2.21.0 | 2 | 0 |
+| pytest | 9.1.1 | 2 | 0 |
+| pytest-socket | 0.8.1 | 2 | 0 |
+| python-dotenv | 1.2.4 | 2 | 0 |
+| sortedcontainers | 2.4.0 | 2 | 0 |
+| typing-extensions | 4.16.0 | 2 | 0 |
+| typing-inspection | 0.4.4 | 2 | 0 |
+
+Then ran `uv sync --frozen`; actual exit code 0, 15 packages installed for this Linux environment (the audited Windows-only colorama package was not installed). The persistent `[tool.uv] exclude-newer = "7 days"` remains in place without package overrides. No third-party research API or paid quota was used.
+
+Completed the test harness's socket policy: non-e2e tests block network sockets while allowing local Unix sockets for async internals; e2e tests allow only loopback connections. Child uv commands run offline. Added only Hypothesis's generated cache to the minimal bootstrap ignore file. Every test function now has an explicit `@pytest.mark.ac(...)` decorator, so the future static acceptance-ID scanner can find its label. Added a subprocess test for the custom linter's actual script entry point, preventing a silent no-op script from passing later.
+
+### RED run 2026-10-22 — complete tests-first step
+
+Command run on the final test drafts and unchanged implementation placeholders:
+
+```sh
+uv run --offline pytest tests/test_skeleton.py tests/test_tooling.py tests/test_config.py tests/test_hooks.py tests/test_lint_custom.py tests/test_workspace.py tests/test_readme.py tests/e2e/test_database.py -q --tb=line -o 'addopts=--strict-markers -p no:cacheprovider --import-mode=importlib'
+```
+
+Actual final output: `102 failed, 13 passed in 1.38s`; exit code 1. All 115 cases collected and ran. Every failure was AssertionError or NotImplementedError, with no ImportError, SyntaxError, collection errors, fixture-setup errors, skips or xfails. This is the expected RED result before implementation, not a passing quality gate.
+
+| AC / test module | Failing cases | Failure reason |
+|---|---:|---|
+| AC1 / test_skeleton.py | 10 | CLI not implemented; Python pin and developer commands absent |
+| AC2 / test_tooling.py | 14 | Required packaging, lint/type/coverage configuration absent or incomplete |
+| AC3 / test_config.py | 14 | Settings constructor/validator intentionally raise NotImplementedError |
+| AC3 / e2e/test_database.py | 5 | Compose absent; CLI guidance not implemented |
+| AC4 / test_hooks.py | 5 | Local hook configuration and installation command absent |
+| AC5 / test_lint_custom.py | 44 | Custom linter functions intentionally unimplemented; executable script performs no checks yet |
+| AC6 / test_workspace.py | 7 | Full data/cache ignores and example settings absent |
+| AC7 / test_readme.py | 3 | Product explanation and setup instructions absent |
+
+The 13 passing tests are the 12 justified bootstrap/shipped-asset guards described in the partial run, plus protection for the Hypothesis cache created by the now-runnable property tests. None is being used as evidence that its AC is complete. Every AC has at least one real RED behavior/configuration test. Settings validation and source-linting properties ran and failed at their intentional placeholders, without test-harness errors.
+
+Static AST inspection found 51 explicitly AC-decorated test functions covering AC1 through AC7. `scripts/check_acceptance_ids.py` is still absent because S0.2 builds it; the tests-first skill explicitly permits reporting that absence at this bootstrap stage. Its real command was not run and no substitute checker was added to the repository.
+
+Tests-first is now complete. No feature implementation, database start, migration, make check, PROOF, REVIEW or S0.2 work occurred. The next step is implementation under the existing approved plan; finish and report this step before starting it.

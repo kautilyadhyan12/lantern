@@ -1,9 +1,9 @@
 """The front page explains Lantern and gives a usable beginner setup."""
 import pytest
 
-pytestmark = pytest.mark.ac("S0.1-AC7")
 
 
+@pytest.mark.ac("S0.1-AC7")
 def test_readme_explains_product_and_codespaces(project_file):
     text = project_file("README.md").lower()
     assert "lantern" in text
@@ -12,6 +12,7 @@ def test_readme_explains_product_and_codespaces(project_file):
     assert "codespace" in text and "browser" in text
 
 
+@pytest.mark.ac("S0.1-AC7")
 def test_readme_has_setup_commands(project_file):
     text = project_file("README.md")
     for command in ["uv sync", "make db", "make hooks", "make check", "lantern db upgrade", "make db-down"]:
@@ -19,6 +20,7 @@ def test_readme_has_setup_commands(project_file):
     assert "LANTERN_DATABASE_URL" in text and "export" in text
 
 
+@pytest.mark.ac("S0.1-AC7")
 def test_readme_has_only_placeholder_credentials(project_file):
     text = project_file("README.md")
     assert "Codespaces secrets" in text, "Explain where real secrets belong"

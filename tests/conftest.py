@@ -2,6 +2,7 @@
 from pathlib import Path
 
 import pytest
+from pytest_socket import disable_socket, socket_allow_hosts
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -27,3 +28,11 @@ def isolate_settings(monkeypatch):
         if name.startswith("LANTERN_"):
             monkeypatch.delenv(name)
     monkeypatch.setenv("UV_OFFLINE", "1")
+
+
+@pytest.fixture(autouse=True)
+def offline_sockets(request):
+    if request.path.parent.name == "e2e":
+        socket_allow_hosts(["127.0.0.1", "::1"], allow_unix_socket=True)
+    else:
+        disable_socket(allow_unix_socket=True)

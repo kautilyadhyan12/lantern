@@ -1,15 +1,17 @@
 """Behavioral examples and generated valid programs for the custom linter."""
 import ast
 import string
+import subprocess
+import sys
 
 import pytest
 from hypothesis import given, strategies as st
 
 from scripts.lint_custom import lint_source, main
 
-pytestmark = pytest.mark.ac("S0.1-AC5")
 
 
+@pytest.mark.ac("S0.1-AC5")
 @pytest.mark.parametrize("handler", ["Exception", "BaseException", ""])
 def test_broad_handler_rules(handler):
     source = f"try:\n    work()\nexcept {handler}:\n    pass\n"
@@ -18,17 +20,20 @@ def test_broad_handler_rules(handler):
     assert violations[0].line == 3
 
 
+@pytest.mark.ac("S0.1-AC5")
 @pytest.mark.parametrize("handler", ["Exception", "BaseException", ""])
 @pytest.mark.parametrize("body", ["raise", "logger.exception('Operation failed')"])
 def test_broad_handlers_allow_reraise_and_exception_logging(handler, body):
     assert lint_source(f"try:\n    work()\nexcept {handler}:\n    {body}\n", "src/example.py") == []
 
 
+@pytest.mark.ac("S0.1-AC5")
 def test_nested_function_does_not_rescue_broad_handler():
     source = "try:\n    work()\nexcept Exception:\n    def unrelated():\n        raise\n"
     assert len(lint_source(source, "src/example.py")) == 1
 
 
+@pytest.mark.ac("S0.1-AC5")
 @pytest.mark.parametrize("comment", ["# type: ignore", "# type: ignore[arg-type]", "# noqa", "# noqa: F401"])
 def test_suppression_requires_reason(comment):
     violations = lint_source(f"value = call()  {comment}\n", "src/example.py")
@@ -36,12 +41,14 @@ def test_suppression_requires_reason(comment):
     assert violations[0].line == 1
 
 
+@pytest.mark.ac("S0.1-AC5")
 @pytest.mark.parametrize("comment", ["# type: ignore[arg-type]  # External library has incomplete stubs",
                                      "# noqa: F401  # Public re-export used by callers"])
 def test_suppression_with_reason_allowed(comment):
     assert lint_source(f"value = call()  {comment}\n", "src/example.py") == []
 
 
+@pytest.mark.ac("S0.1-AC5")
 @pytest.mark.parametrize("source", [
     "import pytest\npytest.skip('not ready')\n",
     "import pytest\npytest.importorskip('optional')\n",
@@ -54,17 +61,20 @@ def test_skip_requires_issue_url(source):
     assert len(lint_source(source, "tests/example.py")) == 1
 
 
+@pytest.mark.ac("S0.1-AC5")
 @pytest.mark.parametrize("call", ["pytest.skip", "pytest.xfail", "pytest.importorskip"])
 def test_skip_with_issue_url_allowed(call):
     source = f"import pytest\n{call}('https://github.com/example/lantern/issues/1')\n"
     assert lint_source(source, "tests/example.py") == []
 
 
+@pytest.mark.ac("S0.1-AC5")
 def test_skip_decorator_with_issue_url_allowed():
     source = "import pytest\n@pytest.mark.skipif(True, reason='https://github.com/example/lantern/issues/1')\ndef test_x():\n    pass\n"
     assert lint_source(source, "tests/example.py") == []
 
 
+@pytest.mark.ac("S0.1-AC5")
 @pytest.mark.parametrize("source", ["import time\ntime.sleep(1)\n",
                                      "import time as clock\nclock.sleep(1)\n",
                                      "from time import sleep as pause\npause(1)\n"])
@@ -73,16 +83,19 @@ def test_sleep_only_forbidden_in_src(source):
     assert lint_source(source, "tests/example.py") == []
 
 
+@pytest.mark.ac("S0.1-AC5")
 @pytest.mark.parametrize("value", ["True", "1", "0", "None", "flag", "bool(False)"])
 def test_shell_requires_literal_false(value):
     assert len(lint_source(f"subprocess.run(['echo'], shell={value})\n", "scripts/example.py")) == 1
 
 
+@pytest.mark.ac("S0.1-AC5")
 def test_subprocess_without_shell_or_literal_false_allowed():
     assert lint_source("subprocess.run(['echo'], shell=False)\n", "src/example.py") == []
     assert lint_source("subprocess.run(['echo'])\n", "src/example.py") == []
 
 
+@pytest.mark.ac("S0.1-AC5")
 @pytest.mark.parametrize("source", ["print('hello')\n",
                                      "from builtins import print as show\nshow('hello')\n"])
 def test_print_only_forbidden_in_src(source):
@@ -90,6 +103,7 @@ def test_print_only_forbidden_in_src(source):
     assert lint_source(source, "scripts/example.py") == []
 
 
+@pytest.mark.ac("S0.1-AC5")
 def test_clean_code():
     source = "# A useful comment\nvalue = 'print( and # noqa are data'\ntry:\n    work()\nexcept ValueError:\n    recover()\n"
     assert lint_source(source, "src/lantern/example.py") == []
@@ -104,12 +118,14 @@ def valid_programs(draw):
     return f"{body}\ndef example(argument):\n    if argument:\n        return {literal}\n    return None\n"
 
 
+@pytest.mark.ac("S0.1-AC5")
 @given(source=valid_programs())
 def test_valid_python_never_raises(source):
     ast.parse(source)
     assert lint_source(source, "src/lantern/example.py") == []
 
 
+@pytest.mark.ac("S0.1-AC5")
 @given(prefix=st.integers(min_value=0, max_value=30))
 def test_line_positions_and_determinism(prefix):
     source = "\n" * prefix + "print('hello')\n"
@@ -121,6 +137,7 @@ def test_line_positions_and_determinism(prefix):
     assert first[0].rule and first[0].message
 
 
+@pytest.mark.ac("S0.1-AC5")
 def test_rules_have_stable_distinct_ids():
     sources = ["try:\n    work()\nexcept Exception:\n    pass\n",
                "value = call()  # noqa\n", "import pytest\npytest.skip('later')\n",
@@ -133,6 +150,7 @@ def test_rules_have_stable_distinct_ids():
     assert len(set(ids)) == 6
 
 
+@pytest.mark.ac("S0.1-AC5")
 def test_cli_exit_and_diagnostics(tmp_path, capsys):
     source = tmp_path / "unsafe.py"
     source.write_text("subprocess.run([], shell=True)\n")
@@ -141,3 +159,14 @@ def test_cli_exit_and_diagnostics(tmp_path, capsys):
     assert "unsafe.py" in output and "1" in output and "shell" in output.lower()
     source.write_text("value = 1\n")
     assert main([str(source)]) == 0
+
+
+@pytest.mark.ac("S0.1-AC5")
+def test_script_exit_and_diagnostics(repo, tmp_path):
+    source = tmp_path / "unsafe.py"
+    source.write_text("subprocess.run([], shell=True)\n")
+    command = [sys.executable, str(repo / "scripts/lint_custom.py"), str(source)]
+    result = subprocess.run(command, cwd=tmp_path, capture_output=True,
+                            text=True, timeout=10, check=False)
+    assert result.returncode != 0, "The executable linter must run its checks"
+    assert "unsafe.py" in result.stdout + result.stderr

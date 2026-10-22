@@ -7,10 +7,10 @@ import sys
 
 import pytest
 
-pytestmark = pytest.mark.ac("S0.1-AC6")
 BASE = "1491cfcba7d09d000ee09d6f35a22771a6bfdcd5"
 
 
+@pytest.mark.ac("S0.1-AC6")
 def test_pack_files_unchanged(repo):
     paths = [".devcontainer/devcontainer.json", "scripts/review_schema.json", ".codex", ".agents"]
     tracked = subprocess.run(["git", "ls-tree", "-r", "--name-only", BASE, "--", *paths],
@@ -22,6 +22,7 @@ def test_pack_files_unchanged(repo):
         assert (repo / relative).read_bytes() == original, f"Protected pack changed: {relative}"
 
 
+@pytest.mark.ac("S0.1-AC6")
 @pytest.mark.parametrize("path", [".env", ".env.local", ".venv/bin/python", "var/evidence.html",
                                   "src/lantern/__pycache__/config.pyc", ".pytest_cache/state",
                                   ".mypy_cache/cache", ".ruff_cache/cache", ".hypothesis/examples/example"])
@@ -32,6 +33,7 @@ def test_gitignore_protects_local_material(project_file, repo, path):
     assert result.returncode == 0, f"Local material must be ignored: {path}"
 
 
+@pytest.mark.ac("S0.1-AC6")
 def test_no_tracked_env(repo):
     tracked = subprocess.run(["git", "ls-files", "-z"], cwd=repo, capture_output=True,
                              check=True, timeout=10).stdout.decode().split("\0")
@@ -39,6 +41,7 @@ def test_no_tracked_env(repo):
     assert prohibited == [], "Only placeholder .env.example may be tracked"
 
 
+@pytest.mark.ac("S0.1-AC6")
 def test_example_settings_complete(project_file, repo):
     example = project_file(".env.example")
     from lantern.config import Settings
@@ -51,6 +54,7 @@ def test_example_settings_complete(project_file, repo):
     assert not (repo / ".env").is_file(), "Tests must not generate a real .env"
 
 
+@pytest.mark.ac("S0.1-AC6")
 def test_development_commands_available():
     assert sys.version_info[:2] == (3, 12)
     for name in ["uv", "docker", "node", "gh", "codex"]:

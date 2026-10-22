@@ -8,14 +8,15 @@ import pytest
 
 from lantern import cli
 
-pytestmark = pytest.mark.ac("S0.1-AC1")
 CHECKS = ["ruff check", "ruff format --check", "lint_custom.py", "mypy", "pytest"]
 
 
+@pytest.mark.ac("S0.1-AC1")
 def test_placeholder():
     assert Path(cli.__file__).parts[-3:] == ("src", "lantern", "cli.py")
 
 
+@pytest.mark.ac("S0.1-AC1")
 def test_console_help(capsys):
     with pytest.raises(SystemExit) as caught:
         cli.main(["--help"])
@@ -24,6 +25,7 @@ def test_console_help(capsys):
     assert "lantern" in output and "db" in output
 
 
+@pytest.mark.ac("S0.1-AC1")
 def test_python_pin_and_lockfile(project_file):
     assert project_file(".python-version").strip().split(".")[:2] == ["3", "12"]
     lock = tomllib.loads(project_file("uv.lock"))
@@ -31,6 +33,7 @@ def test_python_pin_and_lockfile(project_file):
     assert not any(package["name"] == "litellm" for package in lock["package"])
 
 
+@pytest.mark.ac("S0.1-AC1")
 @pytest.mark.parametrize("failed_step", [None, *range(5)])
 def test_make_check_commands_and_failure_propagation(project_file, repo, tmp_path, failed_step):
     project_file("Makefile")
@@ -58,6 +61,7 @@ def test_make_check_commands_and_failure_propagation(project_file, repo, tmp_pat
     assert (result.returncode == 0) is (failed_step is None)
 
 
+@pytest.mark.ac("S0.1-AC1")
 @pytest.mark.parametrize(("target", "expected"), [("db", "up"), ("db-down", "down")])
 def test_db_targets(project_file, repo, target, expected):
     project_file("Makefile")

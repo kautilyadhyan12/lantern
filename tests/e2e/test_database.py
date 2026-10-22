@@ -9,7 +9,6 @@ from lantern.cli import main
 from lantern.config import Settings
 from lantern.db.migrate import MigrationError, upgrade
 
-pytestmark = pytest.mark.ac("S0.1-AC3")
 
 
 def compose_config(repo):
@@ -20,6 +19,7 @@ def compose_config(repo):
     return json.loads(result.stdout)
 
 
+@pytest.mark.ac("S0.1-AC3")
 def test_compose_loopback_healthcheck(repo):
     config = compose_config(repo)
     db = config["services"]["db"]
@@ -57,6 +57,7 @@ async def inspect_database(settings):
         await connection.close()
 
 
+@pytest.mark.ac("S0.1-AC3")
 def test_upgrade_records_baseline(repo, monkeypatch, tmp_path):
     settings = database_settings(repo)
     monkeypatch.chdir(tmp_path)
@@ -70,6 +71,7 @@ def test_upgrade_records_baseline(repo, monkeypatch, tmp_path):
     assert tables == {"alembic_version"}, "The baseline creates no application tables"
 
 
+@pytest.mark.ac("S0.1-AC3")
 def test_upgrade_is_idempotent(repo):
     settings = database_settings(repo)
     try:
@@ -81,6 +83,7 @@ def test_upgrade_is_idempotent(repo):
     assert asyncio.run(inspect_database(settings)) == before
 
 
+@pytest.mark.ac("S0.1-AC3")
 def test_missing_database_guidance(monkeypatch, capsys):
     with socket.socket() as unused:
         unused.bind(("127.0.0.1", 0))
@@ -92,6 +95,7 @@ def test_missing_database_guidance(monkeypatch, capsys):
     assert "synthetic-only" not in output.out + output.err
 
 
+@pytest.mark.ac("S0.1-AC3")
 def test_cli_never_echoes_credentials(monkeypatch, capsys):
     monkeypatch.setenv("LANTERN_DATABASE_URL", "sqlite://example:SYNTHETIC_SECRET_ONLY@localhost/db")
     assert main(["db", "upgrade"]) != 0

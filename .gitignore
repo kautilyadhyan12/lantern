@@ -1,3 +1,4 @@
 # Bootstrap test artifacts; implementation adds the full local-data rules.
 .venv/
 __pycache__/
+.hypothesis/

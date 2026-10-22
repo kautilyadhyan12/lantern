@@ -6,7 +6,6 @@ import subprocess
 
 import pytest
 
-pytestmark = pytest.mark.ac("S0.1-AC4")
 EXPECTED = {"end-of-file-fixer", "trailing-whitespace-fixer", "ruff", "ruff-format", "mypy", "detect-secrets"}
 
 
@@ -16,6 +15,7 @@ def hook_config(project_file):
     return yaml.safe_load(content)
 
 
+@pytest.mark.ac("S0.1-AC4")
 def test_all_hooks_are_local_uv_commands(project_file):
     config = hook_config(project_file)
     assert config["repos"], "Install the required development hooks"
@@ -26,6 +26,7 @@ def test_all_hooks_are_local_uv_commands(project_file):
             assert shlex.split(hook["entry"])[:2] == ["uv", "run"]
 
 
+@pytest.mark.ac("S0.1-AC4")
 def test_expected_hooks_present(project_file):
     config = hook_config(project_file)
     hooks = {hook["id"]: hook for repository in config["repos"] for hook in repository["hooks"]}
@@ -36,6 +37,7 @@ def test_expected_hooks_present(project_file):
     assert "version" in baseline and "results" in baseline
 
 
+@pytest.mark.ac("S0.1-AC4")
 def test_make_hooks_installs(project_file, repo, tmp_path):
     makefile = project_file("Makefile")
     config = project_file(".pre-commit-config.yaml")
@@ -50,6 +52,7 @@ def test_make_hooks_installs(project_file, repo, tmp_path):
     assert installed.is_file() and "pre_commit" in installed.read_text()
 
 
+@pytest.mark.ac("S0.1-AC4")
 def test_whitespace_fixers_change_temp_file(project_file, repo, tmp_path):
     config = hook_config(project_file)
     hooks = {hook["id"]: hook for repository in config["repos"] for hook in repository["hooks"]}
@@ -63,6 +66,7 @@ def test_whitespace_fixers_change_temp_file(project_file, repo, tmp_path):
     assert sample.read_bytes() == b"example\n"
 
 
+@pytest.mark.ac("S0.1-AC4")
 def test_secret_scanner_detects_synthetic_token(project_file, repo, tmp_path):
     config = hook_config(project_file)
     hooks = [hook for item in config["repos"] for hook in item["hooks"] if hook["id"] == "detect-secrets"]

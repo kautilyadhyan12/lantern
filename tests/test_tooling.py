@@ -3,7 +3,6 @@ import tomllib
 
 import pytest
 
-pytestmark = pytest.mark.ac("S0.1-AC2")
 EXPECTED = {
     "project.name": "lantern",
     "project.requires-python": ">=3.12",
@@ -25,6 +24,7 @@ EXPECTED = {
 }
 
 
+@pytest.mark.ac("S0.1-AC2")
 @pytest.mark.parametrize(("key", "expected"), EXPECTED.items())
 def test_required_tooling_keys(project_file, key, expected):
     value = tomllib.loads(project_file("pyproject.toml"))
@@ -34,6 +34,7 @@ def test_required_tooling_keys(project_file, key, expected):
     assert value == expected, f"Configuration differs from docs/05 §2.1: {key}"
 
 
+@pytest.mark.ac("S0.1-AC2")
 def test_per_file_lint_ignores(project_file):
     config = tomllib.loads(project_file("pyproject.toml"))
     assert "ruff" in config.get("tool", {}), "S0.1 must configure ruff"
@@ -42,6 +43,7 @@ def test_per_file_lint_ignores(project_file):
                        "tests/review/**": ["S101", "PLR", "ARG", "N999"]}
 
 
+@pytest.mark.ac("S0.1-AC2")
 def test_src_package_and_console_entry(project_file, repo):
     config = tomllib.loads(project_file("pyproject.toml"))
     assert config.get("project", {}).get("scripts", {}).get("lantern") == "lantern.cli:main"
@@ -50,6 +52,7 @@ def test_src_package_and_console_entry(project_file, repo):
     assert config["build-system"]["requires"], "Build dependencies must be pinned and audited"
 
 
+@pytest.mark.ac("S0.1-AC2")
 def test_dependency_cooldown(project_file):
     config = tomllib.loads(project_file("pyproject.toml"))
     assert config["tool"]["uv"]["exclude-newer"] == "7 days"
