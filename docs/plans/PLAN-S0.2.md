@@ -264,3 +264,59 @@ Four already-passing cases are legitimate regression guards: Pydantic's existing
 The acceptance-ID checker is itself an unimplemented S0.2 stub, so the skill's bootstrap exception applies: no acceptance-tracing command is claimed to have run successfully. Every new test explicitly names one of the six backlog ACs. No cassette recorder is needed or used.
 
 Test/stub housekeeping checks passed using the existing environment: ruff check, ruff format --check (30 files), custom lint, and strict mypy (15 source files). These are not a full make check, PROOF or independent review. The intentionally RED checkpoint will become green only after implementation; neither bootstrap story is marked DONE or merged.
+
+### Implementation checkpoint and amendment proposal 2026-10-23
+
+The user asked what comes next after the pushed RED checkpoint. Started the
+approved implementation skill on story/M0-boot. The following is partial work,
+not completion of the implementation step.
+
+- Explained why all five planned development dependencies are needed. Rechecked
+  exact PyPI metadata and OSV advisories, then ran uv add --dev --no-sync for
+  import-linter 2.15, pytest-cov 7.1.0, coverage 7.17.0, bandit 1.9.4 and
+  pip-audit 2.10.1. Before uv sync --frozen, checked all 75 registry packages in
+  uv.lock: official PyPI sources, files.pythonhosted.org URLs, matching SHA256
+  hashes, no yanked artifacts and no active PyPI/OSV advisories. Installed the
+  checked lock. No package-age wait was imposed under ADR 0002.
+- Built the shared ten-command runner, bounded/sanitized process results,
+  coverage validation and thresholds, complete-lock dependency deny-list and
+  committed Git-tree digest. Connected Make check/prove entry points; added
+  the exact quality paths, current CLI/database import contract, subprocess
+  coverage configuration and generated-cache ignores. No tests were changed.
+- Targeted verification of these four implemented tools and their wiring:
+  `uv run --offline pytest tests/test_dependencies.py tests/test_code_tree.py tests/test_coverage_gate.py tests/test_check_pipeline.py tests/test_skeleton.py::test_make_check_commands_and_failure_propagation -k 'not check_acceptance_ids.py and not prove.py' -q --tb=short --junitxml=/tmp/lantern-s02-built-tools.xml`.
+  The two deselected parameter cases are the standalone help checks for the
+  two unimplemented scripts, not skips or a changed suite. Full tests remain
+  required. A preceding run without that selection passed 112 cases and failed
+  exactly those two cases. No full make check/PASS is claimed.
+  The final targeted rerun after Git executable-path hardening exited 0:
+  **112 passed, 0 failed, 0 errors, 0 skipped**, in 9.423 seconds.
+- Ruff, format, custom lint and strict mypy passed. Bandit initially reported
+  five low-severity process-launch warnings. Resolved Git to its installed
+  absolute executable; narrowly documented B404 and B603 suppressions only at
+  the required subprocess imports and argument-list calls. No shell execution,
+  global scanner exclusions or security threshold changes. Bandit then exited
+  0 without findings or warnings.
+- The literal approved audit command failed, exit 1:
+  `ERROR:pip_audit._cli:lantern: distribution marked as editable`.
+  Inspection of the installed official 2.10.1 source confirmed that --strict
+  treats even --skip-editable's intended exclusion as a fatal collection skip.
+  The exact catalogue test therefore demands an invalid command. It has not
+  been edited or weakened, and --strict has not been removed.
+- Verified a proposed replacement read-only: generated exact pins for all 74
+  installed third-party packages, verified that the only omitted editable is
+  local Lantern, and ran pip-audit --strict --no-deps --disable-pip
+  --progress-spinner off --timeout 30 -r /tmp/lantern-s02-installed-requirements.txt.
+  Exit 0: No known vulnerabilities found. This is diagnostic evidence only,
+  not the future helper, the full gate or a proof artifact.
+- Measured 397 added handwritten non-test lines, including remaining stubs and
+  configuration, relative to S0.1 implementation commit 0464260. Tracing and
+  proof generation remain stubs. Stop here before expanding the approved size
+  or changing the incorrect test. Proposed ADR 0003 documents both the split
+  alternative and the recommended one-story exception (up to 800 lines), plus
+  the exact audit-helper/test correction. User approval is pending. No new
+  helper, changed test, accepted policy exception, proof, review or merge has
+  been produced. S0.1's fresh-container rebuild limitation remains open.
+
+Proposed amendment for approval:
+[ADR 0003 — Proof kit size exception and strict package auditing](../adr/ADR-0003-proof-kit-size-and-strict-audit.md).

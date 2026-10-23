@@ -57,17 +57,40 @@ markers = [
 [tool.coverage.run]
 branch = true
 source = ["src/lantern", "scripts"]
+patch = ["subprocess"]
+
+[tool.importlinter]
+root_package = "lantern"
+
+[[tool.importlinter.contracts]]
+name = "CLI depends on database, never the reverse"
+type = "layers"
+layers = ["lantern.cli", "lantern.db"]
+
+[tool.lantern.quality]
+coverage_total = 85
+coverage_critical = 95
+critical_paths = [
+    "src/lantern/core", "src/lantern/policy", "src/lantern/egress",
+    "src/lantern/db/events.py", "src/lantern/tools/gateway.py", "src/lantern/llm/gateway.py",
+    "src/lantern/report/render_html.py", "scripts/hooks",
+]
 
 [dependency-groups]
 dev = [
+    "bandit==1.9.4",
+    "coverage==7.17.0",
     "detect-secrets==1.5.0",
     "hatchling==1.32.4",
     "hypothesis==6.169.4",
+    "import-linter==2.15",
     "mypy==2.4.0",
+    "pip-audit==2.10.1",
     "pre-commit==4.7.0",
     "pre-commit-hooks==6.0.0",
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
+    "pytest-cov==7.1.0",
     "pytest-socket==0.8.1",
     "ruff==0.17.0",
 ]

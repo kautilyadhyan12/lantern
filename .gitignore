@@ -9,6 +9,8 @@ __pycache__/
 .ruff_cache/
 .hypothesis/
 .coverage
+.coverage.*
+.import_linter_cache/
 coverage.json
 htmlcov/
 dist/

@@ -1,10 +1,11 @@
-.PHONY: check db db-down hooks
+.PHONY: check prove db db-down hooks
+export STORY AC_STORIES
+
 check:
-	uv run ruff check .
-	uv run ruff format --check src scripts tests
-	uv run python scripts/lint_custom.py
-	uv run mypy --strict
-	uv run --offline pytest
+	uv run python -m scripts.checks
+
+prove:
+	uv run python -m scripts.prove
 
 db:
 	docker compose up -d --wait db
