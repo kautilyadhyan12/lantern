@@ -20,9 +20,8 @@ make hooks
 make check
 ```
 
-The credentials above are public, local development credentials only. The database
-listens on localhost port 5434. Never reuse these credentials for deployment.
-Real secrets come from environment variables; .env.example contains placeholders.
-Checks run offline and need the local database. If it is stopped, run `make db`.
-Use `make db-down` to stop it; its data volume is kept. Never commit local evidence
-or personal data. The source, development tools and saved process documents are public.
+These public credentials are for local development only; never reuse them for deployment.
+The database listens on localhost port 5434. Checks run offline and need it running.
+Run `make db` to start it, or `make db-down` to stop it while keeping its data.
+Real secrets come from environment variables; .env.example has placeholders.
+Never commit captured evidence or personal data to this public repository.

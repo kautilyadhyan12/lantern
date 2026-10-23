@@ -1,4 +1,5 @@
 """Alembic's async engine bridge; the URL remains an in-memory secret."""
+
 import asyncio
 
 from alembic import context
@@ -17,7 +18,9 @@ def do_run_migrations(connection: Connection) -> None:
 async def run_async_migrations() -> None:
     secret: SecretStr = context.config.attributes["database_url"]
     engine = create_async_engine(
-        secret.get_secret_value(), poolclass=NullPool, hide_parameters=True,
+        secret.get_secret_value(),
+        poolclass=NullPool,
+        hide_parameters=True,
         connect_args={"timeout": 5, "command_timeout": 10},
     )
     try:

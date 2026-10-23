@@ -1,8 +1,10 @@
 """Settings accept one database driver and never expose credentials."""
+
 import string
 
 import pytest
-from hypothesis import given, strategies as st
+from hypothesis import given
+from hypothesis import strategies as st
 from pydantic import SecretStr, ValidationError
 
 from lantern.config import Settings
@@ -29,14 +31,20 @@ def test_reject_other_drivers(driver):
 
 
 @pytest.mark.ac("S0.1-AC3")
-@pytest.mark.parametrize("value", [None, "", "not a URL", "postgresql+asyncpg:///db",
-                                    "postgresql+asyncpg://localhost", "postgresql+asyncpg://localhost:bad/db"])
+@pytest.mark.parametrize(
+    "value",
+    [
+        None,
+        "",
+        "not a URL",
+        "postgresql+asyncpg:///db",
+        "postgresql+asyncpg://localhost",
+        "postgresql+asyncpg://localhost:bad/db",
+    ],
+)
 def test_missing_or_malformed_url(value):
     with pytest.raises(ValidationError):
-        if value is None:
-            Settings()
-        else:
-            Settings(database_url=value)
+        Settings(**({} if value is None else {"database_url": value}))
 
 
 @pytest.mark.ac("S0.1-AC3")
@@ -61,5 +69,5 @@ def test_valid_url_property(host, database, password):
 @pytest.mark.ac("S0.1-AC3")
 @given(driver=st.sampled_from(["https", "sqlite", "postgresql", "mysql+asyncmy"]), db=SEGMENT)
 def test_invalid_driver_property(driver, db):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011  # Any invalid driver must be rejected.
         Settings.validate_database_url(SecretStr(f"{driver}://example:synthetic@localhost/{db}"))

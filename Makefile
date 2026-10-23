@@ -1,7 +1,7 @@
 .PHONY: check db db-down hooks
 check:
 	uv run ruff check .
-	uv run ruff format --check .
+	uv run ruff format --check src scripts tests
 	uv run python scripts/lint_custom.py
 	uv run mypy --strict
 	uv run --offline pytest

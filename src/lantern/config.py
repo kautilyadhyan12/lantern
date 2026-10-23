@@ -1,4 +1,5 @@
 """Typed environment settings; secret values never appear in validation text."""
+
 from urllib.parse import urlsplit
 
 from pydantic import SecretStr, field_validator
@@ -17,8 +18,10 @@ class Settings(BaseSettings):
         try:
             url = urlsplit(value.get_secret_value())
             valid = (
-                url.scheme == "postgresql+asyncpg" and url.hostname
-                and url.path.strip("/") and (url.port is None or url.port > 0)
+                url.scheme == "postgresql+asyncpg"
+                and url.hostname
+                and url.path.strip("/")
+                and (url.port is None or url.port > 0)
             )
         except ValueError:
             valid = False

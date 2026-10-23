@@ -1,7 +1,8 @@
 """Development commands for Lantern."""
+
 import argparse
-from collections.abc import Sequence
 import sys
+from collections.abc import Sequence
 
 from pydantic import ValidationError
 

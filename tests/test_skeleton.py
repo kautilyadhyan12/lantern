@@ -1,8 +1,9 @@
 """Project entry point and developer commands work as advertised."""
+
 import os
-from pathlib import Path
 import subprocess
 import tomllib
+from pathlib import Path
 
 import pytest
 
@@ -22,7 +23,8 @@ def test_console_help(capsys):
         cli.main(["--help"])
     assert caught.value.code == 0
     output = capsys.readouterr().out.lower()
-    assert "lantern" in output and "db" in output
+    assert "lantern" in output
+    assert "db" in output
 
 
 @pytest.mark.ac("S0.1-AC1")
@@ -51,10 +53,21 @@ def test_make_check_commands_and_failure_propagation(project_file, repo, tmp_pat
         "sys.exit(9 if str(index) == os.environ['FAIL_STEP'] else 0)\n"
     )
     executable.chmod(0o755)
-    env = {**os.environ, "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}",
-           "CHECK_LOG": str(log), "FAIL_STEP": str(failed_step)}
-    result = subprocess.run(["make", "check"], cwd=repo, env=env, capture_output=True,
-                            text=True, timeout=20, check=False)
+    env = {
+        **os.environ,
+        "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}",
+        "CHECK_LOG": str(log),
+        "FAIL_STEP": str(failed_step),
+    }
+    result = subprocess.run(
+        ["make", "check"],
+        cwd=repo,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=20,
+        check=False,
+    )
     assert log.is_file(), "make check must invoke the checks through uv run"
     seen = [int(line) for line in log.read_text().splitlines()]
     assert seen == list(range(5 if failed_step is None else failed_step + 1))
@@ -65,11 +78,19 @@ def test_make_check_commands_and_failure_propagation(project_file, repo, tmp_pat
 @pytest.mark.parametrize(("target", "expected"), [("db", "up"), ("db-down", "down")])
 def test_db_targets(project_file, repo, target, expected):
     project_file("Makefile")
-    result = subprocess.run(["make", "--dry-run", target], cwd=repo, capture_output=True,
-                            text=True, timeout=10, check=False)
+    result = subprocess.run(
+        ["make", "--dry-run", target],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
     assert result.returncode == 0
-    assert "docker compose" in result.stdout and expected in result.stdout
+    assert "docker compose" in result.stdout
+    assert expected in result.stdout
     if target == "db":
         assert "--wait" in result.stdout, "Wait for database health before reporting success"
     else:
-        assert "--volumes" not in result.stdout and " -v" not in result.stdout
+        assert "--volumes" not in result.stdout
+        assert " -v" not in result.stdout

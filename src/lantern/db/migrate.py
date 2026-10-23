@@ -1,4 +1,5 @@
 """Apply packaged migrations without writing credentials to config files."""
+
 from pathlib import Path
 
 from alembic import command

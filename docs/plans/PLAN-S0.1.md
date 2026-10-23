@@ -372,3 +372,16 @@ Applied the read-only test-audit checklist. This is advisory and is not an indep
 - Notes: tests/test_skeleton.py::test_placeholder is an explicitly justified bootstrap regression guard. The Makefile fake-tool tests are complemented by actual commands; they are not the sole execution evidence. tests/test_workspace.py::test_development_commands_available checks the current workspace, not a clean rebuild; AC6 must remain incomplete until actual rebuild evidence exists.
 
 Implementation remains unfinished. The user's package cooldown is unchanged, the test-correction question is pending, and the unresolved quality checks are recorded above. Stop at the required test-correction approval point, save this checkpoint, and do not represent it as a completed implementation step.
+
+
+### Interrupted cleanup checkpoint 2026-10-23
+
+The user asked to continue the prior checkpoint. Interpreted that continuation as approval to apply the specific previously proposed secret-scanner test strengthening; announced that interpretation before editing. The test now first requires a clean-file scan to return 0, then requires exit 1 and the synthetic-token file's path in the detection diagnostic. The patch preserves the fake-token requirement and rejects missing/broken tools. No secret-scanner baseline was fabricated and blocked dependencies were not installed.
+
+Applied safe ruff fixes and formatting, moved test imports to module scope, and split compound assertions without removing any conditions. Simplified the custom linter's alias/skip handling without changing the required six rule categories. Changed the Makefile formatter target to src/scripts/tests because this installed formatter also touched Python fences inside Markdown when given the whole repository. Restored those incidental documentation-formatting edits; no design-doc behavior or acceptance criterion changed. Shortened duplicate README wording while retaining setup and credential guidance.
+
+The latest ruff report decreased from 84 findings to 24, all in tests: 20 warnings about deliberate execution of trusted repository/development tools and four long string literals. Those warnings have not been globally suppressed. Remaining cleanup has not been completed. Handwritten non-test files currently total 402 physical lines, close to the approved approximate 400-line limit; reassess before expanding scope. No split or rescope was performed.
+
+The user interrupted the turn to ask whether work was still running. Checked processes: no project build/test/install command was running. Saving this checkpoint before further work. No new pytest, mypy, custom-linter or complete make-check result is claimed for these edits; the prior 112-pass/3-failure run predates this cleanup. The updated scanner test still needs its real tool/baseline verification once safe dependencies can be installed. Implementation remains unfinished, with no proof, review, merge or later-story work.
+
+The seven-day cutoff and secure minimum constraints remain unchanged. Latest official Node LTS was rechecked as v24.22.1 and the running workspace already has it; no additional runtime update occurred. No Python packages were installed or updated on October 23 during this cleanup.
