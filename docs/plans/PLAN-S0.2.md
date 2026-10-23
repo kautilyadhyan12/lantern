@@ -351,3 +351,66 @@ and injection at the first nine existing commands already stops correctly.
 No import, syntax, collection or fixture error occurred. Captured output is
 /tmp/lantern-s02-audit-red.log. Ruff and strict mypy passed on this checkpoint.
 The requirement tracer remains a stub, so no acceptance-check success is claimed.
+
+### Implementation and advisory test audit 2026-10-23
+
+Implemented the accepted design and ADR 0003 without further dependencies.
+
+- The strict audit helper validates the complete installed distribution inventory,
+  rejects malformed/duplicate metadata and unexpected editable packages, omits
+  only verified local Lantern, and runs pip-audit on temporary exact pins with
+  strict collection and no installation/resolution. Temporary files are removed
+  on success and failure. Package validation is shared with the lock deny-list.
+- The requirement tracer reads backlog headings/AC lines and Python ASTs, maps
+  explicit literal markers to test paths/names, never imports test modules, and
+  fails missing/unknown requirements or malformed source/markers. It does not
+  count nested functions or methods of non-test classes as collected tests.
+- The proof writer validates filename-safe IDs, rejects dirty/untracked code
+  including both sides of renames, captures one committed SHA/tree digest, clears
+  only generated untracked coverage files, runs all ten checks plus AC tracing,
+  and checks provenance again before PASS. It records bounded/redacted output,
+  UTC, platform, commands, exits and durations with safe Markdown fences, writes
+  atomically, and refuses symlinked proof directories. No repository proof or
+  review artifact was generated at this implementation step; writer tests use
+  isolated synthetic Git repositories.
+- Advisory test-audit skill completed read-only over the PLAN, tests and tools.
+  No unit under test was mocked, no vacuous acceptance test was found, and every
+  planned pure function has a Hypothesis property. Inventory, subprocess and
+  audit stubs represent external boundaries; real Make, Git and writer tests
+  verify the actual behavior. No research/API cassette is applicable.
+- The audit found missing cases in tests/test_acceptance_ids.py/test_marks:
+  bare markers, nested functions and non-test classes; and in
+  tests/test_check_pipeline.py/run_checks: exceptions or invalid results from
+  the runner boundary must be recorded while later checks still run. Added six
+  cases in tests/test_proof_boundaries.py. Their pre-fix command was
+  `uv run --offline pytest tests/test_proof_boundaries.py -q --tb=line --junitxml=/tmp/lantern-s02-boundaries-red.xml`:
+  **6 assertion failures, 0 errors, 0 skipped**, exit 1 in 0.205 seconds.
+  Fixed those cases using a shared validating invocation wrapper, which also
+  handles the proof writer's final AC check. No existing assertion was weakened.
+- Initial full make check reached pytest and reported 294 passed/1 failed:
+  a nested Make invocation added entering/leaving-directory text to the dry-run
+  command assertion. Added MAKEFLAGS += --no-print-directory; the assertion stays
+  exact and unchanged. The subsequent targeted run of proof/audit/tracing and
+  boundary cases passed all 77 cases in 5.756 seconds.
+- Final `make check` exited **0**. All ten ordered checks passed: ruff, format,
+  custom lint, current CLI/database import contract, strict mypy (16 files),
+  **301 tests in 52.73 seconds**, coverage gate, dependency deny-list, Bandit,
+  and the live strict advisory audit. Total line-and-branch coverage was
+  **95.90723055934515%**. All eight future critical paths were explicitly listed
+  as not present. Coverage/security thresholds remain unchanged. Bandit found
+  no issues and pip-audit reported no known vulnerabilities. Its advisory
+  warning about hashless lookup input is retained: installation authority
+  remains the previously checked, version/hash-locked uv.lock; the helper only
+  queries already installed exact versions and disables installation/resolution.
+  Full output is /tmp/lantern-s02-make-check.log; coverage.json is generated and
+  ignored. AC tracing for S0.1 and S0.2 also exited 0 with all 13 criteria mapped
+  and no unknown markers.
+- Final measured handwritten non-test additions: **694 lines** relative to
+  S0.1 implementation commit 0464260, counting .gitignore, Makefile,
+  pyproject.toml and scripts/, excluding generated uv.lock, tests and process
+  documentation as agreed. This is within ADR 0003's 800-line cap.
+- No runtime investigation code, schema, harness, CI, fixtures, paid service,
+  GitHub account setting or other repository changed. Main is unchanged. The
+  implementation step is green, but neither bootstrap story is marked DONE:
+  joint PLAN-M0, formal generated proof and fresh independent review remain.
+  The unverified fresh-container-rebuild limitation from S0.1 remains explicit.

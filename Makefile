@@ -1,4 +1,5 @@
 .PHONY: check prove db db-down hooks
+MAKEFLAGS += --no-print-directory
 export STORY AC_STORIES
 
 check:

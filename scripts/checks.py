@@ -44,10 +44,22 @@ CHECKS = tuple(
         "uv run python scripts/coverage_gate.py",
         "uv run python scripts/check_dependencies.py",
         "uv run bandit -r src/lantern scripts",
-        "uv run pip-audit --local --skip-editable --strict --progress-spinner off --timeout 30",
+        "uv run python scripts/audit_dependencies.py",
     )
 )
 StepRunner = Callable[[Sequence[str], Path], StepResult]
+
+
+def invoke_step(command: Sequence[str], root: Path, runner: StepRunner) -> StepResult:
+    try:
+        return StepResult.model_validate(runner(command, root))
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
+        return StepResult(
+            command=tuple(command),
+            exit_code=126,
+            duration_seconds=0,
+            output_tail=(f"Check could not complete ({type(error).__name__}).",),
+        )
 
 
 def run_step(command: Sequence[str], root: Path) -> StepResult:
@@ -81,7 +93,7 @@ def run_checks(
 ) -> list[StepResult]:
     results = []
     for command in CHECKS:
-        result = StepResult.model_validate(runner(command, root))
+        result = invoke_step(command, root, runner)
         results.append(result)
         if result.exit_code and not continue_on_error:
             break

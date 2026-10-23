@@ -23,7 +23,7 @@ DENIED = frozenset(
 
 class Package(BaseModel):
     name: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
-    version: str
+    version: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9.+!_-]*$")
 
 
 class Lock(BaseModel):
