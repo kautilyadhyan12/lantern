@@ -444,3 +444,25 @@ Actual current-workspace validation:
 - uv build --wheel --no-build-isolation --offline --out-dir /tmp/lantern-s01-wheel: exit 0. Inspected the resulting wheel and confirmed the CLI, settings and all package-relative Alembic environment/baseline files are included.
 
 This is implementation/check evidence, not a generated PROOF or an independent review. The bootstrap rule still requires S0.2 and the combined M0 proof/review before shipping. Saving this checked candidate before testing a separate clean checkout. Clean full dependency sync and clean rebuild evidence are not yet claimed at this log entry.
+
+
+### Clean-checkout verification and implementation handoff 2026-10-23
+
+Saved the checked candidate as commit 61af96d. Every installed pre-commit hook passed before that commit: EOF, whitespace, ruff, ruff format, strict types and the local secret scanner. Pushed the branch without merging.
+
+Created a separate Git clone of that commit under /tmp with no virtual environment. In the clean checkout, ran:
+
+```sh
+uv sync --frozen
+uv run lantern --help
+make check
+make hooks
+```
+
+All commands exited 0. uv installed the complete locked environment, the console command displayed its db subcommand, every make-check step passed, strict mypy reported no issues in 8 source files, and pytest reported **115 passed in 7.25s**. make hooks installed the hook only in that temporary checkout. The tests used the existing local Compose database; no external research service was called. No fake fixtures or baselines were created.
+
+The repository's .devcontainer file, .codex/, .agents/, review schema, CI and hooks harness paths remain unchanged from main. make check passes in the running Codespace and a clean checkout inside it. A newly rebuilt Codespace has **not** been created or claimed: this is clean-checkout evidence, not a new-container rebuild. The devcontainer base image is not cached locally. That verification limitation remains visible for the combined M0 proof/review and must not be mistaken for completed fresh-rebuild evidence.
+
+Advisory test-audit follow-up: the formerly weak scanner test now proves a clean-file scan exits 0 before requiring a fake-token detection exit and filename. It passed in both the working checkout and the independent clean checkout. No test is now relying solely on a failed executable. Existing Hypothesis tests ran. This follow-up is not the independent T3 review.
+
+S0.1's implementation and current automated check step are now green, with the rebuild limitation above recorded. Do not mark the story DONE, publish a PROOF or REVIEW by hand, or merge. Under docs/08 §5, the next proposed job is S0.2 on the same bootstrap branch; it builds the proof kit required to prove/review S0.1 and S0.2 together. User approval is required before starting that next job's plan and again before its tests/code. The earlier package-age blocker is resolved by ADR 0002 and must not be reintroduced.
