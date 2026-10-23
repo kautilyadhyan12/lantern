@@ -4,6 +4,8 @@ Pack 3.0 · written 2026-10-22
 
 Accepted additions: [ADR 0001 — Official Node.js security updates bypass the cooldown](adr/ADR-0001-node-security-update-cooldown.md) clarifies the development supply-chain policy. The seven-day wait remains for everything else.
 
+[ADR 0002 — Use checked security fixes without an age delay](adr/ADR-0002-advisory-checked-security-updates.md), accepted 2026-10-23, supersedes that waiting period. Current advisory checks, official sources, locked versions/hashes and the other security rules remain required.
+
 The decisions behind this pack, with what was rejected and why. Future changes go into `docs/adr/` as new records that cite the decision they change; the docs are then updated to match.
 
 ### D1 — Fresh start on a proven stack

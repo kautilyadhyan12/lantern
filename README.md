@@ -2,8 +2,8 @@
 
 Lantern will research questions using public information, preserve its evidence,
 and produce reports with citations you can inspect. This first stage supplies
-its development setup; investigation features will follow. Setup is in progress:
-safe dependency fixes must finish the seven-day wait before a full install/check.
+its development setup; investigation features will follow. Dependencies use
+checked security fixes and a locked set of versions; there is no age-based wait.
 
 Open the repository on GitHub, choose **Code → Codespaces → Create codespace**,
 and work in your browser. The container provides Python 3.12, uv and Docker.

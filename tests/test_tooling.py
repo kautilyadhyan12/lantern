@@ -89,7 +89,9 @@ def test_src_package_and_console_entry(project_file, repo):
 
 
 @pytest.mark.ac("S0.1-AC2")
-def test_dependency_cooldown(project_file):
+def test_dependency_security_policy(project_file):
     config = tomllib.loads(project_file("pyproject.toml"))
-    assert config["tool"]["uv"]["exclude-newer"] == "7 days"
-    assert not config["tool"]["uv"].get("exclude-newer-package"), "No cooldown exceptions"
+    assert config["tool"]["uv"]["exclude-newer"] is False
+    constraints = config["tool"]["uv"]["constraint-dependencies"]
+    assert "certifi>=2026.10.19" in constraints
+    assert "virtualenv>=21.14.13" in constraints

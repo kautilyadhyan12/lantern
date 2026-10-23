@@ -4,6 +4,9 @@ Date: 2026-10-22
 
 Status: Accepted by the user in this session.
 
+Update 2026-10-23: ADR 0002 supersedes the seven-day wait below. The official
+nodejs.org restriction is retained; this document records the earlier decision.
+
 Context: AGENTS.md requires a seven-day wait for newly published packages and a
 current patched Node.js LTS runtime. The latest official LTS security release,
 24.22.1, was released on 2026-10-21, so the two rules needed clarification.

@@ -21,8 +21,8 @@ build-backend = "hatchling.build"
 packages = ["src/lantern"]
 
 [tool.uv]
-exclude-newer = "7 days"
-constraint-dependencies = ["certifi>=2026.10.19", "virtualenv>=21.14.9"]
+exclude-newer = false
+constraint-dependencies = ["certifi>=2026.10.19", "virtualenv>=21.14.13"]
 
 [tool.ruff]
 line-length = 100
