@@ -20,7 +20,7 @@ CHECKS = [
     "coverage_gate.py",
     "check_dependencies.py",
     "bandit",
-    "pip-audit",
+    "audit_dependencies.py",
 ]
 
 

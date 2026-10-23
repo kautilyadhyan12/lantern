@@ -29,18 +29,7 @@ EXPECTED = (
     ("uv", "run", "python", "scripts/coverage_gate.py"),
     ("uv", "run", "python", "scripts/check_dependencies.py"),
     ("uv", "run", "bandit", "-r", "src/lantern", "scripts"),
-    (
-        "uv",
-        "run",
-        "pip-audit",
-        "--local",
-        "--skip-editable",
-        "--strict",
-        "--progress-spinner",
-        "off",
-        "--timeout",
-        "30",
-    ),
+    ("uv", "run", "python", "scripts/audit_dependencies.py"),
 )
 CRITICAL_PATHS = [
     "src/lantern/core",
@@ -200,6 +189,7 @@ def test_critical_paths_exact(project_file):
         "coverage_gate.py",
         "check_acceptance_ids.py",
         "check_dependencies.py",
+        "audit_dependencies.py",
         "code_tree.py",
         "prove.py",
     ],

@@ -91,7 +91,7 @@ pick → `$plan` → `$tests-first` → `$implement` → `$prove` → `$review` 
 8. Pydantic at every boundary. Timezone-aware datetimes only. Async I/O with timeouts. No `time.sleep`, `print` or `shell=True` in `src/`; subprocesses only with argument lists.
 9. Every state change writes its event in the same transaction. Logs are structured (`structlog`) and redact secrets and personal data.
 10. Errors and refusals say what happened and what to do instead, in plain words. No slogans.
-11. Stories stay under ~400 non-test lines. Design changes get a decision record.
+11. Stories stay under ~400 non-test lines. S0.2 alone may use up to 800 handwritten non-test lines under accepted [ADR 0003](docs/adr/ADR-0003-proof-kit-size-and-strict-audit.md); all quality gates remain required. Design changes get a decision record.
 
 ## Non-negotiable invariants (each needs a test; any violation is a review blocker)
 

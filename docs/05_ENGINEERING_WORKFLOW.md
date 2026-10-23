@@ -32,7 +32,7 @@ Rules:
 - Each step finishes and is reported before the next starts. Nothing is skipped or reordered.
 - If a step needs a tool that a later story builds, stop and ask — unless the skill says exactly what to do.
 - Never commit to `main` directly; never merge without your yes.
-- A story's diff is at most ~400 non-test lines; larger stories are split in `$plan`, with your approval.
+- A story's diff is at most ~400 non-test lines; larger stories are split in `$plan`, with your approval. The user approved a one-story exception of up to 800 handwritten non-test lines for S0.2 in [ADR 0003](adr/ADR-0003-proof-kit-size-and-strict-audit.md); its quality, proof and review gates remain required.
 
 ### 1.1 Housekeeping the agent always does
 

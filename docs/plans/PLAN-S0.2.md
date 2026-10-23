@@ -27,6 +27,7 @@ Files to create or change:
 | scripts/coverage_gate.py | Validate coverage JSON and apply configured thresholds |
 | scripts/check_acceptance_ids.py | Read backlog IDs and inspect test ASTs without importing tests |
 | scripts/check_dependencies.py | Scan the complete lockfile for prohibited packages |
+| scripts/audit_dependencies.py, tests/test_audit_dependencies.py | Strict audit of the validated installed inventory under accepted ADR 0003 |
 | scripts/code_tree.py | Hash committed Git tree entries with explicit prefix exclusions |
 | scripts/prove.py | Run all checks, trace IDs, and write the generated proof artifact |
 | Makefile | check/prove entry points; existing db/db-down/hooks behavior retained |
@@ -126,7 +127,7 @@ The shared CHECKS catalogue runs these ten checks, in this order:
 7. uv run python scripts/coverage_gate.py
 8. uv run python scripts/check_dependencies.py
 9. uv run bandit -r src/lantern scripts
-10. uv run pip-audit --local --skip-editable --strict --progress-spinner off --timeout 30
+10. uv run python scripts/audit_dependencies.py (accepted ADR 0003; invokes pip-audit with --strict --no-deps --disable-pip --progress-spinner off --timeout 30 -r <temporary exact pins>)
 
 Use pip-audit's documented --strict collection option so collection failure cannot be treated as success, and retain nonzero network/audit errors. Confirm the pinned CLI arguments during implementation. Do not use --fix, vulnerability ignore lists, --exit-zero or blanket source exclusions. Only Lantern's editable first-party package is excluded from public-package lookup; third-party dependencies remain audited. Bandit scans application and tool code; any genuine false-positive suppression must be narrowly scoped with a reason and logged, not a global lowering of the bar.
 
@@ -224,7 +225,7 @@ Primary maintainer references:
 
 ## Size
 
-Target approximately 350–400 handwritten non-test lines: about 70 for shared commands/runner, 55 for coverage/config parsing, 55 for acceptance tracing, 30 for code-tree hashing, 100 for proof orchestration/rendering, 35 for dependency denial and 25–40 for Make/configuration/import wiring. Reuse the existing Pydantic dependency and avoid a general-purpose framework. Tests, generated uv.lock/cache/coverage output and process documentation are counted separately. This is a large foundation story; if the real handwritten change needs more than approximately 400 non-test lines, stop and propose a split before building beyond that scope.
+The original estimate was 350–400 handwritten non-test lines. Accepted ADR 0003 permits this one story up to 800, with an expected final size of approximately 700–750, after the implemented tools showed the original estimate was too small. Reuse existing dependencies and avoid a general-purpose framework. Tests, generated uv.lock/cache/coverage output and process documentation are counted separately. No quality gate or acceptance criterion changes. Stop for a new decision before exceeding 800.
 
 ## Rollback
 
@@ -320,3 +321,33 @@ not completion of the implementation step.
 
 Proposed amendment for approval:
 [ADR 0003 — Proof kit size exception and strict package auditing](../adr/ADR-0003-proof-kit-size-and-strict-audit.md).
+
+### Amendment accepted 2026-10-23
+
+The user approved ADR 0003. Recorded its narrow 800-line exception in AGENTS.md
+and docs/05 before further code. Correct only the invalid audit catalogue entry,
+the matching fake-uv label and standalone-script coverage; retain every other
+assertion and all six acceptance criteria. Add tests and a RED checkpoint for
+the audit helper before implementing it. The helper's interfaces are
+`installed_requirements(root: Path) -> list[str]`,
+`audit(root: Path, *, runner: StepRunner = run_step) -> int`, and
+`main(argv: Sequence[str] | None = None) -> int`. Property-test sorted,
+order-independent exact pins, plus the inventory/strict-audit cases in ADR 0003.
+The earlier pending proposal and failure evidence remain historical log entries.
+
+### Additional RED run 2026-10-23 — accepted audit correction
+
+Changed only the approved audit expectation, matching fake-uv label and CLI
+parameter list. Added 16 audit-helper cases and signature-only stubs. No helper
+behavior was implemented before this run.
+
+Command: `uv run --offline pytest tests/test_audit_dependencies.py tests/test_check_pipeline.py::test_required_order tests/test_check_pipeline.py::test_standalone_scripts_have_working_cli tests/test_skeleton.py::test_make_check_commands_and_failure_propagation -q --tb=line --junitxml=/tmp/lantern-s02-audit-red.xml`.
+
+Real exit 1 in 8.112 seconds: **22 failed, 13 passed, 0 errors, 0 skipped**.
+16 failures are the audit stubs' NotImplementedError; six are assertions for
+the changed catalogue, missing CLI behavior and final pipeline step. The 13
+passing cases are regression guards: four built scripts already support help,
+and injection at the first nine existing commands already stops correctly.
+No import, syntax, collection or fixture error occurred. Captured output is
+/tmp/lantern-s02-audit-red.log. Ruff and strict mypy passed on this checkpoint.
+The requirement tracer remains a stub, so no acceptance-check success is claimed.

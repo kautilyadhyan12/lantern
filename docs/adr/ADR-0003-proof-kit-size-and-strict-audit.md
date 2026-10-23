@@ -2,7 +2,7 @@
 
 Date: 2026-10-23
 
-Status: Proposed. Requires the user's approval. This does not change policy yet.
+Status: Accepted by the user on 2026-10-23, before further implementation.
 
 Context: S0.2's approved plan estimated roughly 400 handwritten non-test lines.
 This proposes a narrow exception to the size rule accompanying D12's workflow,
@@ -24,14 +24,14 @@ The test's exact command catalogue encodes that invalid combination. It needs
 an approved correction; the implementation must not silently weaken the test
 or remove --strict.
 
-Proposed decision:
+Decision:
 
 1. Allow this one S0.2 bootstrap story up to 800 handwritten non-test lines.
    The expected final size is approximately 700–750, allowing readable validation
    and error handling. Retain the existing branch and all six acceptance criteria.
    Keep every coverage, lint, type, security, proof and independent-review gate.
-   Other stories retain the existing approximately 400-line rule. If accepted,
-   record this narrow exception in AGENTS.md and docs/05 before further code.
+   Other stories retain the existing approximately 400-line rule. Record this
+   narrow exception in AGENTS.md and docs/05 before further code.
 2. Add scripts/audit_dependencies.py and tests/test_audit_dependencies.py. The
    helper inventories the installed environment, validates package names,
    versions and editable metadata with Pydantic, and writes exact pins into a
