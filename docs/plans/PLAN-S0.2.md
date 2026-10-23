@@ -12,7 +12,7 @@ Out: investigation features, model calls, HTTP adapters, database schema changes
 
 Use the existing story/M0-boot branch under docs/08 §5. S0.1's implementation/check step has been reported: make check passed all 115 tests in both the working Codespace and a clean checkout. S0.1 is not marked DONE or merged. The first two stories receive joint proof and independent review after this implementation, using PLAN-M0 and make prove STORY=M0 AC_STORIES="S0.1 S0.2". That later plan/proof/review is not executed during this planning step.
 
-The user approved preparing this plan on 2026-10-23. Approval of its tests/code is still required. ADR 0002 is current: no mandatory package-age wait, but current advisory checks, official sources and locked hashes remain required.
+The user approved preparing this plan on 2026-10-23 and subsequently approved the plan before the tests-first step. ADR 0002 is current: no mandatory package-age wait, but current advisory checks, official sources and locked hashes remain required.
 
 ## Design
 
@@ -239,3 +239,28 @@ Plan written 2026-10-23.
 - Stayed on story/M0-boot under the documented bootstrap exception; the existing two-story branch is not recreated from main or merged.
 - Queried exact candidate versions/licences/Python support and current PyPI/OSV advisories, and checked primary maintainer docs. Verified the five coverage JSON summary keys against the maintainer's tagged 7.17.0 jsonreport.py source, and verified pip-audit --strict in its documented CLI. No dependency installation, tests, stubs, implementation, proof or review occurred during this plan step.
 - S0.1's pending fresh-container-rebuild limitation is carried forward without a fabricated result. No scope/AC changes are proposed; the six criteria in the Acceptance criteria section were copied verbatim from the backlog.
+
+### RED run 2026-10-23
+
+The user approved this plan. Used the tests-first skill on story/M0-boot. Added six test modules with explicit acceptance markers and Hypothesis properties for the planned pure functions. Extended the S0.1 pipeline contract exactly as approved: ten commands, failure injection at every step, and a narrowly matched fake-uv handoff to the actual Python interpreter for the shared-runner bootstrap.
+
+Added only interface stubs: the approved model fields, empty command/deny-list constants and functions raising `NotImplementedError("S0.2: not implemented yet")`. The standalone proof stub has the minimal repository-root import bootstrap required to resolve its type/signature imports. No proof behavior, Makefile/configuration changes, dependency additions, fixtures, proof/review artifacts or investigation features were implemented.
+
+Final RED command (stdout/stderr captured in /tmp/lantern-s02-red.log; JUnit detail in /tmp/lantern-s02-red.xml):
+
+```sh
+uv run --offline pytest tests/test_check_pipeline.py tests/test_coverage_gate.py tests/test_acceptance_ids.py tests/test_dependencies.py tests/test_code_tree.py tests/test_prove.py tests/test_skeleton.py::test_make_check_commands_and_failure_propagation -q --tb=line --junitxml=/tmp/lantern-s02-red.xml
+```
+
+Real result: exit 1; 169 cases collected, **165 failed, 4 passed, 0 errors, 0 skipped**, in 5.956 seconds. All failures were assertions or the deliberate stub's NotImplementedError, with no import, syntax, collection or fixture errors.
+
+| Failure reason | Cases | Meaning |
+|---|---:|---|
+| NotImplementedError from the approved interface stubs | 131 | Coverage, requirement tracing, dependency denial, committed-tree hashing, process execution and proof generation have no implementation yet |
+| AssertionError | 34 | Missing command catalogue, shared Make entry points, quality/import settings, CLI behavior and validation; the existing five-command pipeline does not yet satisfy its ten-command extension |
+
+Four already-passing cases are legitimate regression guards: Pydantic's existing AwareDatetime type already rejects naive proof timestamps, and failure injection at the first three existing checks already stops the S0.1 Makefile. These retain working guarantees rather than claiming the new tools are implemented. All later pipeline cases and its success case are RED. The first exploratory run had 163 failures and 4 passes; the final run additionally covers rounded percentages and partially unmeasured critical directories.
+
+The acceptance-ID checker is itself an unimplemented S0.2 stub, so the skill's bootstrap exception applies: no acceptance-tracing command is claimed to have run successfully. Every new test explicitly names one of the six backlog ACs. No cassette recorder is needed or used.
+
+Test/stub housekeeping checks passed using the existing environment: ruff check, ruff format --check (30 files), custom lint, and strict mypy (15 source files). These are not a full make check, PROOF or independent review. The intentionally RED checkpoint will become green only after implementation; neither bootstrap story is marked DONE or merged.

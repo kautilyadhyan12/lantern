@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+import sys
 import tomllib
 from pathlib import Path
 
@@ -9,7 +10,18 @@ import pytest
 
 from lantern import cli
 
-CHECKS = ["ruff check", "ruff format --check", "lint_custom.py", "mypy", "pytest"]
+CHECKS = [
+    "ruff check",
+    "ruff format --check",
+    "lint_custom.py",
+    "lint-imports",
+    "mypy",
+    "pytest",
+    "coverage_gate.py",
+    "check_dependencies.py",
+    "bandit",
+    "pip-audit",
+]
 
 
 @pytest.mark.ac("S0.1-AC1")
@@ -36,7 +48,8 @@ def test_python_pin_and_lockfile(project_file):
 
 
 @pytest.mark.ac("S0.1-AC1")
-@pytest.mark.parametrize("failed_step", [None, *range(5)])
+@pytest.mark.ac("S0.2-AC1")
+@pytest.mark.parametrize("failed_step", [None, *range(10)])
 def test_make_check_commands_and_failure_propagation(project_file, repo, tmp_path, failed_step):
     project_file("Makefile")
     project_file("scripts/lint_custom.py")
@@ -45,6 +58,8 @@ def test_make_check_commands_and_failure_propagation(project_file, repo, tmp_pat
     executable.write_text(
         "#!/usr/bin/env python3\n"
         "import json, os, sys\n"
+        "if sys.argv[1:] == ['run', 'python', '-m', 'scripts.checks']:\n"
+        f"    os.execv({sys.executable!r}, [{sys.executable!r}, '-m', 'scripts.checks'])\n"
         "args = ' '.join(sys.argv[1:])\n"
         f"checks = {CHECKS!r}\n"
         "index = next((i for i, item in enumerate(checks) if item in args), None)\n"
@@ -70,7 +85,7 @@ def test_make_check_commands_and_failure_propagation(project_file, repo, tmp_pat
     )
     assert log.is_file(), "make check must invoke the checks through uv run"
     seen = [int(line) for line in log.read_text().splitlines()]
-    assert seen == list(range(5 if failed_step is None else failed_step + 1))
+    assert seen == list(range(10 if failed_step is None else failed_step + 1))
     assert (result.returncode == 0) is (failed_step is None)
 
 
