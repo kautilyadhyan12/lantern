@@ -41,7 +41,9 @@ EXPECTED = {
     "tool.mypy.strict": True,
     "tool.mypy.warn_unreachable": True,
     "tool.mypy.plugins": ["pydantic.mypy"],
-    "tool.pytest.ini_options.addopts": "-q --strict-markers -p no:cacheprovider --import-mode=importlib",
+    "tool.pytest.ini_options.addopts": (
+        "-q --strict-markers -p no:cacheprovider --import-mode=importlib"
+    ),
     "tool.pytest.ini_options.pythonpath": ["."],
     "tool.pytest.ini_options.testpaths": ["tests"],
     "tool.pytest.ini_options.asyncio_mode": "auto",

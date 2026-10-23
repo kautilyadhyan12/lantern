@@ -16,8 +16,8 @@ BASE = "1491cfcba7d09d000ee09d6f35a22771a6bfdcd5"
 @pytest.mark.ac("S0.1-AC6")
 def test_pack_files_unchanged(repo):
     paths = [".devcontainer/devcontainer.json", "scripts/review_schema.json", ".codex", ".agents"]
-    tracked = subprocess.run(
-        ["git", "ls-tree", "-r", "--name-only", BASE, "--", *paths],
+    tracked = subprocess.run(  # noqa: S603  # Only repository tools and temporary test paths.
+        ["git", "ls-tree", "-r", "--name-only", BASE, "--", *paths],  # noqa: S607  # Only repository tools and temporary test paths.
         cwd=repo,
         text=True,
         capture_output=True,
@@ -26,8 +26,8 @@ def test_pack_files_unchanged(repo):
     )
     assert tracked.stdout.splitlines(), "The base pack must exist"
     for relative in tracked.stdout.splitlines():
-        original = subprocess.run(
-            ["git", "show", f"{BASE}:{relative}"],
+        original = subprocess.run(  # noqa: S603  # Only repository tools and temporary test paths.
+            ["git", "show", f"{BASE}:{relative}"],  # noqa: S607  # Only repository tools and temporary test paths.
             cwd=repo,
             capture_output=True,
             check=True,
@@ -53,8 +53,8 @@ def test_pack_files_unchanged(repo):
 )
 def test_gitignore_protects_local_material(project_file, repo, path):
     project_file(".gitignore")
-    result = subprocess.run(
-        ["git", "check-ignore", "--no-index", path],
+    result = subprocess.run(  # noqa: S603  # Only repository tools and temporary test paths.
+        ["git", "check-ignore", "--no-index", path],  # noqa: S607  # Only repository tools and temporary test paths.
         cwd=repo,
         capture_output=True,
         text=True,
@@ -68,7 +68,11 @@ def test_gitignore_protects_local_material(project_file, repo, path):
 def test_no_tracked_env(repo):
     tracked = (
         subprocess.run(
-            ["git", "ls-files", "-z"], cwd=repo, capture_output=True, check=True, timeout=10
+            ["git", "ls-files", "-z"],  # noqa: S607  # Fixed tool from the Codespace PATH.
+            cwd=repo,
+            capture_output=True,
+            check=True,
+            timeout=10,
         )
         .stdout.decode()
         .split("\0")
@@ -106,12 +110,19 @@ def test_development_commands_available():
     for name in ["uv", "docker", "node", "gh", "codex"]:
         assert shutil.which(name), f"Development container must provide {name}"
     node = subprocess.run(
-        ["node", "--version"], capture_output=True, text=True, check=True, timeout=10
+        ["node", "--version"],  # noqa: S607  # Fixed tool from the Codespace PATH.
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=10,
     )
     assert re.fullmatch(r"v(?:22|24)\.\d+\.\d+\s*", node.stdout), (
         "Expected an October 2026 Node LTS line"
     )
     compose = subprocess.run(
-        ["docker", "compose", "version"], capture_output=True, check=False, timeout=10
+        ["docker", "compose", "version"],  # noqa: S607  # Fixed tool from the Codespace PATH.
+        capture_output=True,
+        check=False,
+        timeout=10,
     )
     assert compose.returncode == 0

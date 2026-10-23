@@ -51,12 +51,12 @@ def test_expected_hooks_present(project_file):
 def test_make_hooks_installs(project_file, repo, tmp_path):
     makefile = project_file("Makefile")
     config = project_file(".pre-commit-config.yaml")
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, timeout=10)
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, timeout=10)  # noqa: S603, S607  # Only repository tools and temporary test paths.
     (tmp_path / "Makefile").write_text(makefile)
     (tmp_path / ".pre-commit-config.yaml").write_text(config)
     env = {**os.environ, "UV_PROJECT": str(repo), "PRE_COMMIT_HOME": str(tmp_path / "hook-cache")}
     result = subprocess.run(
-        ["make", "hooks"],
+        ["make", "hooks"],  # noqa: S607  # Only repository tools and temporary test paths.
         cwd=tmp_path,
         env=env,
         capture_output=True,
@@ -78,7 +78,7 @@ def test_whitespace_fixers_change_temp_file(project_file, repo, tmp_path):
     sample = tmp_path / "example.txt"
     sample.write_bytes(b"example  \n\n")
     for name in ["trailing-whitespace-fixer", "end-of-file-fixer"]:
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: S603  # Only repository tools and temporary test paths.
             [*shlex.split(hooks[name]["entry"]), str(sample)],
             cwd=repo,
             capture_output=True,
@@ -107,11 +107,11 @@ def test_secret_scanner_detects_synthetic_token(project_file, repo, tmp_path):
     command[command.index(".secrets.baseline")] = str(baseline_path)
     clean = tmp_path / "clean.py"
     clean.write_text("value = 42\n")
-    clean_result = subprocess.run(
+    clean_result = subprocess.run(  # noqa: S603  # Only repository tools and temporary test paths.
         [*command, str(clean)], cwd=repo, capture_output=True, text=True, timeout=30, check=False
     )
     assert clean_result.returncode == 0, "Prove the installed scanner runs on a clean file"
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: S603  # Only repository tools and temporary test paths.
         [*command, str(fake)], cwd=repo, capture_output=True, text=True, timeout=30, check=False
     )
     assert result.returncode == 1, "The installed hook must report the synthetic secret"

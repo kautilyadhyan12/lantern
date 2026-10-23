@@ -60,7 +60,7 @@ def test_make_check_commands_and_failure_propagation(project_file, repo, tmp_pat
         "FAIL_STEP": str(failed_step),
     }
     result = subprocess.run(
-        ["make", "check"],
+        ["make", "check"],  # noqa: S607  # Only repository tools and temporary test paths.
         cwd=repo,
         env=env,
         capture_output=True,
@@ -78,8 +78,8 @@ def test_make_check_commands_and_failure_propagation(project_file, repo, tmp_pat
 @pytest.mark.parametrize(("target", "expected"), [("db", "up"), ("db-down", "down")])
 def test_db_targets(project_file, repo, target, expected):
     project_file("Makefile")
-    result = subprocess.run(
-        ["make", "--dry-run", target],
+    result = subprocess.run(  # noqa: S603  # Only repository tools and temporary test paths.
+        ["make", "--dry-run", target],  # noqa: S607  # Only repository tools and temporary test paths.
         cwd=repo,
         capture_output=True,
         text=True,

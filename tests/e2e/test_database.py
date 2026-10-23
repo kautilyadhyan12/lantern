@@ -16,7 +16,7 @@ from lantern.db.migrate import MigrationError, upgrade
 def compose_config(repo):
     assert (repo / "compose.yaml").is_file(), "S0.1 must provide compose.yaml"
     result = subprocess.run(
-        ["docker", "compose", "config", "--format", "json"],
+        ["docker", "compose", "config", "--format", "json"],  # noqa: S607  # Only repository tools and temporary test paths.
         cwd=repo,
         text=True,
         capture_output=True,

@@ -385,3 +385,33 @@ The latest ruff report decreased from 84 findings to 24, all in tests: 20 warnin
 The user interrupted the turn to ask whether work was still running. Checked processes: no project build/test/install command was running. Saving this checkpoint before further work. No new pytest, mypy, custom-linter or complete make-check result is claimed for these edits; the prior 112-pass/3-failure run predates this cleanup. The updated scanner test still needs its real tool/baseline verification once safe dependencies can be installed. Implementation remains unfinished, with no proof, review, merge or later-story work.
 
 The seven-day cutoff and secure minimum constraints remain unchanged. Latest official Node LTS was rechecked as v24.22.1 and the running workspace already has it; no additional runtime update occurred. No Python packages were installed or updated on October 23 during this cleanup.
+
+
+### Cleanup and verification 2026-10-23
+
+The user asked to continue and explain progress in beginner-friendly terms. Stayed on the existing S0.1 implementation step; no later story, proof, review or merge was started.
+
+Resolved the 24 remaining ruff findings without changing acceptance criteria or removing test conditions. Wrapped the four long test fixture/configuration literals as adjacent strings so their values are unchanged. Added narrowly scoped S603/S607 suppressions only at deliberate subprocess call sites in tests, each with an inline reason identifying trusted repository tools and temporary test paths. No project-wide lint rule or per-file ignore list was weakened. The already-strengthened scanner test remains unchanged by this cleanup.
+
+Actual current-code verification:
+
+```sh
+UV_NO_SYNC=1 make check
+```
+
+Ran with the previously verified local database healthy and dependency syncing explicitly disabled. Output:
+
+- `uv run ruff check .`: All checks passed.
+- `uv run ruff format --check src scripts tests`: 17 files already formatted.
+- `uv run python scripts/lint_custom.py`: exit 0.
+- `uv run mypy --strict`: Success, no issues found in 8 source files.
+- `uv run --offline pytest`: **3 failed, 112 passed in 5.38s**.
+- Overall make exit: **2**. The full quality gate is not green.
+
+The remaining failures are exactly the three previously documented hook/secret-scanner tests: expected baseline absent, pre-commit intentionally not installed, and scanner baseline absent. None was skipped, marked xfail, weakened or made to pass using a missing executable. Actual baseline/scanner positive and negative behavior cannot be verified until the safe dependencies are installable. No fake baseline or fixture was written.
+
+No packages were installed or upgraded. The secure minimum constraints, seven-day cutoff and official-Node-only security exception are unchanged. Based on the previously checked artifact upload timestamps, certifi's secure minimum does not finish its waiting period until October 27; that remains the earliest planned retry for a complete dependency resolution, subject to fresh advisory/version checks at that time. No bypass is authorized.
+
+Started the existing pinned Compose image using make db for verification and stopped it afterward using make db-down while retaining the named volume. No captured evidence, real secrets or personal data was added. The only code-file changes in this checkpoint are test formatting and documented test-command suppressions; runtime code and protected container/harness files are unchanged. Handwritten non-test files remain 402 physical lines, approximately the story-size guideline, with no scope expansion.
+
+Status: S0.1 implementation still unfinished, but lint, formatting, custom checks, strict types and the available tests have now been rechecked on the cleaned code. Fresh-clone full sync, clean container rebuild, generated scanner baseline, hook installation, a fully green make check, combined M0 proof/review and merge remain outstanding. Save and push this checkpoint; do not mark the story done or begin S0.2 while implementation is incomplete.

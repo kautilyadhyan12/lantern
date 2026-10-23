@@ -81,7 +81,11 @@ def test_skip_with_issue_url_allowed(call):
 
 @pytest.mark.ac("S0.1-AC5")
 def test_skip_decorator_with_issue_url_allowed():
-    source = "import pytest\n@pytest.mark.skipif(True, reason='https://github.com/example/lantern/issues/1')\ndef test_x():\n    pass\n"
+    source = (
+        "import pytest\n"
+        "@pytest.mark.skipif(True, reason='https://github.com/example/lantern/issues/1')\n"
+        "def test_x():\n    pass\n"
+    )
     assert lint_source(source, "tests/example.py") == []
 
 
@@ -122,7 +126,10 @@ def test_print_only_forbidden_in_src(source):
 
 @pytest.mark.ac("S0.1-AC5")
 def test_clean_code():
-    source = "# A useful comment\nvalue = 'print( and # noqa are data'\ntry:\n    work()\nexcept ValueError:\n    recover()\n"
+    source = (
+        "# A useful comment\nvalue = 'print( and # noqa are data'\n"
+        "try:\n    work()\nexcept ValueError:\n    recover()\n"
+    )
     assert lint_source(source, "src/lantern/example.py") == []
 
 
@@ -132,7 +139,10 @@ def valid_programs(draw):
     literal = repr(draw(st.text(max_size=100)))
     name = "value_" + draw(st.text(alphabet=string.ascii_lowercase, min_size=1, max_size=12))
     body = "\n".join(f"{name}_{index} = {value!r}" for index, value in enumerate(values))
-    return f"{body}\ndef example(argument):\n    if argument:\n        return {literal}\n    return None\n"
+    return (
+        f"{body}\ndef example(argument):\n    if argument:\n"
+        f"        return {literal}\n    return None\n"
+    )
 
 
 @pytest.mark.ac("S0.1-AC5")
@@ -191,7 +201,7 @@ def test_script_exit_and_diagnostics(repo, tmp_path):
     source = tmp_path / "unsafe.py"
     source.write_text("subprocess.run([], shell=True)\n")
     command = [sys.executable, str(repo / "scripts/lint_custom.py"), str(source)]
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: S603  # Only repository tools and temporary test paths.
         command, cwd=tmp_path, capture_output=True, text=True, timeout=10, check=False
     )
     assert result.returncode != 0, "The executable linter must run its checks"
