@@ -856,3 +856,17 @@ propose a focused split of the remaining requirement-checker repair through
 the planning step. No fourth review, further implementation, passing final
 proof, ship or merge is authorized by the existing plan. The code-removal
 blocker remains visible and unfixed pending the user's decision.
+
+Saved/pushed the unchanged third review and new regression file as `01ada5a`.
+Its raw report SHA256 still matches the captured value. Removed only the
+owned temporary worktree after confirming the copied test's identical bytes.
+
+Prepared proposed PLAN-S0.2.1 and ADR 0007 as the required split proposal.
+They isolate the remaining binding repair, preserve all original requirements,
+propose two explicit repair criteria, and request a narrow bootstrap branch
+extension plus exactly one additional joint review after a new full proof.
+They do not silently reset the review count or declare approval. The proposed
+repair adds an estimated 20–30 non-test lines, remaining within the existing
+combined size cap. No backlog, branch rule, protected harness, code, test or
+review-budget change was made in this planning step. Await the user's yes
+before accepting the ADR or beginning the proposed story.
