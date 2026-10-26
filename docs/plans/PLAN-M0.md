@@ -576,3 +576,92 @@ Regenerated proof completed successfully at 2026-10-26T06:19:08.925521+00:00: al
 310 tests passed and RESULT: PASS. Pre-save artifact SHA256 is
 `4074e4900802506520ac64af39a1f7ebb47c71270a2701bea359ee50aa719291`. Verify that exact hash after the docs-only commit;
 no auto-formatted artifact is accepted.
+
+
+### Independent review round 1 — REQUEST_CHANGES — 2026-10-26
+
+After committing/pushing the unchanged generated proof, created the owned
+detached worktree at f38d51a, ran `uv sync --frozen`, and prepared the exact
+protected prompt with only its four documented placeholders substituted.
+Used the accepted ADR 0004 temporary output-schema digest field. Showed every
+review command before running it. The CLI ran a fresh ephemeral review with
+requested model gpt-6-astra, workspace-write sandbox, approval_policy=never,
+shell network disabled and a minimal shell environment with offline/no-sync
+uv settings. API-key environment overrides were explicitly removed from that
+process; it used the existing Codex sign-in.
+
+The sanctioned CLI wrote REVIEW-M0.json. Its original payload validates against
+the unchanged shipped JSON schema, with code_tree validated separately against
+the captured digest. HEAD and digest match the reviewed commit. The report
+self-identifies its model family as `gpt-6`; retain that value unaltered rather
+than replacing it with the configured alias. This field is not an independent
+backend-model attestation; the launch command and preflight record the
+requested available gpt-6-astra alias. All 13 AC IDs are present exactly once.
+
+Verdict: **REQUEST_CHANGES**. Both blockers are supported by failing tests and
+contradict the already approved linter behavior, so both are real:
+
+- B1: bare skip/xfail decorators bypass the issue-link check (two cases).
+- B2: an import alias local to an unrelated function can overwrite the module
+  alias map and hide a forbidden time.sleep call (one case).
+
+The reviewer created only `tests/review/test_m0_r1_adversarial.py`, with eleven
+test functions/15 parametrized cases, including Hypothesis comparisons. Its
+result was **12 passed, 3 failed**. Copied only that exact new file back; the
+same root-workspace command `uv run --offline pytest tests/review -q -k m0`
+(same temporary cache/no-sync environment) reproduced all three failures.
+Ruff check and format check pass for the retained file. No existing file was
+changed in the worktree. After verifying the retained bytes, removed its copy
+and deleted only the owned worktree. No REVIEW bytes were edited.
+
+Notes and limits: the review sandbox denied socket creation, so three original
+database tests failed there while 307 passed. As instructed by the prompt,
+these are environment notes, not blockers; the full gate passed with the real
+database outside that sandbox. The reviewer disclosed that its reference
+functions were written after inspecting implementation, so they are not
+claimed as blinded reference comparisons. The next fresh review must honor
+the existing prompt's reference-before-implementation requirement. No final
+approval is claimed for round 1. The bounded-output memory observation is a
+future maintainability note; it does not expand this fix's scope.
+
+The user added an explicit instruction: do not add an API key without asking.
+Acknowledged that no key has been added. Record it in the root project rules
+during the next fix commit; no new credential, registration, auth flow or paid
+service is authorized. Existing sign-in remains the review authentication.
+
+Save/push the reviewer tests and raw REQUEST_CHANGES report before fixing B1/B2.
+The fixes remain within the approved static-linter scope, keep all existing
+assertions and retained review tests, and require another proof/fresh review.
+
+Raw round-1 REVIEW SHA256 before saving: `5858e785c6d2ae8a3d221af37e8345e31748f2d04ef497ee404ff343e647135f`.
+
+
+The round-1 save was initially blocked by the real secret hook: the REVIEW's
+`head_sha` and `code_tree` values triggered hex-entropy alarms. Verified that
+both are the public Git/code fingerprints already validated against the
+reviewed source, not API keys. No credential was created or inserted.
+
+Added a genuine scanner regression test in tests/test_hooks.py. Before the
+configuration change, the public-metadata case failed with AssertionError
+(scanner exit 1). Regenerated .secrets.baseline using the installed
+`detect-secrets scan --no-verify --baseline .secrets.baseline --exclude-lines`
+CLI, adding only an anchored, whole-line pattern for JSON head_sha (40/64 hex)
+and code_tree (64 hex) fields. The independent review metadata validation still
+binds those values to actual committed code. This avoids a cyclic per-value
+baseline that would change whenever a new code fingerprint is generated.
+
+All detector plugins/entropy thresholds and all ten previous findings are
+unchanged. No review file or general hash class is excluded. The real
+configured hook now accepts the public fields but rejects a test-authored
+synthetic token in notes, both in pretty JSON and in compact JSON on the same
+line as metadata. Existing scanner tests remain unchanged and still check a
+clean file and synthetic-token detection. The isolated new test passed after
+regeneration completed; an initial concurrent attempt had read the prior
+baseline before regeneration finished and was repeated after that dependency
+completed. No failed run is relabeled as a pass.
+
+This is baseline housekeeping within S0.1's approved local-hook scope, using
+its sanctioned generator; no baseline was hand-edited and no secret detector,
+CI file, protected harness file, real key or account setting was changed.
+The baseline and its regression guard are included with this save, and will
+be covered by the next full proof and fresh review.

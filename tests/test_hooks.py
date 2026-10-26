@@ -1,5 +1,6 @@
 """Developer hooks use the locked local environment and actually check files."""
 
+import hashlib
 import json
 import os
 import shlex
@@ -116,3 +117,36 @@ def test_secret_scanner_detects_synthetic_token(project_file, repo, tmp_path):
     )
     assert result.returncode == 1, "The installed hook must report the synthetic secret"
     assert str(fake) in result.stdout + result.stderr
+
+
+@pytest.mark.ac("S0.1-AC4")
+def test_secret_scanner_allows_review_fingerprints_but_checks_notes(project_file, repo, tmp_path):
+    config = hook_config(project_file)
+    hook = next(h for item in config["repos"] for h in item["hooks"] if h["id"] == "detect-secrets")
+    baseline = tmp_path / ".secrets.baseline"
+    baseline.write_text(project_file(".secrets.baseline"))
+    command = shlex.split(hook["entry"])
+    command[command.index(".secrets.baseline")] = str(baseline)
+    metadata = {
+        "head_sha": hashlib.sha1(b"public git object", usedforsecurity=False).hexdigest(),
+        "code_tree": hashlib.sha256(b"public code tree").hexdigest(),
+        "notes": [],
+    }
+    report = tmp_path / "review.json"
+    report.write_text(json.dumps(metadata, indent=2) + "\n")
+    clean = subprocess.run(  # noqa: S603  # Configured local scanner checks this test's fake report.
+        [*command, str(report)], cwd=repo, capture_output=True, text=True, timeout=30, check=False
+    )
+    assert clean.returncode == 0, "Public review fingerprints must not cause a secret alarm"
+    metadata["notes"] = ["Synthetic test token: " + "AKIA" + "A" * 16]
+    report.write_text(json.dumps(metadata, indent=2) + "\n")
+    unsafe = subprocess.run(  # noqa: S603  # The token is synthetic and never a real credential.
+        [*command, str(report)], cwd=repo, capture_output=True, text=True, timeout=30, check=False
+    )
+    assert unsafe.returncode == 1, "Fingerprint handling must not exempt review notes"
+    assert str(report) in unsafe.stdout + unsafe.stderr
+    report.write_text(json.dumps(metadata) + "\n")
+    compact = subprocess.run(  # noqa: S603  # Metadata must not hide a synthetic token on one line.
+        [*command, str(report)], cwd=repo, capture_output=True, text=True, timeout=30, check=False
+    )
+    assert compact.returncode == 1, "A compact report must still have its notes scanned"
