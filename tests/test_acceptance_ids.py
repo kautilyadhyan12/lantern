@@ -50,6 +50,55 @@ def test_class_test_names():
 
 
 @pytest.mark.ac("S0.2-AC3")
+def test_same_method_name_in_different_classes_is_allowed():
+    source = "\n".join(
+        f"class Test{suffix}:\n    @pytest.mark.ac('S9.1-AC1')\n    def test_case(self): pass\n"
+        for suffix in ("First", "Second")
+    )
+    assert trace.test_marks(source, "tests/test_rules.py") == {
+        "S9.1-AC1": [
+            "tests/test_rules.py::TestFirst::test_case",
+            "tests/test_rules.py::TestSecond::test_case",
+        ]
+    }
+
+
+@pytest.mark.ac("S0.2-AC3")
+def test_redefined_test_class_cannot_cover_ac():
+    source = (
+        "class TestExample:\n    @pytest.mark.ac('S9.1-AC1')\n"
+        "    def test_case(self): pass\nclass TestExample:\n    pass\n"
+    )
+    with pytest.raises(ValueError, match=r"(?i)(duplicate|redefined)"):
+        trace.test_marks(source, "tests/test_example.py")
+
+
+@pytest.mark.ac("S0.2-AC3")
+@pytest.mark.parametrize("filename", ["test_example.py", "example_test.py"])
+def test_default_pytest_module_patterns_are_counted(tmp_path, monkeypatch, filename):
+    monkeypatch.chdir(tmp_path)
+    args = workspace(
+        tmp_path,
+        {filename: marked_source("S9.1-AC1") + marked_source("S9.1-AC2", "test_second")},
+    )
+    assert trace.main(args) == 0
+
+
+@pytest.mark.ac("S0.2-AC3")
+def test_unknown_marker_in_helper_file_still_fails(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    args = workspace(
+        tmp_path,
+        {
+            "test_valid.py": marked_source("S9.1-AC1") + marked_source("S9.1-AC2", "test_second"),
+            "helper.py": marked_source("S99.9-AC1"),
+        },
+    )
+    assert trace.main(args) != 0
+    assert "S99.9-AC1" in capsys.readouterr().out
+
+
+@pytest.mark.ac("S0.2-AC3")
 @pytest.mark.parametrize(
     "argument", ["VARIABLE", "'S9.1-' + 'AC1'", "", "123", "'S9.1-AC1', 'extra'"]
 )

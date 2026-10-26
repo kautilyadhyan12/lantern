@@ -752,3 +752,40 @@ test. Regenerated the baseline with the real scanner's `scan --no-verify
 all ten previous findings retained, and exactly one new finding at the
 review test's digest line. No credential was detected or added. The native
 review artifact's SHA256 remains unchanged.
+
+### Round 2 blocker fixes — checkpoint pending test-correction permission
+
+Preserved and pushed the native round-2 review/tests as `4d8ca01` before
+fixing anything. The root reviewer-test run reproduced B1/B2; all earlier
+round-1 tests passed. Added ordinary tests for replacing a Test class, both
+default pytest module filename patterns, same method names in distinct
+classes, and unknown markers inside helper modules. Before implementation,
+the replaced-class test failed with DID NOT RAISE; allowed cases passed.
+
+The acceptance checker now credits only test_*.py and *_test.py modules,
+while still inspecting every Python module under tests/ for unknown IDs.
+It rejects duplicate test-function or Test-class definitions within a single
+namespace, preserving same method names across different classes. The two
+reviewer blockers and the focused acceptance/boundary/reference run pass.
+Ruff check/format and strict mypy pass. The full `make check` result is
+**362 passed, 1 failed**; its sole failure is the unchanged round-2 artifact
+test at line 276, which compares the current committed tree with the older
+proof's digest after the mandatory reviewer-test save. It is not a code-fix
+regression. The reviewer's second fixed digest would also become stale after
+code changes. Log: `/tmp/lantern-m0-r2-fixes-check.txt`.
+
+The proposed correction is to verify each artifact against the commit it
+records: use the PROOF's Commit and Code tree fields and the REVIEW's
+head_sha/code_tree fields with the already approved code_tree(commit=...)
+interface. This preserves the provenance assertions while allowing the
+required review-test/fix/proof cycle. The user's agreement is pending; the
+reviewer test remains byte-for-byte unchanged and no skip/xfail was added.
+Do not claim a passing current gate, new proof or third review yet.
+
+Measured handwritten additions using the original S0.2 counting basis
+(`git diff 0464260 --numstat -- .gitignore Makefile pyproject.toml scripts/`):
+**768 added non-test lines**, including the linter review fixes, within
+ADR 0003's 800-line cap. The separately approved setup remains within its
+100-line amendment. No protected harness/CI file, dependency or API key was
+changed. Save/push this honest checkpoint before asking for the remaining
+test-correction decision.

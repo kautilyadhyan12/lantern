@@ -29,8 +29,16 @@ def acceptance_ids(backlog_text: str, stories: Sequence[str]) -> list[str]:
 
 def test_marks(source: str, path: str) -> dict[str, list[str]]:
     marks: dict[str, list[str]] = {}
+    definitions: dict[tuple[str, ...], set[str]] = {}
 
     def visit(node: ast.AST, parents: tuple[str, ...] = ()) -> None:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            prefix = "Test" if isinstance(node, ast.ClassDef) else "test_"
+            if node.name.startswith(prefix):
+                names = definitions.setdefault(parents, set())
+                if node.name in names:
+                    raise ValueError(f"{path}: Duplicate test definition: {node.name}.")
+                names.add(node.name)
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             for decorator in node.decorator_list:
                 if ast.unparse(decorator) == "pytest.mark.ac":
@@ -70,16 +78,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         all_stories = re.findall(r"^###\s+(S\d+(?:\.\d+)+)\b", backlog, re.M)
         known = set(acceptance_ids(backlog, all_stories))
         marks: dict[str, list[str]] = {}
+        referenced: set[str] = set()
         for path in sorted(Path("tests").rglob("*.py")):
             filename = str(path)
-            for ac, names in test_marks(path.read_text(), str(path)).items():
-                marks.setdefault(ac, []).extend(names)
+            file_marks = test_marks(path.read_text(), str(path))
+            referenced.update(file_marks)
+            if path.match("test_*.py") or path.match("*_test.py"):
+                for ac, names in file_marks.items():
+                    marks.setdefault(ac, []).extend(names)
     except (OSError, ValueError, SyntaxError) as error:
         print(f"{filename}: cannot trace requirements ({type(error).__name__}). Check IDs/markers.")
         return 1
     for ac in selected:
         print(f"{ac} -> {', '.join(marks.get(ac, [])) or 'MISSING TEST'}")
-    unknown = sorted(marks.keys() - known)
+    unknown = sorted(referenced - known)
     if unknown:
         print("Unknown acceptance IDs: " + ", ".join(unknown))
     return int(bool(unknown) or not selected or any(not marks.get(ac) for ac in selected))
