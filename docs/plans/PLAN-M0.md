@@ -693,3 +693,14 @@ from the already approved PLAN descriptions *before* inspecting the matching
 implementation. That ordering satisfies the unchanged protected review
 prompt's reference requirement; round 1's comparisons are not represented
 as blinded. No prompt or review runner is changed.
+
+The round-1 fix was committed and pushed as `19b483a6a6d2474cce8f510669336ff8cfd11906`.
+The sanctioned `make prove STORY=M0 AC_STORIES="S0.1 S0.2"` then exited 0 on
+that exact commit and wrote PROOF-M0.md. It records **338 passed**, **95.85492227979275%**
+total coverage, all eleven step exits 0 and `RESULT: PASS`. The listed future
+critical paths are explicitly `not present`; none is mislabeled as covered.
+The original generated proof SHA256 before saving is
+`1c5196a81bbc57305bbe85ffe2477bfeab09537aa74c9f59cead6b2d25492767`.
+As with the prior generated proof, the two text auto-fixing commit hooks must
+be omitted only for this docs-only save to preserve the writer's exact bytes;
+the secret scan and all other configured hooks remain active.
