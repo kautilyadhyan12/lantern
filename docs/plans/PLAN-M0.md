@@ -515,3 +515,64 @@ remain explicit in ADR 0006 and must be visible to the independent reviewer.
 Implementation is complete and reported to the user. Save/push this evidence
 before running the exact formal `make prove STORY=M0 AC_STORIES="S0.1 S0.2"`.
 No story is marked DONE and no merge or PR is authorized by this handoff.
+
+
+### Formal proof PASS — 2026-10-26
+
+Ran the required command on committed code, with dependency syncing disabled
+and the existing writable temporary uv cache selected:
+
+```sh
+UV_CACHE_DIR=/tmp/lantern-uv-cache UV_NO_SYNC=1 make prove STORY=M0 AC_STORIES="S0.1 S0.2"
+```
+
+Exit **0**. The sanctioned writer produced `docs/proofs/PROOF-M0.md` for commit
+`ac058ac61e37fdaee09f6c33cd4bd26a8f70e997`, code tree
+`db8daa57201317ee2e3bbc04ee33cdafa978f815e858754b659bbeefb5e45bd8`,
+at 2026-10-26T06:13:20.160178+00:00 on Linux/azure x86_64. Read and validated
+its metadata and all **11** results: every exit code is 0, **310 tests passed**,
+coverage **95.90723055934515%**, all 13 ACs mapped, and final **RESULT: PASS**.
+All eight configured critical paths are explicitly "not present"; none is
+misrepresented as measured. No PROOF content was written or edited by hand.
+
+Reported the successful proof to the user. Saving/pushing the generated proof
+and this log before beginning independent review. The only pending process
+step in this approved plan is independent review and any required fixes plus
+the final proof; opening a PR and merging remain outside this plan.
+
+Fresh-test cleanup completed: removed only the owned fresh container, then
+its exact temporary image through the private daemon, and stopped that owned
+daemon after verifying its PID and data-root arguments. The active Docker
+daemon, project database and Codespace were left running. Cloud workspace
+disk: approximately 16 GiB free; cloud temporary disk: approximately 38 GiB
+free. No laptop resources were accessed. No images/volumes belonging to other
+work were pruned. Temporary source clones and text logs remain under /tmp.
+
+Read-only reviewer preflight using the documented Codex account protocol
+confirmed gpt-6-astra and gpt-6-sol are available and existing quota remains.
+No model turn, credit purchase, quota-reset consumption, auth flow or account
+setting change occurred in that preflight. Account usage details are not
+committed. System Python already supplies jsonschema for manual validation;
+no new dependency or review runner is being installed.
+
+
+The first proof-save attempt did not commit: the trailing-whitespace pre-commit
+hook altered one trailing space in lint-imports' captured diagram inside the
+generated proof, then returned failure. No code gate failed and the secret
+scanner passed. That automatically edited artifact is not accepted. Reran the
+exact sanctioned make-prove command to regenerate the complete record, rather
+than repairing the artifact by hand.
+
+For this docs-only generated-artifact commit, omit only the two auto-fixing
+text hooks via `SKIP=end-of-file-fixer,trailing-whitespace-fixer`, so no writer
+other than make prove alters its output. The plan log is checked separately
+for whitespace; the secret scanner still runs. No hook configuration, Python
+check, test, coverage threshold, audit or proof step is skipped or weakened.
+This narrow save procedure follows the exclusive-artifact-writer instruction;
+it is not permission to bypass formatting for source changes. The regenerated
+proof must again validate against HEAD and all 11 check results before saving.
+
+Regenerated proof completed successfully at 2026-10-26T06:19:08.925521+00:00: all 11 exits 0,
+310 tests passed and RESULT: PASS. Pre-save artifact SHA256 is
+`4074e4900802506520ac64af39a1f7ebb47c71270a2701bea359ee50aa719291`. Verify that exact hash after the docs-only commit;
+no auto-formatted artifact is accepted.
