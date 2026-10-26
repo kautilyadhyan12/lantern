@@ -49,4 +49,11 @@ done
 install -m 0755 "$setup_tmp/uv-x86_64-unknown-linux-gnu/uv" \
     "$setup_tmp/uv-x86_64-unknown-linux-gnu/uvx" "$install_root/bin/"
 install -m 0755 "$setup_tmp/codex-x86_64-unknown-linux-musl" "$install_root/bin/codex"
+if [[ $# -eq 0 ]]; then
+    for startup in "$HOME/.bashrc" "$HOME/.zshrc"; do
+        if ! grep -Fqx 'export PATH="$HOME/.local/share/lantern-tools/bin:$PATH"' "$startup" 2>/dev/null; then
+            printf '\n%s\n' 'export PATH="$HOME/.local/share/lantern-tools/bin:$PATH"' >> "$startup"
+        fi
+    done
+fi
 echo 'Workspace tools installed. Run uv sync --frozen to prepare the project.'

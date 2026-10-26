@@ -196,3 +196,37 @@ def test_unsupported_architecture_rejected_before_download(repo, tmp_path):
     assert "x86_64" in (result.stdout + result.stderr)
     assert not Path(env["SETUP_TRACE"]).exists(), "Reject unsupported hosts before downloading"
     assert not root.exists()
+
+
+@pytest.mark.ac("S0.1-AC6")
+def test_default_setup_selects_node_after_shell_initialization(repo, tmp_path):
+    installer, _, _, _, versions, env = prepare(repo, tmp_path)
+    user_directory = tmp_path / "user"
+    user_directory.mkdir()
+    # HOME retains its normal meaning: the test subprocess's simulated user home.
+    env["HOME"] = str(user_directory)
+    bashrc = user_directory / ".bashrc"
+    bashrc.write_text("export PATH=/usr/bin:/bin\n")
+    command = ["/bin/bash", str(installer)]
+    subprocess.run(command, env=env, capture_output=True, text=True, timeout=15, check=True)  # noqa: S603  # Test-authored installer copy with harmless archives.
+    result = subprocess.run(  # noqa: S603  # Fixed shell command reads only this test's profile.
+        [
+            "/bin/bash",
+            "--noprofile",
+            "--rcfile",
+            str(bashrc),
+            "-ic",
+            "command -v node; node --version",
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    expected = user_directory / ".local/share/lantern-tools/bin/node"
+    assert result.stdout.splitlines() == [str(expected), f"v{versions['NODE']}"]
+    profiles = [bashrc, user_directory / ".zshrc"]
+    before = [profile.read_text() for profile in profiles]
+    subprocess.run(command, env=env, capture_output=True, text=True, timeout=15, check=True)  # noqa: S603  # Same isolated installer invocation verifies a repeat run.
+    assert [profile.read_text() for profile in profiles] == before

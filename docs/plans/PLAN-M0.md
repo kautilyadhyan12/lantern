@@ -398,3 +398,86 @@ reading docs/02 §9/§17 and docs/07 §1–§2 and the applicable source/tests:
 Saving this checked implementation candidate before creating its fresh clone.
 Fresh-container verification, formal proof and independent review are still
 pending; the full gate result alone does not satisfy those steps.
+
+### Fresh-environment verification and shell regression — 2026-10-26
+
+All work runs in the existing cloud Codespace, not on the user's laptop. The
+user asked about low memory; clarified that the warning concerned the cloud
+workspace's disk. The imported image's measured logical size (10,488,245,848
+bytes) underestimated peak Docker import disk usage. Stopped only the owned
+`docker load` client when the cloud workspace approached capacity. Docker
+released its temporary import data; the workspace returned to **16 GiB free**.
+The active daemon still contained only its existing 445-MB database image and
+running database. No user data, volume, image cache or repository was deleted.
+
+Used the separate temporary daemon's already verified image directly instead.
+Its data lives on the cloud `/tmp` filesystem, with approximately 27 GiB still
+free after setup. Created the owned container `lantern-m0-fresh-f165784`, using
+the exact pinned Microsoft image, its codespace user, a 4-GiB memory limit and
+two CPUs. No auth directory, repository host mount or secret environment was
+provided. The source is an independent clone of committed candidate f165784.
+The host network permits use of the already-running loopback test database;
+this is not a new Codespace and not an independent database test.
+
+Ran the real `.devcontainer/setup.sh` with no install-root override. Every
+official download passed its committed SHA256 check. The first fresh shell
+exposed a real bug: interactive Bash selected the image's Node 24.21.0 after
+initialization, overriding remoteEnv's selected Node 24.22.1. Fixed the default
+installation to append one PATH line to Bash and Zsh startup files, after any
+image-provided version-manager initialization. Explicit installation roots
+used by tests remain isolated. Existing lines are recognized exactly, so a
+rerun does not append duplicate entries. The installer is now 59 lines, and
+the installer plus JSON configuration total 68 physical lines, below the
+approved 100-line bound.
+
+Added `test_default_setup_selects_node_after_shell_initialization` with harmless
+local archives. It runs a real interactive Bash after a preexisting profile
+resets PATH, checks the selected executable and version, and repeats setup to
+verify both profiles are unchanged. HOME is set only in that test subprocess
+to represent its simulated user's home; no actual user profile is changed by
+pytest. No existing test demand was weakened.
+
+Actual regression evidence: copied the new test and the **previous committed
+installer from f165784** into an owned temporary test tree, then ran:
+
+```sh
+UV_CACHE_DIR=/tmp/lantern-uv-cache UV_NO_SYNC=1 uv run --offline pytest /tmp/lantern-m0-profile-red-0xy0i457/tests/test_devcontainer_setup.py -k default_setup -q --tb=line
+```
+
+Exit **1**, **one failed** with AssertionError: the old installer did not select
+the installed Node after shell initialization. This is a regression check
+against the actual prior code, not a claim that the earlier eight-test RED log
+covered this extra failure. The same new test against the corrected installer,
+with all setup/workspace tests, exited **0: 22 passed**. Ruff check, formatting,
+Bash syntax and diff whitespace checks passed.
+
+Before fresh dependency installation, rechecked all **75** locked PyPI packages
+against current exact-version metadata and **1,238** selected artifact hashes.
+No active advisory, yanked selected artifact or nonofficial source was found.
+Current lock SHA256:
+`5354cf428795c97e808e0017dfaaeba8ca357f0eff7755e2fbaeea51cf5f88c1`.
+The earlier 50-package count belongs to the S0.1 environment before the proof
+kit's development dependencies; it is not the current complete inventory.
+
+Actual fresh `uv sync --frozen` exited 0, with Python downloads explicitly
+disabled. It used the image's existing `/usr/bin/python3.12` (CPython 3.12.3),
+created a new .venv and installed the exact lock. No unreviewed managed Python
+build was substituted. The publisher's interpreter metadata was inspected as
+data only; no managed interpreter was downloaded. Upstream patch availability
+is not a claim that this image's distro-backported interpreter has received a
+complete OS audit. Project dependencies retain the strict audit gate.
+
+Verified an actual Docker daemon inside the fresh container. A first nested
+container smoke command failed because overlay-on-overlay storage is not
+supported in this temporary arrangement. Restarted only the owned inner daemon
+using VFS and disabled bridge/iptables management, without changing repository
+configuration or the active cloud network. Built a tiny root filesystem from
+the pinned image's existing `/bin/true`, libc and loader; imported it into that
+inner daemon and ran it with `--network none`: **exit 0**. No extra image was
+downloaded for this smoke command. This proves the inner engine actually ran a
+container, beyond checking that its CLI binary exists.
+
+After the profile fix, the real fresh interactive shell selected Node 24.22.1,
+and the fresh project environment reported Python 3.12.3. Refresh the committed
+source in this owned clone and run its full gate before formal proof. The
+original workspace remains running with its checked code saved and pushed.
