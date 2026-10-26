@@ -665,3 +665,31 @@ its sanctioned generator; no baseline was hand-edited and no secret detector,
 CI file, protected harness file, real key or account setting was changed.
 The baseline and its regression guard are included with this save, and will
 be covered by the next full proof and fresh review.
+
+### Round 1 blocker fixes — 2026-10-26
+
+Reproduced all three failures in the retained reviewer file before changing
+the linter. Added ordinary S0.1-AC5 regression tests for bare skip/xfail
+decorators, unrelated local imports, methods, decorator evaluation and the
+separate expression scopes of lambdas and comprehensions. The first focused
+RED run failed seven checks; a second scope-edge RED run failed five checks.
+Kept the allowed variants, including the first iterable of a comprehension
+running in its enclosing class scope.
+
+The linter now checks bare decorators and resolves imported aliases within
+their actual lexical scope. It evaluates decorators/default arguments in the
+enclosing scope and avoids treating a class namespace as a closure for its
+methods or expression scopes. This is a correction to the approved static
+S0.1 linter, not a new public interface or runtime investigation feature.
+Retained the round-1 reviewer tests unchanged. The full `make check` completed
+with all ten steps green: **338 passed**, total coverage
+**95.85492227979275%**, strict mypy, ruff, dependency audit and other gates
+green. The check log is `/tmp/lantern-m0-r1-fixes-final-check.txt`.
+
+Recorded the user's standing rule in AGENTS.md: never create, add or change
+an API key without explicit permission. No key was created or changed. Before
+round 2, the fresh reviewer must write its own reference implementations
+from the already approved PLAN descriptions *before* inspecting the matching
+implementation. That ordering satisfies the unchanged protected review
+prompt's reference requirement; round 1's comparisons are not represented
+as blinded. No prompt or review runner is changed.

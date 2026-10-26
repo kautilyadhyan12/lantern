@@ -90,6 +90,85 @@ def test_skip_decorator_with_issue_url_allowed():
 
 
 @pytest.mark.ac("S0.1-AC5")
+@pytest.mark.parametrize("marker", ["skip", "xfail"])
+def test_bare_decorator_with_issue_comment_allowed(marker):
+    source = (
+        f"import pytest\n@pytest.mark.{marker}  # https://github.com/example/lantern/issues/1\n"
+        "def test_x():\n    pass\n"
+    )
+    assert lint_source(source, "tests/example.py") == []
+
+
+@pytest.mark.ac("S0.1-AC5")
+@given(st.text(alphabet=string.ascii_lowercase, min_size=1, max_size=12))
+def test_unrelated_imports_preserve_alias_rule_results(suffix):
+    alias = "clock_" + suffix
+    source = f"import time as {alias}\ndef wait():\n    {alias}.sleep(1)\n"
+    unrelated = f"def other():\n    import logging as {alias}\n    {alias}.info('message')\n"
+    assert lint_source(source + unrelated, "src/example.py") == lint_source(
+        source, "src/example.py"
+    )
+
+
+@pytest.mark.ac("S0.1-AC5")
+@pytest.mark.parametrize(
+    ("source", "rule"),
+    [
+        (
+            (
+                "import time as clock\nclass Example:\n    import math as clock\n"
+                "    def wait(self):\n        clock.sleep(1)\n"
+            ),
+            "L004",
+        ),
+        (
+            (
+                "import pytest\n@pytest.mark.skip\ndef test_example():\n"
+                "    import logging as pytest\n    pytest.info('message')\n"
+            ),
+            "L003",
+        ),
+        (
+            (
+                "from builtins import Exception as Failure\nclass Example:\n"
+                "    from builtins import ValueError as Failure\n"
+                "    def run(self):\n        try:\n            work()\n"
+                "        except Failure:\n            pass\n"
+            ),
+            "L001",
+        ),
+    ],
+)
+def test_scope_rules_for_methods_and_decorators(source, rule):
+    assert any(item.rule == rule for item in lint_source(source, "src/example.py"))
+
+
+@pytest.mark.ac("S0.1-AC5")
+@pytest.mark.parametrize(
+    "expression",
+    [
+        "lambda: time.sleep(1)",
+        "[time.sleep(1) for item in [1]]",
+        "{time.sleep(1) for item in [1]}",
+        "{item: time.sleep(1) for item in [1]}",
+        "(time.sleep(1) for item in [1])",
+    ],
+)
+def test_class_imports_do_not_leak_into_expression_scopes(expression):
+    source = f"import time\nclass Example:\n    import asyncio as time\n    wait = {expression}\n"
+    assert any(item.rule == "L004" for item in lint_source(source, "src/example.py"))
+
+
+@pytest.mark.ac("S0.1-AC5")
+def test_first_comprehension_iterable_uses_enclosing_class_scope():
+    source = (
+        "import time\nclass Example:\n    import asyncio as time\n"
+        "    values = [item for item in [time.sleep(1)]]\n"
+    )
+    assert lint_source(source, "src/example.py") == []
+
+
+@pytest.mark.ac("S0.1-AC5")
 @pytest.mark.parametrize(
     "source",
     [

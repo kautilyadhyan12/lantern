@@ -53,6 +53,7 @@ pick → `$plan` → `$tests-first` → `$implement` → `$prove` → `$review` 
 - At the end of every step: commit on the story branch, then `git push -u origin HEAD`.
 - At the end of a session, tell the user: "Everything is saved and pushed. You can close this tab." The codespace stops by itself after 30 minutes idle.
 - Secrets come only from environment variables (Codespaces secrets). Never print them. Never create or commit `.env` with real values.
+- Never create, add or change an API key without the user's explicit permission.
 - The repository is public: never commit personal data, captured evidence (`var/`), or secrets.
 
 ## Commands
