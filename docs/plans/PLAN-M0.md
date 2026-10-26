@@ -822,3 +822,37 @@ remain explicitly `not present`. Original generated PROOF SHA256:
 `3291a997dda3db627aa00e33d378e8fe7aea053a0dbcb716c8a21b62f48b413c`.
 Save the unedited writer output with only the two text auto-fixing hooks
 omitted as previously documented; all other applicable hooks remain active.
+
+### Independent review round 3 — REQUEST_CHANGES — 2026-10-26
+
+Before launch, read-only model/list and account/rateLimits/read requests
+confirmed gpt-6-astra and existing usage allowance were available. No new
+credits, keys or settings were created. Created the owned detached worktree
+at `ca888737067ebaa179462dedd42ae0b7bb2f9628`, ran frozen sync and prepared
+only the protected prompt's documented substitutions plus the ADR 0004
+temporary schema. Showed the commands first. The fresh ephemeral reviewer
+used the configured different model, workspace-write sandbox, offline shell,
+approval_policy=never and the existing sign-in with API-key overrides removed.
+
+The native CLI wrote REVIEW-M0.json. Validated the original schema in memory,
+the captured HEAD/digest, all 13 unique AC IDs and the expected regular test
+file with at least six functions. The unchanged report self-identifies its
+model family as gpt-6. Copied only the new round-3 test file byte-for-byte;
+no other worktree changes existed. Raw review SHA256:
+`8a4fccb8168523f3f8fa92f59a839aaf33590c95f139f963a1a3d6f2476f451d`.
+
+Verdict: REQUEST_CHANGES. One supported blocker remains in S0.2-AC3: the
+checker still credits a marked test after `test_case = None` or
+`del test_case` removes the callable binding. Both new cases fail with an
+AssertionError showing the stale criterion mapping. The root-workspace run
+reproduced both failures. The new file has seven passing reference cases and
+two failing removal cases; all 35 prior reviewer cases pass. All other ACs
+are SATISFIED. No additional invariant violation or scope issue was reported.
+The reviewer's three database/socket failures remain sandbox notes.
+
+The three unsuccessful rounds exhaust this plan's review budget. Stop code
+work here, retain every report in Git history and every reviewer test, and
+propose a focused split of the remaining requirement-checker repair through
+the planning step. No fourth review, further implementation, passing final
+proof, ship or merge is authorized by the existing plan. The code-removal
+blocker remains visible and unfixed pending the user's decision.
