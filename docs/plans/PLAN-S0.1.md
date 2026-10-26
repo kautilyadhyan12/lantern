@@ -476,3 +476,21 @@ requirements and all other criteria are unchanged. The devcontainer exception
 is reflected in the preservation test; all other shipped pack files retain
 their original byte-for-byte checks. PLAN-M0 records the amendment's tests-first
 evidence and subsequent work. Historical logs above describe the earlier scope.
+
+
+### Fresh-container acceptance evidence — 2026-10-26
+
+Under the approved ADR 0005 amendment and user-directed existing-tool exception
+in ADR 0006, the exact pinned Microsoft image and repository installer were
+verified in an owned fresh cloud container. On committed code def3f4d,
+`uv sync --frozen`, `make hooks` and the full `make check` exited 0:
+310 tests passed, coverage 95.90723055934515%, all ten checks green. The fresh
+container's code-tree digest matched the original workspace. A nested Docker
+engine actually ran a network-disabled test container successfully. PLAN-M0
+records the complete commands, versions, shell regression and evidence.
+
+This is real fresh-container evidence, using the already-running local test
+database. It is not a rebuild of the active Codespace or a newly provisioned
+GitHub Codespace. Original logs above retain the earlier verification gap;
+that isolated-container gap is now closed. Formal joint proof, independent
+review and the later user-approved merge remain required before DONE.

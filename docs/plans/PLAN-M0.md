@@ -89,7 +89,7 @@ Run the full existing offline suite and all subsequent review tests. Keep the or
 | S0.1-AC3 | tests/test_config.py::test_database_url_valid_driver, ::test_secrets_hidden_in_errors_and_repr; tests/e2e/test_database.py::test_upgrade_records_baseline, ::test_upgrade_is_idempotent, ::test_missing_database_guidance; unit/property and database e2e |
 | S0.1-AC4 | tests/test_hooks.py::test_all_hooks_are_local_uv_commands, ::test_make_hooks_installs, ::test_secret_scanner_detects_synthetic_token; actual local tools/contracts |
 | S0.1-AC5 | tests/test_lint_custom.py::test_broad_handler_rules, ::test_shell_requires_literal_false, ::test_valid_python_never_raises, ::test_cli_exit_and_diagnostics; unit/property/CLI |
-| S0.1-AC6 | tests/test_workspace.py::test_pack_files_unchanged, ::test_gitignore_protects_local_material, ::test_no_tracked_env, ::test_development_commands_available; contracts plus real fresh-container evidence, currently outstanding |
+| S0.1-AC6 | tests/test_workspace.py::test_pack_files_unchanged, ::test_gitignore_protects_local_material, ::test_no_tracked_env, ::test_development_commands_available; tests/test_devcontainer_setup.py image, authentication, failure, installation and shell-profile cases; real fresh-container evidence recorded below |
 | S0.1-AC7 | tests/test_readme.py::test_readme_explains_product_and_codespaces, ::test_readme_has_setup_commands; documentation contracts |
 | S0.2-AC1 | tests/test_check_pipeline.py::test_required_order, ::test_stops_at_each_failure, ::test_import_contract_blocks_reverse_dependency; tests/test_audit_dependencies.py::test_strict_arguments_status_and_manifest_cleanup, ::test_real_process_boundary_and_error_output; tests/test_proof_boundaries.py::test_runner_boundary_failure_is_recorded_and_later_steps_run; process/contract/property tests |
 | S0.2-AC2 | tests/test_coverage_gate.py::test_total_boundary, ::test_critical_boundary, ::test_weighted_directory_coverage, ::test_no_prefix_collision, ::test_aggregation_bounds_and_order; unit/property/CLI |
@@ -481,3 +481,37 @@ After the profile fix, the real fresh interactive shell selected Node 24.22.1,
 and the fresh project environment reported Python 3.12.3. Refresh the committed
 source in this owned clone and run its full gate before formal proof. The
 original workspace remains running with its checked code saved and pushed.
+
+### Fresh gate PASS and implementation handoff — 2026-10-26
+
+Refreshed the independent clone/container to committed code
+`def3f4d50695b5b16ef16d9bfabb59dd3e429209`. Both its working tree before/after
+the full gate and the original working tree were clean. The committed code-tree
+digest matched in both environments:
+`db8daa57201317ee2e3bbc04ee33cdafa978f815e858754b659bbeefb5e45bd8`.
+
+In the fresh container, with the configuration's tool PATH and the owned inner
+Docker socket selected, ran the real `make hooks` and `make check`. Both
+exited **0**. The gate reported **310 passed in 49.27s**, total coverage
+**95.90723055934515%**, all ten ordered checks green, and no known
+vulnerabilities in the complete installed Python dependency inventory.
+Critical paths remain correctly reported as not present. Output is retained
+at `/tmp/lantern-m0-fresh-make-check.txt`; this is real command output, not a
+hand-authored PROOF artifact.
+
+Fresh environment: Ubuntu 24.04.5, CPython 3.12.3, Node 24.22.1, uv 0.13.5,
+Codex CLI 0.164.0, Docker Engine 29.8.2-1 (VFS for this nested verification),
+Compose 5.6.0 and GitHub CLI 2.102.0. The nested Docker container smoke command
+also exited 0. No research API, paid model call or new Codespace was created.
+The database was the existing local Compose service reached through loopback;
+its limitations and the nested-engine storage adjustment are recorded above.
+
+This closes the outstanding isolated fresh-container evidence gap under the
+approved plan. It does not claim that the active Codespace was rebuilt or that
+a new GitHub Codespace was provisioned. The application code and real setup
+command passed in a fresh instance of the exact image. Tool-advisory exceptions
+remain explicit in ADR 0006 and must be visible to the independent reviewer.
+
+Implementation is complete and reported to the user. Save/push this evidence
+before running the exact formal `make prove STORY=M0 AC_STORIES="S0.1 S0.2"`.
+No story is marked DONE and no merge or PR is authorized by this handoff.
