@@ -2,8 +2,8 @@
 
 Date: 2026-10-26
 
-Status: Proposed. No configuration, test or acceptance-criterion change is
-authorized until the user approves this amendment to PLAN-M0.
+Status: Accepted 2026-10-26. The user replied "approve" to the explicit
+request to update workspace setup and its matching requirement and tests.
 
 ## Evidence
 
@@ -28,7 +28,7 @@ configuration to remain byte-for-byte unchanged. A rebuild alone does not
 correct the saved command or resolve that conflict. This inspection is not a
 fresh-container test result or a claim that all other setup requirements fail.
 
-## Proposed decision and scope
+## Decision and scope
 
 Amend the existing bootstrap only to repair fresh-workspace setup before its
 joint proof and independent review:
@@ -69,8 +69,7 @@ Preserving the current configuration leaves the security-policy conflict and
 fresh-setup acceptance unresolved. Manually preparing each new workspace does
 not establish a repeatable saved setup. Neither is accepted silently.
 
-Until approval, retain the current configuration, all tests and criteria, and
-keep the bootstrap unfinished. After approval, changes stay on `story/M0-boot`;
+Changes stay on `story/M0-boot`;
 main and the active workspace lifecycle remain untouched. Revert ordinary
 setup changes if necessary while preserving generated evidence and the logs.
 

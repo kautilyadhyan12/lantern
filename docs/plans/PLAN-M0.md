@@ -8,6 +8,11 @@ Verify the repository setup and proof kit together, save machine-generated evide
 
 In: joint proof of all S0.1 and S0.2 acceptance criteria, investigation of the outstanding fresh-container verification gap, the documented pre-S0.4 manual independent review, retained adversarial tests, fixes required by real review blockers, and repeat proof/review as needed (maximum three review rounds). Reuse story/M0-boot and the approved story plans and accepted ADRs.
 
+Approved amendment (2026-10-26): ADR 0005 adds the narrow devcontainer setup
+correction, its associated tests, and the explicit S0.1-AC6 preservation-clause
+change. The original logs below remain historical. No other harness or CI
+change is included.
+
 Out: S0.3 and later stories, new product features, new runtime dependencies, schema migrations, CI/harness changes, paid services, account settings, opening/merging a PR, deployment and declaring the whole M0 milestone complete. Shipping is a later step and merging still requires a separate yes. No new proof/review runner is built.
 
 The S0.2 implementation is committed and pushed at 20a20a4. Its full make check exited 0: 301 tests, 95.90723055934515% coverage, all ten ordered checks green. No formal PROOF or independent REVIEW exists yet. S0.1's current-Codespace and clean-checkout results do not prove a newly rebuilt container; that gap must remain visible and cannot be waived as part of this plan.
@@ -16,11 +21,36 @@ The S0.2 implementation is committed and pushed at 20a20a4. Its full make check 
 
 No new application module, function interface, layer, migration or generic framework is proposed. Use the already approved interfaces in PLAN-S0.1 and PLAN-S0.2; their original RED evidence remains authoritative. This joint plan does not repeat tests-first/implementation for working code or replace either story's acceptance criteria.
 
+ADR 0005 setup interface: `.devcontainer/setup.sh [INSTALL_ROOT]` is a Bash
+installer for Linux x86_64. Its default root is
+`$HOME/.local/share/lantern-tools`; an explicit root permits isolated tests.
+It downloads only pinned official Node, uv and Codex archives with committed
+SHA256 digests. Constants are `NODE_VERSION`, `UV_VERSION`, `CODEX_VERSION`
+and their corresponding `<TOOL>_SHA256` values. Authenticate all three
+downloads before extracting or installing anything. Network failure, digest
+mismatch or an unsupported platform exits nonzero. Successful installation
+makes `node`, `npm`, `npx`, `uv`, `uvx` and `codex` available under
+`INSTALL_ROOT/bin`. Configure the devcontainer to select that directory before
+inherited tool paths. Pin a maintained Microsoft universal image by digest;
+retain its Docker and GitHub CLI support. Tool versions are candidates until
+the complete applicable advisory checks succeed; no unsafe pin is approved
+merely because it is the newest release. Project Python remains 3.12 through
+the existing pin and uv's managed-interpreter checksum verification.
+
+New tests in `tests/test_devcontainer_setup.py` cover the image pin, setup
+registration/PATH, all three per-tool checksum failures, an HTTP failure,
+unsupported architecture, successful installation using harmless local
+archives, and failure of the final download without partial installation.
+They run offline: subprocess download commands are replaced with local test
+programs, and test archives are authored only under pytest's temporary
+directory. No cassette or captured source is involved. The existing pack
+preservation test changes only for the approved devcontainer exception.
+
 Files expected to change: this plan's Log, generated docs/proofs/PROOF-M0.md, the sanctioned reviewer CLI's docs/reviews/REVIEW-M0.json, and only fresh reviewer tests under tests/review/test_m0_r<round>_adversarial.py. Real blockers may require fixes confined to the two approved story scopes, followed by new proof/review; ask before correcting a wrong existing test, exceeding S0.2's accepted 800-line cap, expanding scope, or touching any protected harness/CI file. Do not hand-write or edit artifacts.
 
 Execution after approval:
 
-1. Verify clean committed code and the 13-criterion trace. Resolve the fresh-container evidence gap using read-only setup inspection followed, where safely possible, by isolated fresh-container verification of the unchanged configuration. Do not rebuild/stop the active Codespace, create billable resources, install unreviewed tools, execute an unchecked mutable installer, or modify the devcontainer. If a user-assisted rebuild or a configuration change is necessary, present the concrete action and seek approval; do not mark S0.1-AC6 satisfied without real evidence. The current image is not cached and no devcontainer CLI is installed, so success is not assumed.
+1. Verify clean committed code and the 13-criterion trace. Resolve the fresh-container evidence gap through the approved ADR 0005 setup correction and isolated fresh-container verification where safely possible. Do not rebuild/stop the active Codespace, create billable resources, install unreviewed tools or execute an unchecked mutable installer. If a user-assisted rebuild or a further scope change is necessary, present the concrete action and seek approval; do not mark S0.1-AC6 satisfied without real evidence. The current image is not cached and no devcontainer CLI is installed, so success is not assumed.
 2. Run exactly make prove STORY=M0 AC_STORIES="S0.1 S0.2" on committed code. Read the generated report and verify commit SHA, code-tree digest, UTC/platform, all 11 results, counts/coverage, and final RESULT. Report a failure honestly, fix its cause within scope, commit and repeat. Commit/push the generated proof before review.
 3. Apply the review skill's manual bootstrap exception (docs/05 §4.1–§4.2), showing each command first. Create an owned throwaway worktree at the reviewed HEAD and sync the checked lock. Keep the original prompt and shipped schema unchanged. Substitute STORY=M0, STORY_SLUG=m0, ROUND=1 (then 2/3), BASE=main in memory. Start a fresh ephemeral Codex reviewer using the documented different model, workspace-write sandbox and approval_policy="never"; never bypass the sandbox. Check model availability and existing quota before launch; ask before any new charge.
 4. Resolve the existing review-metadata documentation inconsistency through proposed ADR 0004 as part of this plan's approval. Use a temporary schema extending the unchanged shipped schema with the exact precomputed code_tree enum; codex exec --output-last-message remains the sole review writer. Validate the review payload against the original schema separately from the fixed digest/HEAD metadata. Do not edit the prompt, schema, scripts/review.py or any generated review. Add only the accepted explanatory docs/05 note before using this procedure.
@@ -29,14 +59,16 @@ Execution after approval:
 
 ## Acceptance criteria
 
-Copied verbatim from the backlog, as required by docs/08 §5. No criteria are added or changed.
+Copied verbatim from the backlog, as required by docs/08 §5. The user approved
+only the S0.1-AC6 preservation-clause change in ADR 0005; it is reflected in
+the backlog and both plans. All other criterion text remains unchanged.
 
 - S0.1-AC1 `uv sync` on a fresh clone succeeds (Python 3.12 pinned in `.python-version`, `uv.lock` committed); `make check` runs `ruff check`, `ruff format --check`, `scripts/lint_custom.py`, `mypy --strict` and the offline `pytest` suite, and is green with one placeholder test; `make db` and `make db-down` start and stop the compose database. (S0.2 extends `make check`.)
 - S0.1-AC2 `pyproject.toml` (uv project `lantern`, src layout, console script `lantern`) carries the tool configuration of 05 §2.1; a test asserts each key.
 - S0.1-AC3 `docker compose up db` starts Postgres 16 with pgvector (current `pgvector/pgvector` pg16 tag, verified in the PLAN) with a healthcheck, bound to `127.0.0.1:${LANTERN_DB_PORT:-5434}`; `config.Settings` reads `LANTERN_DATABASE_URL` as a secret and accepts only the `postgresql+asyncpg` driver; `lantern db upgrade` applies an empty baseline Alembic migration. The e2e test uses the compose database and fails with a pointer to `make db` when it is down.
 - S0.1-AC4 `.pre-commit-config.yaml` uses only local hooks run through `uv run`: end-of-file and trailing-whitespace fixers, ruff, ruff format, mypy, detect-secrets with a committed baseline; `make hooks` installs them.
 - S0.1-AC5 `scripts/lint_custom.py` reports each forbidden pattern of 05 §2.1 (one test per pattern, with allowed variants) and passes clean code; property test: it never raises on valid Python.
-- S0.1-AC6 The files shipped with the pack (`.devcontainer/devcontainer.json`, `scripts/review_schema.json`, `.codex/`, `.agents/`) are kept unchanged; the dev container still builds a working Codespace after S0.1: Python 3.12, uv, Docker inside the container, Node LTS, the GitHub CLI and the Codex CLI; `make check` passes inside it. `.gitignore` covers `.env`, `.venv/`, `var/` and tool caches; `.env.example` lists every setting with placeholders; a test asserts no `.env` file is tracked.
+- S0.1-AC6 The shipped review schema, `.codex/` and `.agents/` are kept unchanged; `.devcontainer/` may receive the setup correction approved in ADR 0005; the dev container still builds a working Codespace after S0.1: Python 3.12, uv, Docker inside the container, Node LTS, the GitHub CLI and the Codex CLI; `make check` passes inside it. `.gitignore` covers `.env`, `.venv/`, `var/` and tool caches; `.env.example` lists every setting with placeholders; a test asserts no `.env` file is tracked.
 - S0.1-AC7 `README.md` explains what Lantern is in plain words and how to open it in a Codespace, without secrets or personal data.
 - S0.2-AC1 `make check` runs, in this order, stopping at the first failure: `ruff check`, `ruff format --check`, `scripts/lint_custom.py`, `lint-imports` (layer contracts of 02 §5, covering only packages that exist), `mypy --strict`, the offline `pytest` suite with coverage, `scripts/coverage_gate.py`, `scripts/check_dependencies.py`, `bandit`, `pip-audit`. It exits 0 only when every step passes.
 - S0.2-AC2 `scripts/coverage_gate.py` reads the coverage JSON report and fails when total coverage is below `coverage_total` or any existing path in `critical_paths` is below `coverage_critical` (all three read from `[tool.lantern.quality]` in `pyproject.toml`); configured paths that do not exist yet are listed as "not present", not failed.
@@ -86,7 +118,13 @@ The fresh setup uses mcr.microsoft.com/devcontainers/universal:2 and a mutable p
 
 ## Size
 
-Verification and process documentation only: zero planned new runtime/non-test code. The current S0.2 implementation is 694 handwritten non-test added lines under its accepted 800-line cap. Reviewer tests and generated evidence are counted separately. Necessary fixes must remain inside that cap or stop for a new size decision; no speculative new feature or review harness is proposed.
+The original verification plan proposed zero new runtime/non-test code. The
+accepted ADR 0005 amendment permits up to 100 handwritten non-test setup lines.
+The current S0.2 implementation is 694 handwritten non-test added lines; even
+counting all proposed setup lines against that cap would total at most 794,
+below its accepted 800-line limit. Reviewer tests and generated evidence are
+counted separately. Necessary fixes must remain inside that cap or stop for a
+new size decision; no speculative product feature or review harness is proposed.
 
 ## Rollback
 
@@ -142,3 +180,130 @@ moved down one line, its timestamp changed, and it recorded its standard
 baseline-file exclusion. Finding hashes/counts are unchanged. Retain that
 tool-generated refresh; no baseline was hand-edited. No full quality-gate
 result is claimed for this documentation checkpoint.
+
+### RED run 2026-10-26 — approved fresh-setup amendment
+
+The user replied "approve" to the explicit request to update workspace setup
+and its matching requirement/tests. Accepted ADR 0005, changed only the
+S0.1-AC6 preservation clause in its three authoritative copies, and adjusted
+`test_pack_files_unchanged` only to exclude the authorized devcontainer path.
+The original `.codex/`, `.agents/` and review schema still have byte-for-byte
+checks. No original RED log or other acceptance criterion was changed.
+
+Used the tests-first skill. Added eight tests under S0.1-AC6 for the corrected
+setup, including all three digest failures, failed final download, unsupported
+host and a positive installation path using harmless local test archives.
+The installer interface is documented above. Tests author no files under
+`tests/fixtures/`; no external binary is executed by the test harness.
+
+Final RED command (using the existing environment without dependency syncing):
+
+```sh
+UV_CACHE_DIR=/tmp/lantern-uv-cache UV_NO_SYNC=1 uv run --offline pytest tests/test_devcontainer_setup.py -q --tb=line
+```
+
+Exit 1: **8 failed, 0 passed**, all AssertionErrors; no collection/import errors.
+
+| Failure reason | Count |
+|---|---:|
+| Existing image lacks the maintained-image/digest pin | 1 |
+| Existing post-create command lacks verified setup and selected tool PATH | 1 |
+| Verified installer does not exist yet (positive path and five negative cases) | 6 |
+
+The subsequent implementation must exercise the deeper assertions after those
+missing setup assertions are satisfied; this RED run does not claim they have
+executed yet. No signature stub is needed for this shell entry point: its
+absence is an explicit behavioral/configuration assertion, not an import error.
+
+The amended existing regression guards were run separately:
+
+```sh
+UV_CACHE_DIR=/tmp/lantern-uv-cache UV_NO_SYNC=1 uv run --offline pytest tests/test_workspace.py -q --tb=line
+```
+
+Exit 0: **13 passed**. These legitimate regression guards predate the amendment;
+their passing result is not relabeled as new RED evidence. Ruff check and
+formatting passed on both touched test files. The real command
+`uv run --offline python scripts/check_acceptance_ids.py S0.1 S0.2 --backlog
+docs/06_ROADMAP_BACKLOG.md` (same cache/no-sync environment) exited 0; every one
+of the 13 ACs has tests and no unknown ID was reported. `git diff --check` passed.
+
+### Supply-chain checks and implementation blocker — 2026-10-26
+
+Read official OpenAI CLI installation guidance, Astral installation/release
+metadata, Microsoft's image inventory/registry and nodejs.org releases before
+selecting candidate artifacts. These are candidates, not approved safe pins:
+
+| Candidate | Verified metadata |
+|---|---|
+| Microsoft universal 6.1.10 | Ubuntu 24.04; created 2026-10-09; index `sha256:019e9ea0eebbab70fb44c68874f975dbeea6b56faf6ad7f97065fd6bce8b61d2`; amd64 `sha256:8707cdea0e828661a60ffb3739f3d755714b5e497517a5e7eabfd216b55a89e2`; compressed 3.77 GiB |
+| Node 24.22.1 linux-x64 tar.xz | Latest LTS in official index; SHA256 `6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6` from official SHASUMS256.txt; October security release |
+| uv 0.13.5 linux-gnu tar.gz | Latest stable in GitHub releases and PyPI; asset SHA256 `f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f` from official release metadata |
+| Codex 0.164.0 linux-musl tar.gz | Official release asset SHA256 `90dd0b03b28afcb7fa733a4f73b413db2916a47347efd43fb669cc1c774ee8e4`; official npm latest also 0.164.0 |
+
+Fetched the official tagged Rust lockfiles as data, without building/installing
+anything. Queried OSV by exact package/version for **654 registry packages**
+from uv and **1,297 registry packages** from Codex, batching up to 500 queries.
+There were advisory matches for 13 uv packages and 26 Codex packages. These
+are workspace-wide matches, including possibly unused/target-specific/dev
+packages; they are not all proven vulnerabilities in a released Linux binary.
+Codex also has pinned Git dependencies, whose complete audit remains open.
+No complete-clean audit is claimed for either candidate, the image, Node's
+bundled npm graph or a managed Python artifact.
+
+Lockfile SHA256 values:
+
+- uv: `3fd592a70bd1c1a83efd3f9191945e57243f26b34a241fe8d4182b5c04258a1b`
+- Codex: `7ec2bfabf3b967c00409b85489076f8df3849745d3e469473d88288322adeb4a`
+
+Triaged a concrete blocker rather than treating all matches as exploitable:
+uv 0.13.5 locks **h2 0.4.15**, below the fix **0.4.16** for
+[RUSTSEC-2026-0258](https://rustsec.org/advisories/RUSTSEC-2026-0258.html)
+(unbounded buffering of empty HTTP/2 DATA frames). Its workspace enables
+reqwest's `http2` feature; `uv-client` uses that workspace reqwest dependency.
+Read `uv-client/src/base_client.rs`: the client builder uses rustls and no
+`http1_only` restriction appears in that file. This supports applicability to
+the download client; it is source/configuration evidence, not a binary exploit
+test. uv 0.13.4 also locks h2 0.4.15. Releases older than 0.13.4 are affected
+by the maintainer's separate [GHSA-hq85-5cpj-mr62](https://github.com/astral-sh/uv/security/advisories/GHSA-hq85-5cpj-mr62).
+Thus the two current candidates cannot clear the required installation audit.
+Other matches, including rustls 0.23.45 and Tokio, require further applicability
+analysis if a new candidate is selected; they have not been waived.
+
+The public GitHub API hit a rate limit during metadata reads; used the already
+available `gh api` for those read-only release/advisory requests instead. No
+authentication flow or account setting was changed. No new tool or executable
+archive was downloaded or installed. The installer and devcontainer remain
+unimplemented/unchanged. Existing uv was used only for offline/no-sync local
+tests and checks; this is not a new uv installation or an audit clearance.
+
+The tests-first step is complete and is being saved/pushed. Implementation
+cannot proceed to an installable setup with these candidates under AGENTS.md's
+"do not install versions with known applicable vulnerabilities" rule. Resume
+by rechecking official patched releases and the complete applicable dependency
+graph. A custom patched build would require a separately reviewed scope
+decision; none is authorized or prepared here. Do not install an affected
+candidate merely to obtain fresh-container evidence. No PROOF/REVIEW, full
+make-check result, container rebuild or merge is claimed.
+
+Sources checked:
+
+- https://learn.chatgpt.com/docs/codex/cli
+- https://docs.astral.sh/uv/getting-started/installation/
+- https://raw.githubusercontent.com/devcontainers/images/main/src/universal/history/6.1.10.md
+- https://mcr.microsoft.com/v2/devcontainers/universal/manifests/6
+- https://nodejs.org/dist/index.json
+- https://nodejs.org/dist/v24.22.1/SHASUMS256.txt
+- https://nodejs.org/en/blog/vulnerability/october-2026-security-releases
+- https://api.github.com/repos/astral-sh/uv/releases/tags/0.13.5
+- https://api.github.com/repos/openai/codex/releases/tags/rust-v0.164.0
+- https://registry.npmjs.org/@openai/codex/latest
+- https://raw.githubusercontent.com/astral-sh/uv/0.13.5/Cargo.lock
+- https://raw.githubusercontent.com/astral-sh/uv/0.13.5/Cargo.toml
+- https://raw.githubusercontent.com/astral-sh/uv/0.13.5/crates/uv-client/Cargo.toml
+- https://raw.githubusercontent.com/astral-sh/uv/0.13.5/crates/uv-client/src/base_client.rs
+- https://raw.githubusercontent.com/astral-sh/uv/0.13.4/Cargo.lock
+- https://raw.githubusercontent.com/openai/codex/rust-v0.164.0/codex-rs/Cargo.lock
+- https://api.osv.dev/v1/querybatch
+- https://api.github.com/repos/astral-sh/uv/security-advisories
+- https://api.github.com/repos/openai/codex/security-advisories

@@ -34,7 +34,7 @@ Planned files and layers:
 | `tests/conftest.py`, `tests/test_skeleton.py`, `tests/test_tooling.py`, `tests/test_config.py`, `tests/test_hooks.py`, `tests/test_lint_custom.py`, `tests/test_workspace.py`, `tests/test_readme.py`, `tests/e2e/test_database.py` | Acceptance, property and database tests |
 | `docs/plans/PLAN-S0.1.md` | Step logs and validation evidence |
 
-Keep `.devcontainer/devcontainer.json`, `scripts/review_schema.json`, `.codex/`, and `.agents/` byte-for-byte unchanged relative to the branch base. No `.github/` files or review/proof files are written by this story.
+Keep `scripts/review_schema.json`, `.codex/`, and `.agents/` byte-for-byte unchanged relative to the branch base. The user-approved ADR 0005 permits the narrow fresh-setup correction under `.devcontainer/`. No `.github/` files or review/proof files are written by this story.
 
 Public interfaces to implement after approval (signatures are proposals, not code created in this step):
 
@@ -103,7 +103,7 @@ Bootstrap test environment: tests-first needs pytest before pyproject and make t
 - S0.1-AC3 `docker compose up db` starts Postgres 16 with pgvector (current `pgvector/pgvector` pg16 tag, verified in the PLAN) with a healthcheck, bound to `127.0.0.1:${LANTERN_DB_PORT:-5434}`; `config.Settings` reads `LANTERN_DATABASE_URL` as a secret and accepts only the `postgresql+asyncpg` driver; `lantern db upgrade` applies an empty baseline Alembic migration. The e2e test uses the compose database and fails with a pointer to `make db` when it is down.
 - S0.1-AC4 `.pre-commit-config.yaml` uses only local hooks run through `uv run`: end-of-file and trailing-whitespace fixers, ruff, ruff format, mypy, detect-secrets with a committed baseline; `make hooks` installs them.
 - S0.1-AC5 `scripts/lint_custom.py` reports each forbidden pattern of 05 §2.1 (one test per pattern, with allowed variants) and passes clean code; property test: it never raises on valid Python.
-- S0.1-AC6 The files shipped with the pack (`.devcontainer/devcontainer.json`, `scripts/review_schema.json`, `.codex/`, `.agents/`) are kept unchanged; the dev container still builds a working Codespace after S0.1: Python 3.12, uv, Docker inside the container, Node LTS, the GitHub CLI and the Codex CLI; `make check` passes inside it. `.gitignore` covers `.env`, `.venv/`, `var/` and tool caches; `.env.example` lists every setting with placeholders; a test asserts no `.env` file is tracked.
+- S0.1-AC6 The shipped review schema, `.codex/` and `.agents/` are kept unchanged; `.devcontainer/` may receive the setup correction approved in ADR 0005; the dev container still builds a working Codespace after S0.1: Python 3.12, uv, Docker inside the container, Node LTS, the GitHub CLI and the Codex CLI; `make check` passes inside it. `.gitignore` covers `.env`, `.venv/`, `var/` and tool caches; `.env.example` lists every setting with placeholders; a test asserts no `.env` file is tracked.
 - S0.1-AC7 `README.md` explains what Lantern is in plain words and how to open it in a Codespace, without secrets or personal data.
 
 ## Test plan
@@ -466,3 +466,13 @@ The repository's .devcontainer file, .codex/, .agents/, review schema, CI and ho
 Advisory test-audit follow-up: the formerly weak scanner test now proves a clean-file scan exits 0 before requiring a fake-token detection exit and filename. It passed in both the working checkout and the independent clean checkout. No test is now relying solely on a failed executable. Existing Hypothesis tests ran. This follow-up is not the independent T3 review.
 
 S0.1's implementation and current automated check step are now green, with the rebuild limitation above recorded. Do not mark the story DONE, publish a PROOF or REVIEW by hand, or merge. Under docs/08 §5, the next proposed job is S0.2 on the same bootstrap branch; it builds the proof kit required to prove/review S0.1 and S0.2 together. User approval is required before starting that next job's plan and again before its tests/code. The earlier package-age blocker is resolved by ADR 0002 and must not be reintroduced.
+
+
+### Approved fresh-setup amendment — 2026-10-26
+
+The user approved ADR 0005 and the explicit change to S0.1-AC6's preservation
+clause. Updated that clause here, in the backlog and in PLAN-M0. Its remaining
+requirements and all other criteria are unchanged. The devcontainer exception
+is reflected in the preservation test; all other shipped pack files retain
+their original byte-for-byte checks. PLAN-M0 records the amendment's tests-first
+evidence and subsequent work. Historical logs above describe the earlier scope.

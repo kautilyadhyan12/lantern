@@ -114,3 +114,5 @@ The decisions behind this pack, with what was rejected and why. Future changes g
 ### D24 — Free search by default
 **Decision.** Tavily's free tier (1,000 searches a month, no card) is the default search provider; Brave is optional.
 **Why.** Zero cost; Brave has no free plan and needs a card. Results stay transient with every provider (D10).
+
+[ADR 0005 — Make the saved workspace setup satisfy the security policy](adr/ADR-0005-fresh-workspace-setup.md), accepted 2026-10-26, permits the narrow bootstrap devcontainer correction and corresponding S0.1-AC6/test amendment. Other shipped pack files and all quality gates remain protected.

@@ -15,7 +15,8 @@ BASE = "1491cfcba7d09d000ee09d6f35a22771a6bfdcd5"
 
 @pytest.mark.ac("S0.1-AC6")
 def test_pack_files_unchanged(repo):
-    paths = [".devcontainer/devcontainer.json", "scripts/review_schema.json", ".codex", ".agents"]
+    # ADR 0005 authorizes only the devcontainer setup correction.
+    paths = ["scripts/review_schema.json", ".codex", ".agents"]
     tracked = subprocess.run(  # noqa: S603  # Only repository tools and temporary test paths.
         ["git", "ls-tree", "-r", "--name-only", BASE, "--", *paths],  # noqa: S607  # Only repository tools and temporary test paths.
         cwd=repo,
