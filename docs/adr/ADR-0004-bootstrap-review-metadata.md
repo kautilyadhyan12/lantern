@@ -2,7 +2,8 @@
 
 Date: 2026-10-23
 
-Status: Proposed with PLAN-M0. User approval is required before use.
+Status: Accepted 2026-10-26. The user instructed "continue lantern from plan M0",
+approving the saved plan and its explicitly included metadata clarification.
 
 Context: docs/05 §4.1 requires validating the review payload against the shipped
 schema and adding a code_tree digest. Its pre-S0.4 exception permits only
@@ -11,7 +12,7 @@ schema has additionalProperties=false and no code_tree property. Writing the
 raw review and adding the digest by hand would violate the artifact rule;
 changing the shipped schema would violate S0.1-AC6. Neither is authorized here.
 
-Proposed decision: During the pre-S0.4 manual bootstrap only, create a temporary
+Decision: During the pre-S0.4 manual bootstrap only, create a temporary
 output schema outside the repository by copying the shipped schema in memory
 and adding exactly one required property: code_tree, a string with a one-value
 enum containing the digest computed by scripts/code_tree.py for the captured
@@ -32,9 +33,8 @@ while respecting the manual writer exception. It is not permission to bypass
 review, modify a verdict, hand-author an artifact, change the harness, or build
 the S0.4 review runner early. S0.4 will implement the normal validated writer.
 
-If this procedure is accepted, add a narrow explanatory note to docs/05 §4.2
-before launching a reviewer. If it is not accepted, leave the shipped schema,
-prompt and artifacts untouched and resolve the inconsistency before review.
+The explanatory note in docs/05 §4.2 records this procedure. The shipped schema,
+prompt and generated artifacts remain protected from hand edits.
 
 References: D12; docs/05 §4.1–§4.2; docs/08 §5; scripts/review_schema.json;
 AGENTS.md Asking first §3; .agents/skills/review/SKILL.md §4.

@@ -100,3 +100,45 @@ Plan written 2026-10-23.
 - Read the plan/prove/review skills, docs/05 workflow/plan/reviewer requirements, the unchanged review schema, both approved story plans and the bootstrap rule in docs/08. Read installed CLI help only.
 - Copied all 13 AC lines directly from the backlog. No additional acceptance criterion or new feature is proposed. Prepared proposed ADR 0004 for the existing schema/metadata inconsistency; it is not accepted or used yet.
 - The fresh-container evidence gap remains explicit. No new container, reviewer session, proof/review artifact, runtime code, dependency, harness/CI change or merge occurred during planning. User approval of this plan and its proposed manual metadata clarification is pending.
+
+### Approved continuation and setup inspection — 2026-10-26
+
+The user instructed "continue lantern from plan M0". Treated this as approval
+of the saved plan, including its explicitly included ADR 0004 procedure.
+Accepted that ADR and added the authorized docs/05 explanation. This log is
+append-only; the original planning entry above records the earlier state.
+
+Confirmed a clean `story/M0-boot` at ef81346, tracking its origin branch.
+Read the starting notes, bootstrap workflow, prove/review skills and existing
+story evidence. No proof or review artifact exists yet.
+
+Execution step 1 used read-only local and official-registry inspection.
+Docker is available; no devcontainer CLI is installed and the base image is
+not cached. The configured universal:2 tag currently resolves to image version
+2.13.1 from May 2025 (3.57 GiB compressed). Microsoft's matching inventory lists
+Node 20.19.1/22.15.0. The unchanged postCreateCommand does not update Node.
+The official release index identifies v24.22.1 as latest patched LTS today;
+the running workspace has that version already. See proposed ADR 0005 for
+exact digests, primary-source links and the narrow setup amendment.
+
+The saved configuration therefore conflicts with the current Node security
+policy, while S0.1-AC6 and its existing preservation test forbid editing it.
+Prepared ADR 0005 as a proposal for the user, not an accepted rescope. It
+specifies the affected configuration/test/criterion, RED-before-code sequence,
+size bound and fresh-environment verification. Approval is required before
+changing that requirement or configuration. Rebuilding alone does not fix the
+saved setup. No image, installer, package or new tool was downloaded for
+execution. No configuration, test, source, harness or CI file was changed;
+the database and active Codespace were left untouched.
+
+Stopped before the proof step, preserving the plan's execution order. No
+`make prove`, independent review, successful fresh-container test or completed
+bootstrap is claimed. Save/push this documentation checkpoint and ask for
+approval of the concrete setup amendment before dependent work.
+
+Checkpoint validation: `git diff --check` passed. The real pre-commit secret
+scanner refreshed `.secrets.baseline`: the same two existing workflow findings
+moved down one line, its timestamp changed, and it recorded its standard
+baseline-file exclusion. Finding hashes/counts are unchanged. Retain that
+tool-generated refresh; no baseline was hand-edited. No full quality-gate
+result is claimed for this documentation checkpoint.

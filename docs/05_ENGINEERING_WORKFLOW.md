@@ -261,6 +261,7 @@ codex exec \
 - **No network by default** inside the review sandbox, so captured content or test code cannot send anything out. If the e2e tests need the local database, S0.4 decides how to allow only that.
 - `scripts/review_schema.json` ships with the pack, so the schema exists from the start.
 - `make review` writes the reviewer's output to a temporary file and then to `docs/reviews/REVIEW-<ID>.json` after validation. Before S0.4 exists (the M0 bootstrap, S0.3 and S0.4 itself), the agent runs these steps by hand, shows you each command first, and passes `--output-last-message docs/reviews/REVIEW-<ID>.json` directly: that `codex exec` command is the only sanctioned by-hand writer of REVIEW files.
+- For those manual bootstrap reviews, [ADR 0004](adr/ADR-0004-bootstrap-review-metadata.md) resolves the shipped schema's missing `code_tree` field: use a temporary output schema outside the repository with that one required field fixed to the independently computed digest. Validate the output minus that field against the unchanged shipped schema, and validate its digest and reviewed HEAD separately. The reviewer CLI remains the sole artifact writer; never repair or rewrite its output.
 - The worktree is a different folder, so Codex does not load the project's rules or hooks there; the sandbox and the throwaway copy are what contain the reviewer. Check the flags against `codex exec --help` in S0.4; they change between versions.
 
 ### 4.3 After the review

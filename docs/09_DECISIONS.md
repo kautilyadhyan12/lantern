@@ -8,6 +8,8 @@ Accepted additions: [ADR 0001 — Official Node.js security updates bypass the c
 
 The decisions behind this pack, with what was rejected and why. Future changes go into `docs/adr/` as new records that cite the decision they change; the docs are then updated to match.
 
+[ADR 0004 — Bind bootstrap reviews to code without editing generated artifacts](adr/ADR-0004-bootstrap-review-metadata.md), accepted 2026-10-26 with PLAN-M0, clarifies the pre-S0.4 manual reviewer output procedure without changing the shipped prompt or schema.
+
 ### D1 — Fresh start on a proven stack
 **Decision.** Build from an empty folder. Keep Lantern's purpose (evidence-based OSINT), its non-negotiable ethics, and a mainstream stack: Python 3.12, uv, ruff, mypy strict, pytest/hypothesis, Pydantic, Postgres 16 + pgvector, SQLAlchemy async + Alembic, Docker Compose, the `openai` SDK against OpenAI-compatible providers.
 **Why.** The earlier code was built for a different, heavier plan; starting clean avoids carrying its machinery. The stack is well supported, runs in Codespaces and CI alike, and is what AI coding agents handle best.
