@@ -812,3 +812,13 @@ fingerprint's finding is removed, leaving the original ten findings with
 unchanged plugins and filters. The round-2 report remains unedited. Commit
 this correction, then run the formal proof on the committed code before
 starting the third fresh review. A new full-gate pass is not yet claimed.
+
+The correction was committed and pushed as
+`fc3e30d83abd5cd91de57ddeae0d2d5bb34b918b`. The sanctioned
+`make prove STORY=M0 AC_STORIES="S0.1 S0.2"` exited 0 on that exact commit:
+**363 tests passed**, **95.95959595959596%** total coverage, all eleven exits
+0, all 13 criterion traces present and `RESULT: PASS`. Future critical paths
+remain explicitly `not present`. Original generated PROOF SHA256:
+`3291a997dda3db627aa00e33d378e8fe7aea053a0dbcb716c8a21b62f48b413c`.
+Save the unedited writer output with only the two text auto-fixing hooks
+omitted as previously documented; all other applicable hooks remain active.
