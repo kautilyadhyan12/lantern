@@ -704,3 +704,51 @@ The original generated proof SHA256 before saving is
 As with the prior generated proof, the two text auto-fixing commit hooks must
 be omitted only for this docs-only save to preserve the writer's exact bytes;
 the secret scan and all other configured hooks remain active.
+
+### Independent review round 2 — REQUEST_CHANGES — 2026-10-26
+
+Ran a fresh ephemeral reviewer in an owned detached worktree at
+`14df15d122404eabf11fa98591952943c3112336`, using the unchanged prompt with
+round 2 substituted, the ADR 0004 temporary schema, gpt-6-astra, the existing
+sign-in and the same offline workspace-write shell restrictions as round 1.
+Showed the commands first. The first temporary-input preparation stopped
+without writing anything because its control-directory constant still named
+round 1; corrected only that temporary helper and reran successfully.
+No API key was created, changed or passed through the launch environment.
+
+The native CLI wrote the report. Validated the original schema in memory
+without code_tree, exact captured HEAD/digest, all 13 unique AC IDs, the
+expected regular test file and at least six tests. Configured model alias is
+gpt-6-astra; the unchanged report identifies its family as gpt-6. Only the
+new `tests/review/test_m0_r2_adversarial.py` existed as a worktree change and
+was copied back byte-for-byte. Raw REVIEW SHA256:
+`c3eec228616e76f9bbd319cbb8a3cee5b90a71df0ca1d086097a7f3658020754`.
+
+Both blockers are real failures reproduced in the root workspace:
+
+- B1: a marker in tests/helper.py can satisfy a criterion even though pytest
+  does not discover that module.
+- B2: a marked test definition can satisfy a criterion after a later unmarked
+  definition of the same name replaces it.
+
+The new file contributes 18 passed and 2 failed cases; all 15 unchanged
+round-1 cases pass. The reviewer's full-suite database/socket restrictions
+remain environment notes. Its reference oracles were written before reading
+the corresponding implementations, and its generated comparisons passed.
+All ACs except S0.2-AC3 are SATISFIED; no approval is claimed.
+
+One new review test contains a literal digest of the reviewed source and
+compares the current tree to a proof that becomes stale when reviewer tests
+are committed. This test cannot remain valid across the required fix/proof
+cycle. Asked the user for the required agreement before correcting only that
+test to bind each artifact to its recorded commit instead; no edit is made
+without their answer. Preserve this original review file and test in Git
+before fixes. The implementation blockers can be fixed independently while
+that question is pending.
+
+The save hook flagged only the literal public digest in that new reviewer
+test. Regenerated the baseline with the real scanner's `scan --no-verify
+--baseline .secrets.baseline` command. Verified unchanged plugins/filters,
+all ten previous findings retained, and exactly one new finding at the
+review test's digest line. No credential was detected or added. The native
+review artifact's SHA256 remains unchanged.
