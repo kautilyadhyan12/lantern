@@ -63,6 +63,8 @@ pick → `$plan` → `$tests-first` → `$implement` → `$prove` → `$review` 
 - Supply chain: before adding or updating a dependency, say why it is needed and check current security advisories for it and its resolved dependencies. There is no mandatory 7-day wait; checked security fixes may be installed immediately. Use official package sources, lock exact resolved versions and hashes, reject yanked releases, and do not install versions with known applicable vulnerabilities. Keep the Node.js used by Codex on the latest patched LTS release, using official releases from nodejs.org only. Never add litellm. Never run gh auth login or use a personal access token in the codespace.
 - Cassettes: only through `scripts/record_fixture.py`. Use `tool <tool> <case> --args <json>` for one call, or `pytest <test ids>` to record what those tests are missing (HTTP and model). Never hand-write or edit anything under `tests/fixtures/`, `docs/proofs/` or `docs/reviews/`.
 
+The user's M0 instruction to continue with the existing development-tool versions is recorded in [ADR 0006](docs/adr/ADR-0006-existing-workspace-tool-versions.md). Its narrow exception does not waive the Python dependency audit or any quality gate.
+
 ## Quality bar (`make check`; never lowered without a recorded decision)
 
 - ruff and ruff format clean · `scripts/lint_custom.py` clean · import contracts clean · dependency deny-list clean · `mypy --strict` clean

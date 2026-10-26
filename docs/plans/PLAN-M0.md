@@ -32,9 +32,10 @@ mismatch or an unsupported platform exits nonzero. Successful installation
 makes `node`, `npm`, `npx`, `uv`, `uvx` and `codex` available under
 `INSTALL_ROOT/bin`. Configure the devcontainer to select that directory before
 inherited tool paths. Pin a maintained Microsoft universal image by digest;
-retain its Docker and GitHub CLI support. Tool versions are candidates until
-the complete applicable advisory checks succeed; no unsafe pin is approved
-merely because it is the newest release. Project Python remains 3.12 through
+retain its Docker and GitHub CLI support. Tool versions require the applicable
+advisory checks or the explicit existing-version exception accepted in ADR
+0006; no unsafe pin is approved merely because it is the newest release.
+Project Python remains 3.12 through
 the existing pin and uv's managed-interpreter checksum verification.
 
 New tests in `tests/test_devcontainer_setup.py` cover the image pin, setup
@@ -307,3 +308,93 @@ Sources checked:
 - https://api.osv.dev/v1/querybatch
 - https://api.github.com/repos/astral-sh/uv/security-advisories
 - https://api.github.com/repos/openai/codex/security-advisories
+
+### User-directed continuation with existing versions — 2026-10-26
+
+The user instructed "go on with exsting version" after the known setup-tool
+warning and inability to verify a fixed official version had been explained.
+Recorded the explicit existing-tool exception in ADR 0006 and linked it from
+AGENTS.md and the decision log. No general security rule or quality threshold
+was lowered. The hypothetical setup deferral was not adopted: all eight new
+setup tests and fresh-setup acceptance remain required.
+
+Verified installed tools: uv 0.13.5, Codex CLI 0.164.0, Node 24.22.1. Read the
+existing uv ELF `.dep-v0` metadata without executing new code: h2 0.4.15,
+rustls 0.23.45 and Tokio 1.53.1 are present. The publisher's stable release
+list still ends at 0.13.5, with no prerelease in the ten latest entries. Its
+current source at `656d02b614609dd6c982707b6d6c325b6120285b` retains those
+dependency versions, so no unverified source build was substituted.
+
+Implemented the approved 52-line Bash installer and pinned image configuration
+(61 physical lines combined), within the 100-line amendment bound. The script
+rejects unsupported platforms, limits HTTPS downloads and redirects, checks
+all three pinned digests before any extraction, and installs tools beneath a
+caller-selected directory. The default is the Codespace user's private tool
+directory, selected through remoteEnv PATH. No npm lifecycle script or mutable
+downloaded shell installer is executed. Documented the setup command in docs/08.
+
+Actual targeted command:
+
+```sh
+UV_CACHE_DIR=/tmp/lantern-uv-cache UV_NO_SYNC=1 uv run --offline pytest tests/test_devcontainer_setup.py tests/test_workspace.py -q --tb=line
+```
+
+Exit 0: **21 passed** (eight new tests and thirteen existing workspace checks).
+All deeper positive/negative installer assertions now execute. Real SHA256,
+tar, copy, install, symlink and test-authored executable behavior are checked;
+only downloads are substituted with harmless local archives. Ruff check,
+format check, `bash -n .devcontainer/setup.sh` and `git diff --check` exited 0.
+
+Started the existing local Compose database with `make db`; it became healthy.
+The full make check is running, with output retained at
+`/tmp/lantern-m0-setup-make-check.txt`; no completed result is claimed here.
+
+For the fresh-environment verification, started an owned temporary Docker
+daemon using existing installed Docker, a private Unix socket and data root
+under `/tmp/lantern-m0-docker-ef1ahnj2`. It has no bridge or iptables management.
+This avoids consuming the active workspace's limited disk while fetching the
+3.77-GiB compressed image. The active Docker daemon and Codespace remain
+running. No auth directory, secret environment, account setting, billable
+resource, review runner, protected harness or CI file was changed. The image
+pull is in progress, not fresh-container proof. Results and cleanup follow.
+
+Full gate completed on the final installer (including the 200,000,000-byte
+per-download cap):
+
+```sh
+UV_CACHE_DIR=/tmp/lantern-uv-cache UV_NO_SYNC=1 make check
+```
+
+Exit **0**, **309 tests passed**, total coverage **95.90723055934515%**.
+All ten ordered checks passed, including strict types in 16 source files,
+import contracts, deny-list, bandit and the complete installed Python inventory
+audit. Every configured critical path is currently "not present", as expected
+at this stage; no invented critical-path coverage is reported. The actual
+final output is `/tmp/lantern-m0-setup-make-check-final.txt`. Pip-audit's cache
+could not be written under the read-only home, but its live advisory check
+completed successfully; that cache warning is not an audit bypass. The
+acceptance-ID checker separately exited 0 for both bootstrap stories.
+
+Advisory security/test checklist pass, scoped to this setup amendment after
+reading docs/02 §9/§17 and docs/07 §1–§2 and the applicable source/tests:
+
+- Security: no new application network surface or research gateway exists in
+  this amendment. The developer installer uses only fixed official URLs,
+  HTTPS-only redirects, fixed hashes before extraction, bounded retries,
+  time/file-size limits, a private temporary directory and quoted paths.
+  No token, auth directory or real database credential is copied into the
+  fresh environment. The remaining development-tool advisory risk is the
+  accepted ADR 0006 exception, not a clean-audit claim. No additional blocker
+  was found in this amendment.
+- Tests: the positive path runs the real checksum/extraction/installation
+  commands on harmless archives and executes the installed test programs;
+  the negative cases corrupt the archive bytes without replacing SHA256.
+  No unit under test is mocked. The shell download function performs I/O,
+  so there is no new pure function requiring a Hypothesis property. Notes for
+  independent review: installation reruns/profile PATH behavior should be
+  checked in the real fresh environment; the byte cap itself is a curl option,
+  not a new claim of an application evidence-capture bound.
+
+Saving this checked implementation candidate before creating its fresh clone.
+Fresh-container verification, formal proof and independent review are still
+pending; the full gate result alone does not satisfy those steps.

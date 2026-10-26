@@ -116,3 +116,5 @@ The decisions behind this pack, with what was rejected and why. Future changes g
 **Why.** Zero cost; Brave has no free plan and needs a card. Results stay transient with every provider (D10).
 
 [ADR 0005 — Make the saved workspace setup satisfy the security policy](adr/ADR-0005-fresh-workspace-setup.md), accepted 2026-10-26, permits the narrow bootstrap devcontainer correction and corresponding S0.1-AC6/test amendment. Other shipped pack files and all quality gates remain protected.
+
+[ADR 0006 — Continue with the existing workspace tool versions](adr/ADR-0006-existing-workspace-tool-versions.md), accepted 2026-10-26 by the user's explicit instruction, permits continuing M0 with the existing pinned development tools despite the recorded unresolved advisory matches. The Python dependency audit and all quality gates remain required.
