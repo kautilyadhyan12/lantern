@@ -789,3 +789,26 @@ ADR 0003's 800-line cap. The separately approved setup remains within its
 100-line amendment. No protected harness/CI file, dependency or API key was
 changed. Save/push this honest checkpoint before asking for the remaining
 test-correction decision.
+
+### Approved correction of the round-2 provenance test
+
+After the plain-English explanation and explicit request to correct the one
+incorrect test, the user instructed "continue". This authorizes that narrow
+correction and continuation of the existing plan; it does not authorize a
+merge or adding API keys.
+
+Changed only the identified provenance test and its JSON import. It now
+checks the PROOF's digest against its recorded Commit, and the REVIEW's
+digest against its recorded head_sha with the required exclusions. It still
+checks both real artifacts against Git; it no longer freezes a literal
+fingerprint or requires an old proof to describe later review-test commits.
+The original round-2 test is preserved in commit 4d8ca01. No other reviewer
+test, assertion, threshold or generated artifact was changed.
+
+All **35 reviewer cases pass** after that correction. Ruff check and format
+check pass. Regenerated the secret baseline through the real scanner with
+`scan --no-verify --baseline .secrets.baseline`: the now-removed literal
+fingerprint's finding is removed, leaving the original ten findings with
+unchanged plugins and filters. The round-2 report remains unedited. Commit
+this correction, then run the formal proof on the committed code before
+starting the third fresh review. A new full-gate pass is not yet claimed.

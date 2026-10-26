@@ -1,6 +1,7 @@
 """Round two: reference oracles written from plans before reading implementation."""
 
 import hashlib
+import json
 import re
 from datetime import UTC, datetime, timedelta, timezone
 
@@ -272,8 +273,11 @@ def test_malformed_coverage_counts(count):
 @pytest.mark.review
 def test_committed_proof_and_review_digests(repo):
     proof = (repo / "docs/proofs/PROOF-M0.md").read_text()
+    recorded_commit = re.search(r"^Commit: ([a-f0-9]{40,64})$", proof, re.M)[1]
     recorded_digest = re.search(r"^Code tree: ([a-f0-9]{64})$", proof, re.M)[1]
-    assert code_tree.code_tree(repo) == recorded_digest
-    assert code_tree.code_tree(repo, excluded_prefixes=["tests/review"]) == (
-        "b77c8ecf98e91753fe08c8c90a4e400f9683a2933c6d07496e15fa2acaa29994"
+    assert code_tree.code_tree(repo, commit=recorded_commit) == recorded_digest
+    review = json.loads((repo / "docs/reviews/REVIEW-M0.json").read_text())
+    assert (
+        code_tree.code_tree(repo, commit=review["head_sha"], excluded_prefixes=["tests/review"])
+        == review["code_tree"]
     )
