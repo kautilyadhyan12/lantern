@@ -5,7 +5,7 @@ import json
 import httpx
 import pytest
 
-from lantern.llm import Gateway, ModelError, Provider
+from lantern.llm import Gateway, ModelError, Provider, QuotaError
 from lantern.models import Usage
 from lantern.prompts import GateOut
 
@@ -83,3 +83,10 @@ async def test_a_request_too_large_for_one_provider_goes_to_the_next():
     model, _, seen = gateway([too_big, reply('{"allowed": true}')], providers=("a", "b"))
     assert (await model.structured("s", "u", GateOut)).allowed
     assert [host for host, _ in seen] == ["a.test", "b.test"]
+
+
+async def test_exhausted_free_limits_raise_a_quota_error():
+    limited = httpx.Response(429, headers={"retry-after": "3600"})
+    model, _, _ = gateway([limited])
+    with pytest.raises(QuotaError, match="used up"):
+        await model.structured("s", "u", GateOut)

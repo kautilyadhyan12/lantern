@@ -4,6 +4,7 @@ import hashlib
 
 import pytest
 
+from lantern.llm import QuotaError
 from lantern.models import Investigation
 from lantern.pipeline import Investigator, Limits, Tools
 from lantern.report import to_markdown
@@ -109,3 +110,16 @@ async def test_page_choice_skips_video_sites_and_caps_pages_per_site(tmp_path, m
     inv = await start()
     reading = next(step.message for step in inv.steps if step.message.startswith("Reading"))
     assert reading == "Reading 3 pages."  # two Wikipedia pages and AP; no YouTube
+
+
+async def test_running_out_of_free_ai_stops_the_run_with_a_clear_message(tmp_path):
+    class OutOfQuota(FakeModel):
+        async def structured(self, system, user, output):
+            if output.__name__ == "ExtractOut":
+                raise QuotaError("The free AI allowance (groq) is used up for now.")
+            return await super().structured(system, user, output)
+
+    start, _, _ = run(tmp_path, model=OutOfQuota())
+    inv = await start()
+    assert inv.status == "failed"
+    assert "used up" in inv.error

@@ -21,6 +21,10 @@ class ModelError(Exception):
     """A model step failed; the message says why and what to do."""
 
 
+class QuotaError(ModelError):
+    """Every provider is at its free limit: the whole investigation must stop."""
+
+
 @dataclass
 class Provider:
     name: str
@@ -112,8 +116,11 @@ class Gateway:
             wait = provider.available_at - loop.time()
             if wait > MAX_WAIT:
                 names = ", ".join(item.name for item in usable)
-                msg = f"All AI providers ({names}) are at their free limits. Try again later."
-                raise ModelError(msg)
+                msg = (
+                    f"The free AI allowance ({names}) is used up for now. It resets by itself; "
+                    "try again later or tomorrow."
+                )
+                raise QuotaError(msg)
             if wait > 0:
                 await asyncio.sleep(wait)
             try:

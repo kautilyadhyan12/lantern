@@ -12,7 +12,7 @@ from urllib.parse import urlsplit, urlunsplit
 from lantern import assessment, prompts
 from lantern.capture import extract
 from lantern.egress import FetchError, Page
-from lantern.llm import Model, ModelError
+from lantern.llm import Model, ModelError, QuotaError
 from lantern.models import Claim, Finding, Investigation, Lead, Question, Report, Source, now
 from lantern.report import strip_refs, verify
 from lantern.safety import check_brief
@@ -392,6 +392,8 @@ class Investigator:
                 out = await self.tools.model.structured(
                     prompts.EXTRACT_POSTS, user, prompts.ExtractPostsOut
                 )
+            except QuotaError:
+                raise
             except ModelError as error:
                 self.note(f"Could not read claims from posts: {error}")
                 continue
@@ -441,6 +443,8 @@ class Investigator:
                         out = await self.tools.model.structured(
                             prompts.EXTRACT, user, prompts.ExtractOut
                         )
+                    except QuotaError:
+                        raise
                     except ModelError as error:
                         self.note(f"Could not read claims from {source.ref}: {error}")
                         return list(found.values())
@@ -504,6 +508,8 @@ class Investigator:
         user = f"Key question {question.ref}: {question.text}\n\nClaims:\n" + "\n".join(lines)
         try:
             out = await self.tools.model.structured(prompts.ASSESS, user, prompts.AssessOut)
+        except QuotaError:
+            raise
         except ModelError as error:
             return Finding(
                 question_ref=question.ref,
