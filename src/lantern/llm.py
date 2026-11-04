@@ -29,6 +29,11 @@ class Provider:
     model: str
     available_at: float = 0.0
     extra: dict[str, str] = field(default_factory=dict)
+    problem: str | None = None
+
+
+class _TooLargeError(Exception):
+    """This request is too large for one provider; another may accept it."""
 
 
 class Model(Protocol):
@@ -91,16 +96,31 @@ class Gateway:
             msg = f"The investigation reached its limit of {self._max_calls} AI calls."
             raise ModelError(msg)
         loop = asyncio.get_running_loop()
+        too_large: set[str] = set()
         for _attempt in range(8):
-            provider = min(self._providers, key=lambda item: item.available_at)
+            usable = [
+                item for item in self._providers if not item.problem and item.name not in too_large
+            ]
+            if not usable:
+                problems = [
+                    f"{item.name} {item.problem}" for item in self._providers if item.problem
+                ]
+                problems += [f"{name} said the request was too large" for name in sorted(too_large)]
+                msg = f"No AI provider could take this step: {'; '.join(problems)}."
+                raise ModelError(msg)
+            provider = min(usable, key=lambda item: item.available_at)
             wait = provider.available_at - loop.time()
             if wait > MAX_WAIT:
-                names = ", ".join(item.name for item in self._providers)
+                names = ", ".join(item.name for item in usable)
                 msg = f"All AI providers ({names}) are at their free limits. Try again later."
                 raise ModelError(msg)
             if wait > 0:
                 await asyncio.sleep(wait)
-            result = await self._call(provider, messages)
+            try:
+                result = await self._call(provider, messages)
+            except _TooLargeError:
+                too_large.add(provider.name)
+                continue
             if result is not None:
                 return result
         msg = "The AI providers kept failing. Try again in a few minutes."
@@ -129,8 +149,12 @@ class Gateway:
             provider.available_at = loop.time() + (retry if retry is not None else 10.0)
             return None
         if response.status_code in {401, 403}:
-            provider.available_at = loop.time() + 10_000
+            key = f"LANTERN_{provider.name.upper()}_API_KEY"
+            provider.problem = f"rejected its API key (check {key})"
             return None
+        too_large = "too large" in response.text.lower() or "context" in response.text.lower()
+        if response.status_code == 413 or (response.status_code == 400 and too_large):
+            raise _TooLargeError
         if response.status_code != 200:
             detail = response.text[:300]
             msg = f"The AI provider {provider.name} refused the request ({detail})."

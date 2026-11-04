@@ -45,7 +45,7 @@ def find_quote(text: str, quote: str) -> tuple[int, int] | None:
     return offsets[position], offsets[position + len(needle) - 1] + 1
 
 
-def chunks(text: str, size: int = 9000, overlap: int = 400, limit: int = 2) -> list[str]:
+def chunks(text: str, size: int = 10000, overlap: int = 400, limit: int = 1) -> list[str]:
     """Split text on paragraph boundaries into at most `limit` chunks of about `size` chars."""
     parts: list[str] = []
     start = 0

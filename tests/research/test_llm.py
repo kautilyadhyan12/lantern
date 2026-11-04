@@ -70,3 +70,16 @@ async def test_the_call_cap_stops_the_investigation():
 def test_no_provider_gives_a_clear_message():
     with pytest.raises(ModelError, match="LANTERN_GROQ_API_KEY"):
         Gateway([], Usage(), 5)
+
+
+async def test_a_rejected_key_is_named_in_the_error():
+    model, _, _ = gateway([httpx.Response(401)])
+    with pytest.raises(ModelError, match="LANTERN_A_API_KEY"):
+        await model.structured("s", "u", GateOut)
+
+
+async def test_a_request_too_large_for_one_provider_goes_to_the_next():
+    too_big = httpx.Response(413, text="Request too large for model")
+    model, _, seen = gateway([too_big, reply('{"allowed": true}')], providers=("a", "b"))
+    assert (await model.structured("s", "u", GateOut)).allowed
+    assert [host for host, _ in seen] == ["a.test", "b.test"]
