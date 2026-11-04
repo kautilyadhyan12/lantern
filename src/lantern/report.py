@@ -1,0 +1,114 @@
+"""Citation checks for the drafted report, and Markdown export."""
+
+import re
+
+from lantern.assessment import CONFIDENCE_WORDS, LIKELIHOOD, RELIABILITY, TERMS
+from lantern.models import Investigation, Removed, Report, Section, Sentence
+from lantern.prompts import ReportOut, SentenceOut
+
+_INLINE = re.compile(r"\s*[\[(]\s*((?:C\d+\s*[,;]?\s*)+)[\])]")
+_REF = re.compile(r"C\d+")
+
+
+def _mixes_scales(text: str) -> bool:
+    lowered = text.lower()
+    has_term = any(re.search(rf"\b{re.escape(term)}\b", lowered) for term in TERMS)
+    return has_term and any(word in lowered for word in CONFIDENCE_WORDS)
+
+
+def _check(sentence: SentenceOut, valid: set[str], removed: list[Removed]) -> Sentence | None:
+    cites = list(sentence.cites)
+    for match in _INLINE.finditer(sentence.text):
+        cites += _REF.findall(match.group(1))
+    text = _INLINE.sub("", sentence.text).strip()
+    cites = list(dict.fromkeys(ref.strip().upper() for ref in cites))
+    unknown = [ref for ref in cites if ref not in valid]
+    if not cites:
+        removed.append(Removed(text=text, reason="It cites no claim."))
+    elif unknown:
+        removed.append(Removed(text=text, reason=f"It cites unknown claims: {', '.join(unknown)}."))
+    elif _mixes_scales(text):
+        removed.append(Removed(text=text, reason="It mixes likelihood and confidence."))
+    else:
+        return Sentence(text=text, cites=cites)
+    return None
+
+
+def verify(draft: ReportOut, investigation: Investigation) -> Report:
+    """Keep only sentences that cite existing claims; list everything removed."""
+    valid = {claim.ref for claim in investigation.claims}
+    answered = {item.question_ref for item in investigation.findings if item.status == "answered"}
+    removed: list[Removed] = []
+    bottom = [item for s in draft.bottom_line if (item := _check(s, valid, removed))]
+    sections: dict[str, Section] = {}
+    for section in draft.sections:
+        if section.question_ref not in answered:
+            continue
+        target = sections.setdefault(
+            section.question_ref, Section(question_ref=section.question_ref)
+        )
+        target.sentences += [item for s in section.sentences if (item := _check(s, valid, removed))]
+    gaps = [gap.strip() for gap in draft.gaps if gap.strip()]
+    for finding in investigation.findings:
+        question = investigation.question(finding.question_ref)
+        if finding.status == "unanswerable" and question:
+            gaps.append(f"{question.ref} — {question.text} {finding.answer}")
+    ordered = [sections[q.ref] for q in investigation.questions if q.ref in sections]
+    return Report(bottom_line=bottom, sections=ordered, gaps=gaps, removed=removed)
+
+
+def _cited(sentence: Sentence) -> str:
+    return f"{sentence.text} [{', '.join(sentence.cites)}]"
+
+
+def to_markdown(investigation: Investigation) -> str:
+    """The report as Markdown, with the claims and sources it relies on."""
+    report = investigation.report or Report()
+    ranges = dict(LIKELIHOOD)
+    lines = [f"# {investigation.brief}", "", f"Status: {investigation.status}.", ""]
+    if investigation.status == "refused":
+        return "\n".join([*lines, f"Refused: {investigation.safety}", ""])
+    lines += ["## Bottom line", "", *(_cited(s) for s in report.bottom_line), ""]
+    for finding in investigation.findings:
+        question = investigation.question(finding.question_ref)
+        lines += [f"## {finding.question_ref}. {question.text if question else ''}", ""]
+        if finding.status == "answered":
+            section = next(
+                (s for s in report.sections if s.question_ref == finding.question_ref), None
+            )
+            lines += [_cited(s) for s in section.sentences] if section else []
+            likelihood = finding.likelihood or ""
+            lines += [
+                "",
+                f"- Answer: {finding.answer}",
+                f"- Likelihood: {likelihood} ({ranges.get(likelihood, '')})",
+                f"- Analytic confidence: {finding.confidence} — {finding.confidence_reason}.",
+            ]
+        else:
+            lines.append(f"Could not be determined. {finding.answer}")
+        lines.append("")
+    if report.gaps:
+        lines += ["## What could not be determined", "", *(f"- {gap}" for gap in report.gaps), ""]
+    lines += ["## Claims", ""]
+    for claim in investigation.claims:
+        lines.append(
+            f"- **{claim.ref}** ({claim.source_ref}, credibility {claim.credibility}): "
+            f"{claim.statement} — “{claim.quote}”"
+        )
+    lines += ["", "## Sources", ""]
+    for source in investigation.sources:
+        grade = RELIABILITY.get(source.reliability, "")
+        lines.append(
+            f"- **{source.ref}** [{source.title or source.domain}]({source.url}) — "
+            f"grade {source.reliability} ({grade}); "
+            f"saved {source.fetched_at:%Y-%m-%d %H:%M} UTC; sha256 `{source.sha256}`"
+        )
+    lines += [
+        "",
+        (
+            "Produced with automated assistance from public sources. Review it before "
+            "publishing or acting on it."
+        ),
+        "",
+    ]
+    return "\n".join(lines)
