@@ -24,7 +24,9 @@ PLAN = (
     f"{COMMON}\nSplit the research question into {{count}} key questions that together answer "
     "it. Each key question must be answerable from public web pages. For each, give one or "
     "two short web search queries (keywords, not sentences). Also give up to three hashtags "
-    "(without #) that people on the ground would use when posting about it on social media."
+    "(without #) that people on the ground would use when posting about it on social media, "
+    "and up to three short everyday phrases (two to four words, no dates) that such people "
+    "would write in their posts."
 )
 
 EXTRACT_POSTS = (
@@ -33,7 +35,9 @@ EXTRACT_POSTS = (
     "about the subject of the key questions. Each claim needs: the ref of the post it comes "
     "from; a one-sentence statement that begins 'A social media post reported'; a quote "
     "copied EXACTLY from that post (15 to 300 characters, no changes); and the refs of the "
-    "key questions it helps answer. Never describe or name the people who posted. Skip "
+    "key questions it helps answer. Never describe or name the people who posted. Only "
+    "extract first-hand observations (what the poster saw, experienced or recorded) and "
+    "local notices. Skip posts that only repeat a news headline or share a link, and skip "
     "jokes, opinions, adverts and posts unrelated to the key questions."
 )
 
@@ -83,6 +87,7 @@ class PlannedQuestion(BaseModel):
 class PlanOut(BaseModel):
     questions: list[PlannedQuestion] = Field(min_length=1)
     hashtags: list[str] = Field(default_factory=list)
+    social_phrases: list[str] = Field(default_factory=list)
 
 
 class ClaimDraft(BaseModel):

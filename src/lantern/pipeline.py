@@ -87,6 +87,7 @@ class Investigator:
         self.on_change = on_change
         self._queries: dict[str, list[str]] = {}
         self._hashtags: list[str] = []
+        self._phrases: list[str] = []
 
     def note(self, message: str) -> None:
         self.inv.log(message)
@@ -150,6 +151,7 @@ class Investigator:
                 : self.limits.queries_per_question
             ]
         self._hashtags = [tag.strip().lstrip("#") for tag in plan.hashtags if tag.strip()][:3]
+        self._phrases = [phrase.strip() for phrase in plan.social_phrases if phrase.strip()][:3]
         self.note(f"Planned {len(self.inv.questions)} key questions.")
 
     async def _search(self) -> list[tuple[str, set[str]]]:
@@ -238,12 +240,14 @@ class Investigator:
             return
         self.note("Looking for ground reports in public social media posts.")
         found: list[tuple[Post, list[str]]] = []
-        for question in self.inv.questions:
-            query = (self._queries.get(question.ref) or [question.text])[0]
-            posts = await social.search(query, self.limits.posts_per_query)
-            self.note(f"Bluesky: searched “{query}” ({len(posts)} posts).")
-            found += [(post, [question.ref]) for post in posts]
         everything = [question.ref for question in self.inv.questions]
+        phrases = self._phrases or [
+            (self._queries.get(q.ref) or [q.text])[0] for q in self.inv.questions
+        ]
+        for phrase in phrases:
+            posts = await social.search(phrase, self.limits.posts_per_query)
+            self.note(f"Bluesky: searched “{phrase}” ({len(posts)} posts).")
+            found += [(post, everything) for post in posts]
         for tag in self._hashtags:
             posts = await social.hashtag(tag, self.limits.posts_per_query)
             self.note(f"Mastodon: #{tag} ({len(posts)} public posts).")

@@ -103,6 +103,14 @@ def to_markdown(investigation: Investigation) -> str:
     lines += ["", "## Sources", ""]
     for source in investigation.sources:
         grade = RELIABILITY.get(source.reliability, "")
+        if source.kind == "post":
+            # Post addresses can contain usernames; the app links to the original instead.
+            lines.append(
+                f"- **{source.ref}** {source.title} (ground report, posted "
+                f"{source.published or 'unknown'}) — grade {source.reliability} ({grade}); "
+                f"sha256 `{source.sha256}`"
+            )
+            continue
         lines.append(
             f"- **{source.ref}** [{source.title or source.domain}]({source.url}) — "
             f"grade {source.reliability} ({grade}); "

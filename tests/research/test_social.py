@@ -6,6 +6,7 @@ import httpx
 
 from lantern.models import Investigation
 from lantern.pipeline import Investigator, Limits, Tools
+from lantern.report import to_markdown
 from lantern.social import PublicSocial, html_to_text
 from lantern.store import Store
 
@@ -113,3 +114,15 @@ async def test_posts_become_ground_reports_without_author_identity(tmp_path):
     assert all(c.statement.startswith("A social media post reported") for c in claims)
     stored = (store.root / "investigations" / f"{inv.id}.json").read_text()
     assert "alice" not in stored.replace("did:plc:alice", "")
+
+
+async def test_markdown_export_does_not_print_post_addresses(tmp_path):
+    store = Store(tmp_path)
+    tools = Tools(
+        model=FakeModel(), searcher=FakeSearch(), fetcher=FakeFetcher(), social=FakeSocial()
+    )
+    inv = Investigation(id=store.new_id(), brief="What happened in the district floods?")
+    inv = await Investigator(inv, tools, store, Limits()).run()
+    markdown = to_markdown(inv)
+    assert "Bluesky post (ground report" in markdown
+    assert "bsky.app/profile" not in markdown
