@@ -5,9 +5,11 @@ import json
 import httpx
 import pytest
 
+from lantern.config import AppSettings
 from lantern.llm import Gateway, ModelError, Provider, QuotaError
 from lantern.models import Usage
 from lantern.prompts import GateOut
+from lantern.runtime import missing_keys, providers
 
 
 def reply(content, tokens=10):
@@ -90,3 +92,11 @@ async def test_exhausted_free_limits_raise_a_quota_error():
     model, _, _ = gateway([limited])
     with pytest.raises(QuotaError, match="used up"):
         await model.structured("s", "u", GateOut)
+
+
+def test_gemini_is_used_only_after_the_other_providers():
+    settings = AppSettings(groq_api_key="g", gemini_api_key="m", tavily_api_key="t")
+    assert [item.name for item in providers(settings)] == ["groq", "gemini"]
+    assert providers(settings)[1].base_url.startswith("https://generativelanguage.googleapis.com")
+    only_gemini = AppSettings(gemini_api_key="m", tavily_api_key="t")
+    assert missing_keys(only_gemini) == []

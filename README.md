@@ -37,6 +37,7 @@ Codespaces → Secrets) and then a codespace restart:
 |---|---|
 | `LANTERN_TAVILY_API_KEY` | web search (Tavily free tier) |
 | `LANTERN_GROQ_API_KEY` and/or `LANTERN_CEREBRAS_API_KEY` | open-weight models (`gpt-oss-120b`) on free tiers, with automatic fallback |
+| `LANTERN_GEMINI_API_KEY` (optional) | backup model on Google's free tier, used only when the others are at their limits; free-tier prompts may be used by Google, so only public material is ever sent |
 
 ```sh
 uv sync --frozen

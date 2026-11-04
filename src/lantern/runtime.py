@@ -13,7 +13,9 @@ from lantern.store import Store
 
 
 def providers(settings: AppSettings) -> list[Provider]:
-    """Configured model providers; Cerebras first because its free tier allows more tokens."""
+    """Configured providers in order of use. Gemini comes last: its free tier may use
+    prompts to improve Google's products, so it only takes over when the others are at
+    their limits. Lantern sends only public pages and posts to any provider."""
     found = []
     if settings.cerebras_api_key:
         found.append(
@@ -35,6 +37,16 @@ def providers(settings: AppSettings) -> list[Provider]:
                 extra={"reasoning_effort": "low"},
             )
         )
+    if settings.gemini_api_key:
+        found.append(
+            Provider(
+                "gemini",
+                "https://generativelanguage.googleapis.com/v1beta/openai",
+                settings.gemini_api_key.get_secret_value(),
+                settings.gemini_model,
+                extra={"reasoning_effort": "low"},
+            )
+        )
     return found
 
 
@@ -42,8 +54,8 @@ def missing_keys(settings: AppSettings) -> list[str]:
     missing = []
     if not settings.tavily_api_key:
         missing.append("LANTERN_TAVILY_API_KEY")
-    if not (settings.groq_api_key or settings.cerebras_api_key):
-        missing.append("LANTERN_GROQ_API_KEY (or LANTERN_CEREBRAS_API_KEY)")
+    if not (settings.groq_api_key or settings.cerebras_api_key or settings.gemini_api_key):
+        missing.append("LANTERN_GROQ_API_KEY (or LANTERN_GEMINI_API_KEY)")
     return missing
 
 
