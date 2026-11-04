@@ -58,6 +58,7 @@ class Fetcher:
         max_bytes: int = 5_000_000,
         total_timeout: float = 25.0,
         host_interval: float = HOST_INTERVAL,
+        blocked: Callable[[str], str | None] | None = None,
     ) -> None:
         self._agent = user_agent
         self._token = user_agent.split("/", maxsplit=1)[0]
@@ -65,6 +66,7 @@ class Fetcher:
         self._max_bytes = max_bytes
         self._total_timeout = total_timeout
         self._interval = host_interval
+        self._blocked = blocked
         self._client = httpx.AsyncClient(
             transport=transport,
             timeout=httpx.Timeout(10.0, connect=5.0),
@@ -92,6 +94,9 @@ class Fetcher:
 
     async def _follow(self, url: str, *, robots: bool) -> tuple[int, httpx.Headers, bytes, str]:
         for _ in range(MAX_REDIRECTS + 1):
+            reason = self._blocked(url) if self._blocked else None
+            if reason:
+                raise FetchError(reason)
             await self._target(url)
             if robots and not await self._allowed(url):
                 raise FetchError("The site's robots.txt does not allow automated reading.")

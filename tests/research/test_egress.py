@@ -4,6 +4,7 @@ import httpx
 import pytest
 
 from lantern.egress import Fetcher, FetchError, is_public
+from lantern.pipeline import blocked_site
 
 HTML = b"<html><body><p>" + b"Public page text. " * 30 + b"</p></body></html>"
 
@@ -131,3 +132,30 @@ async def test_oversized_and_non_text_pages_are_refused():
         await fetcher.fetch("https://example.com/big")
     with pytest.raises(FetchError, match="not application/pdf"):
         await fetcher.fetch("https://example.com/doc")
+
+
+async def test_a_redirect_to_a_never_open_site_is_refused_before_contacting_it():
+    fetcher, seen = make(
+        {
+            ("example.com", "/robots.txt"): (404, {}, b""),
+            ("example.com", "/short"): (302, {"location": "https://x.com/someone/status/1"}, b""),
+        }
+    )
+    fetcher._blocked = blocked_site
+    with pytest.raises(FetchError, match="never opens it"):
+        await fetcher.fetch("https://example.com/short")
+    assert all(request.headers["host"] != "x.com" for request in seen)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://x.com/a/status/1",
+        "https://mobile.twitter.com/a",
+        "https://t.co/abc",
+        "https://nitter.net/a",
+        "https://m.facebook.com/post",
+    ],
+)
+def test_x_and_its_mirrors_are_never_opened(url):
+    assert blocked_site(url) is not None

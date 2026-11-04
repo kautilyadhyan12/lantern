@@ -6,7 +6,7 @@ from lantern.config import AppSettings
 from lantern.egress import Fetcher
 from lantern.llm import Gateway, ModelError, Provider
 from lantern.models import Investigation
-from lantern.pipeline import Investigator, Limits, Tools
+from lantern.pipeline import Investigator, Limits, Tools, blocked_site
 from lantern.search import SearchError, TavilySearch
 from lantern.social import PublicSocial
 from lantern.store import Store
@@ -71,7 +71,7 @@ async def run_investigation(
         store.save(investigation)
         return investigation
     searcher = TavilySearch(settings.tavily_api_key.get_secret_value())
-    fetcher = Fetcher(settings.user_agent)
+    fetcher = Fetcher(settings.user_agent, blocked=blocked_site)
     social = (
         PublicSocial(settings.user_agent, mastodon=settings.mastodon_instance)
         if settings.social_enabled

@@ -35,6 +35,15 @@ SKIP_DOMAINS = {
     "t.me",
     "telegram.org",
     "pinterest.com",
+    "t.co",
+    "fxtwitter.com",
+    "vxtwitter.com",
+    "fixupx.com",
+    "nitter.net",
+    "xcancel.com",
+    "fb.com",
+    "fb.watch",
+    "instagr.am",
 }
 # Video and audio pages have no readable text to quote.
 NO_TEXT_DOMAINS = {"youtube.com", "youtu.be", "vimeo.com", "spotify.com", "soundcloud.com"}
@@ -63,6 +72,14 @@ class Tools:
     searcher: Searcher
     fetcher: PageFetcher
     social: SocialSearch | None = None
+
+
+def blocked_site(url: str) -> str | None:
+    """Why a URL must never be opened, also checked on every redirect hop."""
+    domain = assessment.registrable_domain(url)
+    if domain in SKIP_DOMAINS:
+        return f"{domain} does not allow automated reading, so Lantern never opens it."
+    return None
 
 
 def canonical(url: str) -> str:
