@@ -8,6 +8,7 @@ from lantern.llm import Gateway, ModelError, Provider
 from lantern.models import Investigation
 from lantern.pipeline import Investigator, Limits, Tools
 from lantern.search import SearchError, TavilySearch
+from lantern.social import PublicSocial
 from lantern.store import Store
 
 
@@ -58,7 +59,11 @@ async def run_investigation(
         store.save(investigation)
         return investigation
     assert settings.tavily_api_key is not None  # noqa: S101  # checked by missing_keys above
-    limits = Limits(max_questions=settings.max_questions, max_pages=settings.max_pages)
+    limits = Limits(
+        max_questions=settings.max_questions,
+        max_pages=settings.max_pages,
+        max_posts=settings.max_posts,
+    )
     try:
         model = Gateway(providers(settings), investigation.usage, settings.max_llm_calls)
     except ModelError as error:
@@ -67,8 +72,13 @@ async def run_investigation(
         return investigation
     searcher = TavilySearch(settings.tavily_api_key.get_secret_value())
     fetcher = Fetcher(settings.user_agent)
+    social = (
+        PublicSocial(settings.user_agent, mastodon=settings.mastodon_instance)
+        if settings.social_enabled
+        else None
+    )
     try:
-        tools = Tools(model=model, searcher=searcher, fetcher=fetcher)
+        tools = Tools(model=model, searcher=searcher, fetcher=fetcher, social=social)
         return await Investigator(investigation, tools, store, limits, on_change).run()
     except SearchError as error:
         investigation.status, investigation.error = "failed", str(error)
@@ -78,3 +88,5 @@ async def run_investigation(
         await model.close()
         await searcher.close()
         await fetcher.close()
+        if social:
+            await social.close()

@@ -12,14 +12,19 @@ You ask a question. Lantern:
 3. **Searches the web and reads pages politely.** It only opens links returned by search,
    obeys robots.txt, identifies itself, and never connects to private or internal network
    addresses. Search results themselves are never stored.
-4. **Preserves every source** (`S1`, …) with the sha256 fingerprint of the bytes it saved.
-5. **Extracts claims anchored to exact quotes** (`C1`, …). Code checks that each quote
+4. **Adds ground reports from public social media.** Bluesky public search and Mastodon
+   hashtag timelines supply first-hand posts about the event, graded D (unverified) until
+   other sources confirm them. Only event searches are made, never an account's timeline;
+   opted-out accounts and labelled posts are skipped, authors are not stored, and each
+   account counts once towards corroboration.
+5. **Preserves every source** (`S1`, …) with the sha256 fingerprint of the bytes it saved.
+6. **Extracts claims anchored to exact quotes** (`C1`, …). Code checks that each quote
    appears word for word in the saved page; claims whose quotes cannot be found are dropped.
-6. **Assesses each key question with rules, not model opinion.** Sources get Admiralty
+7. **Assesses each key question with rules, not model opinion.** Sources get Admiralty
    reliability grades (A–F) from a fixed table; corroboration counts independent websites
    only; likelihood uses the seven ICD 203 terms and is toned down when evidence is thin;
    analytic confidence (low, moderate, high) is computed by code.
-7. **Writes a verified report.** Every sentence must cite existing claims; sentences that
+8. **Writes a verified report.** Every sentence must cite existing claims; sentences that
    do not are removed and listed. Each citation opens the exact quote, highlighted inside
    the saved copy of its source.
 
@@ -52,6 +57,7 @@ so free quotas last. Captured evidence is stored under `var/`, which is never co
 | Quote anchoring with an offset map | `src/lantern/text.py` |
 | Ratings, independence, confidence, likelihood limits | `src/lantern/assessment.py` |
 | Fixed safety rules | `src/lantern/safety.py` |
+| Social ground reports (Bluesky, Mastodon) | `src/lantern/social.py` |
 | Model gateway: validated JSON, one retry, provider fallback | `src/lantern/llm.py` |
 | Citation checks and Markdown export | `src/lantern/report.py` |
 | Web app (FastAPI) | `src/lantern/web/` |

@@ -1,6 +1,7 @@
 """The investigation: safety check → key questions → search → fetch → claims → findings → report."""
 
 import asyncio
+import json
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -15,8 +16,9 @@ from lantern.models import Claim, Finding, Investigation, Question, Report, Sour
 from lantern.report import strip_refs, verify
 from lantern.safety import check_brief
 from lantern.search import Searcher, SearchError
+from lantern.social import Post, SocialSearch
 from lantern.store import Store
-from lantern.text import chunks, find_quote
+from lantern.text import chunks, find_quote, normalise
 
 log = logging.getLogger(__name__)
 
@@ -50,6 +52,9 @@ class Limits:
     queries_per_question: int = 2
     results_per_query: int = 5
     claims_per_question: int = 30
+    max_posts: int = 8
+    posts_per_query: int = 20
+    posts_per_account: int = 2
 
 
 @dataclass
@@ -57,6 +62,7 @@ class Tools:
     model: Model
     searcher: Searcher
     fetcher: PageFetcher
+    social: SocialSearch | None = None
 
 
 def canonical(url: str) -> str:
@@ -80,6 +86,7 @@ class Investigator:
         self.limits = limits
         self.on_change = on_change
         self._queries: dict[str, list[str]] = {}
+        self._hashtags: list[str] = []
 
     def note(self, message: str) -> None:
         self.inv.log(message)
@@ -94,6 +101,7 @@ class Investigator:
                 await self._plan()
                 urls = await self._search()
                 await self._fetch(urls)
+                await self._social()
                 await self._extract()
                 await self._assess()
                 await self._write()
@@ -141,6 +149,7 @@ class Investigator:
             self._queries[question.ref] = [q.strip() for q in item.queries if q.strip()][
                 : self.limits.queries_per_question
             ]
+        self._hashtags = [tag.strip().lstrip("#") for tag in plan.hashtags if tag.strip()][:3]
         self.note(f"Planned {len(self.inv.questions)} key questions.")
 
     async def _search(self) -> list[tuple[str, set[str]]]:
@@ -207,6 +216,7 @@ class Investigator:
                 ref=f"S{len(self.inv.sources) + 1}",
                 url=page.url,
                 domain=assessment.registrable_domain(page.url),
+                origin=assessment.registrable_domain(page.url),
                 title=title,
                 published=published,
                 fetched_at=now(),
@@ -220,6 +230,114 @@ class Investigator:
             self.inv.sources.append(source)
             self.inv.usage.pages_fetched += 1
         self.note(f"Saved {len(self.inv.sources)} pages with their sha256 fingerprints.")
+
+    async def _social(self) -> None:
+        """Collect public posts about the event as ground reports (never account timelines)."""
+        social = self.tools.social
+        if social is None:
+            return
+        self.note("Looking for ground reports in public social media posts.")
+        found: list[tuple[Post, list[str]]] = []
+        for question in self.inv.questions:
+            query = (self._queries.get(question.ref) or [question.text])[0]
+            posts = await social.search(query, self.limits.posts_per_query)
+            self.note(f"Bluesky: searched “{query}” ({len(posts)} posts).")
+            found += [(post, [question.ref]) for post in posts]
+        everything = [question.ref for question in self.inv.questions]
+        for tag in self._hashtags:
+            posts = await social.hashtag(tag, self.limits.posts_per_query)
+            self.note(f"Mastodon: #{tag} ({len(posts)} public posts).")
+            found += [(post, everything) for post in posts]
+        seen: set[str] = set()
+        per_origin: dict[str, int] = {}
+        saved = 0
+        for post, refs in found:
+            key = normalise(post.text)[0][:200]
+            if key in seen or per_origin.get(post.origin, 0) >= self.limits.posts_per_account:
+                continue
+            seen.add(key)
+            per_origin[post.origin] = per_origin.get(post.origin, 0) + 1
+            self._save_post(post, refs)
+            saved += 1
+            if saved >= self.limits.max_posts:
+                break
+        self.inv.usage.posts_saved = saved
+        self.note(f"Saved {saved} posts as ground reports, with sha256 fingerprints.")
+
+    def _save_post(self, post: Post, refs: list[str]) -> None:
+        # The saved copy keeps the post itself, not who wrote it.
+        record = {
+            "platform": post.platform,
+            "url": post.url,
+            "posted_at": post.posted_at,
+            "language": post.language,
+            "text": post.text,
+        }
+        body = json.dumps(record, ensure_ascii=False, sort_keys=True).encode()
+        self.inv.sources.append(
+            Source(
+                ref=f"S{len(self.inv.sources) + 1}",
+                url=post.url,
+                domain=urlsplit(post.url).hostname or post.platform,
+                kind="post",
+                origin=post.origin,
+                title=f"{post.platform.capitalize()} post",
+                published=post.posted_at or None,
+                fetched_at=now(),
+                sha256=self.store.put_blob(body),
+                text_sha256=self.store.put_text(post.text),
+                size=len(body),
+                reliability="D",
+                reliability_reason="Social media post: an unverified ground report",
+                question_refs=sorted(refs),
+            )
+        )
+
+    async def _extract_posts(self, refs: set[str], menu: str) -> list[Claim]:
+        posts = [source for source in self.inv.sources if source.kind == "post"]
+        claims: list[Claim] = []
+        spans: set[tuple[str, int, int]] = set()
+        for start in range(0, len(posts), 8):
+            batch = posts[start : start + 8]
+            texts = {source.ref: self.store.text(source.text_sha256) or "" for source in batch}
+            body = "\n\n".join(
+                f'<post ref="{s.ref}" posted="{s.published or ""}">\n{texts[s.ref]}\n</post>'
+                for s in batch
+            )
+            user = f"Key questions:\n{menu}\n\n{body}"
+            try:
+                out = await self.tools.model.structured(
+                    prompts.EXTRACT_POSTS, user, prompts.ExtractPostsOut
+                )
+            except ModelError as error:
+                self.note(f"Could not read claims from posts: {error}")
+                continue
+            for draft in out.claims[:8]:
+                ref = draft.post_ref.strip().upper()
+                text = texts.get(ref)
+                span = find_quote(text, draft.quote) if text else None
+                linked = sorted({r.strip().upper() for r in draft.question_refs} & refs)
+                if text is None or span is None or not linked or (ref, *span) in spans:
+                    self.inv.usage.claims_dropped += 1
+                    continue
+                spans.add((ref, *span))
+                statement = draft.statement.strip()
+                if not statement.lower().startswith("a social media post"):
+                    statement = f"A social media post reported: {statement}"
+                claims.append(
+                    Claim(
+                        ref="",
+                        source_ref=ref,
+                        question_refs=linked,
+                        statement=statement,
+                        quote=text[span[0] : span[1]],
+                        start=span[0],
+                        end=span[1],
+                    )
+                )
+        if posts:
+            self.note(f"Posts: {len(claims)} ground-report claims anchored.")
+        return claims
 
     async def _extract(self) -> None:
         self.note("Pulling out claims with exact quotes.")
@@ -261,7 +379,10 @@ class Investigator:
             self.note(f"{source.ref} ({source.domain}): {len(found)} claims anchored.")
             return list(found.values())
 
-        results = await asyncio.gather(*(one(source) for source in self.inv.sources))
+        pages = [source for source in self.inv.sources if source.kind == "page"]
+        results = await asyncio.gather(
+            *(one(source) for source in pages), self._extract_posts(refs, menu)
+        )
         for claims in results:
             for claim in claims:
                 claim.ref = f"C{len(self.inv.claims) + 1}"
@@ -290,7 +411,9 @@ class Investigator:
         lines = []
         for claim in claims:
             source = self.inv.source(claim.source_ref)
-            where = f"{source.domain}, grade {source.reliability}" if source else ""
+            kind = "social media post" if source and source.kind == "post" else ""
+            where = f"{kind or (source.domain if source else '')}, grade "
+            where += source.reliability if source else ""
             lines.append(
                 f"{claim.ref} [{claim.source_ref} {where}]: {claim.statement} "
                 f"Quote: “{claim.quote}”"
@@ -311,8 +434,7 @@ class Investigator:
         if out.status == "unanswerable" or not supporting:
             return Finding(question_ref=question.ref, status="unanswerable", answer=out.answer)
         sources = [self.inv.source(c.source_ref) for c in claims if c.ref in supporting]
-        urls = [s.url for s in sources if s]
-        domains = assessment.independent_domains(urls)
+        domains = sorted({s.origin or s.domain for s in sources if s})
         best = min((s.reliability for s in sources if s), default=None)
         level, why = assessment.confidence(len(domains), best, bool(contradicting))
         likelihood = assessment.clamp_likelihood(out.likelihood or "", len(domains))

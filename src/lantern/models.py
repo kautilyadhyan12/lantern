@@ -28,6 +28,8 @@ class Source(BaseModel):
     ref: str
     url: str
     domain: str
+    kind: Literal["page", "post"] = "page"
+    origin: str = ""
     title: str | None = None
     published: str | None = None
     fetched_at: AwareDatetime
@@ -90,6 +92,7 @@ class Usage(BaseModel):
     searches: int = 0
     pages_fetched: int = 0
     pages_skipped: int = 0
+    posts_saved: int = 0
     llm_calls: int = 0
     tokens_in: int = 0
     tokens_out: int = 0

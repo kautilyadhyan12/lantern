@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from lantern import prompts
 from lantern.egress import FetchError, Page
 from lantern.search import Hit
+from lantern.social import Post, origin
 
 PAGES = {
     "https://www.reuters.com/floods": (
@@ -60,7 +61,8 @@ class FakeModel:
                 "questions": [
                     {"text": "How high did the river rise?", "queries": ["river rise floods"]},
                     {"text": "How many families were moved?", "queries": ["relief camps families"]},
-                ]
+                ],
+                "hashtags": ["#DistrictFloods"],
             }
         elif output is prompts.ExtractOut:
             data = {
@@ -80,6 +82,27 @@ class FakeModel:
                         "quote": "the dam burst at midnight; nobody was warned",
                         "question_refs": ["Q1"],
                     },
+                ]
+            }
+        elif output is prompts.ExtractPostsOut:
+            refs = [part.split('"')[1] for part in user.split("<post ref=")[1:]]
+            data = {
+                "claims": [
+                    {
+                        "post_ref": ref,
+                        "statement": "Water reached the market road.",
+                        "quote": "water is up to the market road",
+                        "question_refs": ["Q1"],
+                    }
+                    for ref in refs
+                ]
+                + [
+                    {
+                        "post_ref": "S99",
+                        "statement": "A post that does not exist.",
+                        "quote": "water is up to the market road",
+                        "question_refs": ["Q1"],
+                    }
                 ]
             }
         elif output is prompts.AssessOut:
@@ -115,3 +138,30 @@ class FakeModel:
         else:
             raise AssertionError(output)
         return output.model_validate(data)
+
+
+class FakeSocial:
+    """Three accounts; one posts three times; Mastodon offers one more."""
+
+    def __init__(self) -> None:
+        self.hashtags: list[str] = []
+
+    async def search(self, query: str, limit: int) -> list[Post]:
+        posts = []
+        for number, account in enumerate(["alice", "bob", "bob", "bob", "carol"]):
+            text = f"Report {number}: the water is up to the market road near the school."
+            posts.append(
+                Post(
+                    platform="bluesky",
+                    url=f"https://bsky.app/profile/did:plc:{account}/post/{number}",
+                    origin=origin("bluesky", account),
+                    posted_at="2026-11-01T08:00:00Z",
+                    language="en",
+                    text=text,
+                )
+            )
+        return posts
+
+    async def hashtag(self, tag: str, limit: int) -> list[Post]:
+        self.hashtags.append(tag)
+        return []

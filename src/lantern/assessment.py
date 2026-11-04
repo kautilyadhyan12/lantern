@@ -132,7 +132,7 @@ def confidence(domains: int, best_grade: str | None, contradicted: bool) -> tupl
         level = "moderate"
     else:
         level = "low"
-    parts = [f"{domains} independent website{'s' if domains != 1 else ''}"]
+    parts = [f"{domains} independent source{'s' if domains != 1 else ''}"]
     if best_grade:
         parts.append(f"best source grade {best_grade}")
     if contradicted:

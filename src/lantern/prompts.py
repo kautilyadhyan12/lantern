@@ -23,7 +23,18 @@ GATE = (
 PLAN = (
     f"{COMMON}\nSplit the research question into {{count}} key questions that together answer "
     "it. Each key question must be answerable from public web pages. For each, give one or "
-    "two short web search queries (keywords, not sentences)."
+    "two short web search queries (keywords, not sentences). Also give up to three hashtags "
+    "(without #) that people on the ground would use when posting about it on social media."
+)
+
+EXTRACT_POSTS = (
+    f"{COMMON}\nThe posts are public social media posts by ordinary users: ground reports. "
+    "Extract up to 8 claims about what the posts report seeing, experiencing or being told "
+    "about the subject of the key questions. Each claim needs: the ref of the post it comes "
+    "from; a one-sentence statement that begins 'A social media post reported'; a quote "
+    "copied EXACTLY from that post (15 to 300 characters, no changes); and the refs of the "
+    "key questions it helps answer. Never describe or name the people who posted. Skip "
+    "jokes, opinions, adverts and posts unrelated to the key questions."
 )
 
 EXTRACT = (
@@ -43,14 +54,17 @@ ASSESS = (
     "only when no claim addresses the question at all. Do not put claim refs in the answer "
     "text. Choose the likelihood "
     "that the answer is correct from: almost no chance, very unlikely, unlikely, roughly "
-    "even chance, likely, very likely, almost certain."
+    "even chance, likely, very likely, almost certain. Claims from social media posts are "
+    "unverified ground reports: weigh them as such unless other sources confirm them."
 )
 
 WRITE = (
     f"{COMMON}\nWrite a short research report from the findings and claims. Bottom line: two "
     "to four sentences. Then for each answered key question, two to five sentences. Every "
     "sentence states facts from the claims and cites the refs of the claims that support "
-    "it. Attribute allegations to who made them. Do not mention confidence levels, and do "
+    "it. Attribute allegations to who made them. Present social media claims as reports "
+    "('a social media post reported…'), never as established fact. Do not mention confidence "
+    "levels, and do "
     "not use likelihood words except the one given for that finding. List gaps: what "
     "could not be determined."
 )
@@ -68,6 +82,7 @@ class PlannedQuestion(BaseModel):
 
 class PlanOut(BaseModel):
     questions: list[PlannedQuestion] = Field(min_length=1)
+    hashtags: list[str] = Field(default_factory=list)
 
 
 class ClaimDraft(BaseModel):
@@ -78,6 +93,14 @@ class ClaimDraft(BaseModel):
 
 class ExtractOut(BaseModel):
     claims: list[ClaimDraft]
+
+
+class PostClaimDraft(ClaimDraft):
+    post_ref: str
+
+
+class ExtractPostsOut(BaseModel):
+    claims: list[PostClaimDraft]
 
 
 class AssessOut(BaseModel):
