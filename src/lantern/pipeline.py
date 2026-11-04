@@ -241,9 +241,10 @@ class Investigator:
         self.note("Looking for ground reports in public social media posts.")
         found: list[tuple[Post, list[str]]] = []
         everything = [question.ref for question in self.inv.questions]
-        phrases = self._phrases or [
+        phrases = self._phrases[:2] or [
             (self._queries.get(q.ref) or [q.text])[0] for q in self.inv.questions
         ]
+        phrases += [f"#{tag}" for tag in self._hashtags[:1]]
         for phrase in phrases:
             posts = await social.search(phrase, self.limits.posts_per_query)
             self.note(f"Bluesky: searched “{phrase}” ({len(posts)} posts).")

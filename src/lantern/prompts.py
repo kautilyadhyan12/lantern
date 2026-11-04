@@ -25,8 +25,9 @@ PLAN = (
     "it. Each key question must be answerable from public web pages. For each, give one or "
     "two short web search queries (keywords, not sentences). Also give up to three hashtags "
     "(without #) that people on the ground would use when posting about it on social media, "
-    "and up to three short everyday phrases (two to four words, no dates) that such people "
-    "would write in their posts."
+    "and up to two short everyday phrases (two to four words, no dates) that such people "
+    "would write in their posts; each phrase must contain the place or subject name, for "
+    "example 'Pagosa flooding' or 'Guwahati water logging'."
 )
 
 EXTRACT_POSTS = (
