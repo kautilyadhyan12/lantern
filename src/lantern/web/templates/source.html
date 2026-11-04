@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}{{ source.ref }} saved copy · Lantern{% endblock %}
+{% block main %}
+<p class="crumb"><a href="/investigations/{{ inv.id }}">← Back to the report</a></p>
+<h1 class="brief">{{ source.title or source.domain }}</h1>
+<dl class="facts">
+  <div><dt>Ref</dt><dd>{{ source.ref }}</dd></div>
+  <div><dt>Original</dt><dd><a href="{{ source.url }}" rel="noopener noreferrer nofollow" target="_blank">{{ source.url }}</a></dd></div>
+  <div><dt>Grade</dt><dd>{{ source.reliability }} — {{ reliability[source.reliability] }} ({{ source.reliability_reason }})</dd></div>
+  {% if source.published %}<div><dt>Published</dt><dd>{{ source.published }}</dd></div>{% endif %}
+  <div><dt>Saved</dt><dd>{{ source.fetched_at.strftime("%d %b %Y, %H:%M:%S") }} UTC</dd></div>
+  <div><dt>sha256 of saved bytes</dt><dd><code>{{ source.sha256 }}</code></dd></div>
+</dl>
+<p class="hint">This is the text Lantern extracted from its saved copy. Highlighted passages are
+  the exact quotes behind claims; the page's own HTML is never shown.</p>
+<article class="saved">{% for text, ref in parts %}{% if ref %}<mark id="{{ ref }}" title="{{ ref }}">{{ text }}<sup>{{ ref }}</sup></mark>{% else %}{{ text }}{% endif %}{% endfor %}</article>
+{% endblock %}

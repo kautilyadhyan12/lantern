@@ -1,0 +1,81 @@
+"use strict";
+
+function startForm() {
+  const form = document.getElementById("ask");
+  if (!form) return;
+  const error = document.getElementById("ask-error");
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = form.querySelector("button");
+    const brief = document.getElementById("brief").value.trim();
+    error.hidden = true;
+    button.disabled = true;
+    try {
+      const response = await fetch("/api/investigations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brief }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not start the investigation.");
+      window.location.href = `/investigations/${data.id}`;
+    } catch (problem) {
+      error.textContent = problem.message;
+      error.hidden = false;
+      button.disabled = false;
+    }
+  });
+}
+
+function startPolling() {
+  const id = document.body.dataset.id;
+  const status = document.body.dataset.status;
+  if (!id || !["queued", "running"].includes(status)) return;
+  const steps = document.getElementById("steps");
+  const counts = document.getElementById("counts");
+  const tick = async () => {
+    try {
+      const response = await fetch(`/api/investigations/${id}`, { cache: "no-store" });
+      const data = await response.json();
+      if (!["queued", "running"].includes(data.status)) {
+        window.location.reload();
+        return;
+      }
+      steps.replaceChildren(
+        ...data.steps.map((text) => {
+          const item = document.createElement("li");
+          item.textContent = text;
+          return item;
+        }),
+      );
+      const c = data.counts;
+      counts.textContent =
+        `${c.questions} key questions · ${c.sources} pages saved · ${c.claims} claims`;
+    } catch (_) {
+      /* The next tick retries. */
+    }
+    window.setTimeout(tick, 2000);
+  };
+  window.setTimeout(tick, 1500);
+}
+
+function startCitations() {
+  const dialog = document.getElementById("card");
+  if (!dialog) return;
+  const body = document.getElementById("card-body");
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest(".cite");
+    if (!button) return;
+    const template = document.getElementById(`card-${button.dataset.ref}`);
+    if (!template) return;
+    body.replaceChildren(template.content.cloneNode(true));
+    dialog.showModal();
+  });
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) dialog.close();
+  });
+}
+
+startForm();
+startPolling();
+startCitations();
