@@ -1,18 +1,75 @@
 # Lantern
 
-Lantern will research questions using public information, preserve its evidence,
-and produce reports with citations you can inspect. This first stage supplies
-its development setup; investigation features will follow. Dependencies use
-checked security fixes and a locked set of versions; there is no age-based wait.
+Lantern is an open-source intelligence (OSINT) research tool that answers questions
+using only public information, and produces reports where every sentence can be checked
+against the evidence behind it.
+
+You ask a question. Lantern:
+
+1. **Checks it is safe to research.** Fixed rules, then a model check, refuse questions
+   that target private people, locate or track anyone, involve minors, or seek private data.
+2. **Splits it into key questions** (`Q1`, `Q2`, …) that together answer it.
+3. **Searches the web and reads pages politely.** It only opens links returned by search,
+   obeys robots.txt, identifies itself, and never connects to private or internal network
+   addresses. Search results themselves are never stored.
+4. **Preserves every source** (`S1`, …) with the sha256 fingerprint of the bytes it saved.
+5. **Extracts claims anchored to exact quotes** (`C1`, …). Code checks that each quote
+   appears word for word in the saved page; claims whose quotes cannot be found are dropped.
+6. **Assesses each key question with rules, not model opinion.** Sources get Admiralty
+   reliability grades (A–F) from a fixed table; corroboration counts independent websites
+   only; likelihood uses the seven ICD 203 terms and is toned down when evidence is thin;
+   analytic confidence (low, moderate, high) is computed by code.
+7. **Writes a verified report.** Every sentence must cite existing claims; sentences that
+   do not are removed and listed. Each citation opens the exact quote, highlighted inside
+   the saved copy of its source.
+
+## Try it
+
+Lantern needs two free API keys, added as **Codespaces secrets** (GitHub → Settings →
+Codespaces → Secrets) and then a codespace restart:
+
+| Secret | Used for |
+|---|---|
+| `LANTERN_TAVILY_API_KEY` | web search (Tavily free tier) |
+| `LANTERN_GROQ_API_KEY` and/or `LANTERN_CEREBRAS_API_KEY` | open-weight models (`gpt-oss-120b`) on free tiers, with automatic fallback |
+
+```sh
+uv sync --frozen
+uv run lantern serve                      # web app on http://127.0.0.1:8000
+uv run lantern run "What is publicly known about the 2026 Assam floods?"
+```
+
+In a codespace, open the **Ports** tab to view the web app in your browser. Each
+investigation is capped (key questions, pages and model calls) and there is a daily limit,
+so free quotas last. Captured evidence is stored under `var/`, which is never committed.
+
+## How it is built
+
+| Part | Module |
+|---|---|
+| Investigation flow | `src/lantern/pipeline.py` |
+| SSRF-safe fetching, robots.txt, pacing, size limits | `src/lantern/egress.py` |
+| Quote anchoring with an offset map | `src/lantern/text.py` |
+| Ratings, independence, confidence, likelihood limits | `src/lantern/assessment.py` |
+| Fixed safety rules | `src/lantern/safety.py` |
+| Model gateway: validated JSON, one retry, provider fallback | `src/lantern/llm.py` |
+| Citation checks and Markdown export | `src/lantern/report.py` |
+| Web app (FastAPI) | `src/lantern/web/` |
+
+Every model reply must be a single JSON object that validates against a Pydantic model;
+an invalid reply gets one retry, then the step fails with a plain message. Page text is
+treated as untrusted data, and the steps are a fixed sequence, so content on a web page
+cannot make Lantern take any other action. The design documents are in `docs/`.
+
+## Development
 
 Open the repository on GitHub, choose **Code → Codespaces → Create codespace**,
 and work in your browser. The container provides Python 3.12, uv and Docker.
 The owner's development rules are in AGENTS.md; API keys belong in Codespaces secrets.
 
-Run these commands in the Codespace terminal:
-
 ```sh
 uv sync --frozen
+uv run pytest tests/research        # offline tests with fake model, search and pages
 make db
 export LANTERN_DATABASE_URL='postgresql+asyncpg://lantern:lantern-local-only@127.0.0.1:5434/lantern'
 uv run lantern db upgrade
@@ -21,7 +78,7 @@ make check
 ```
 
 These public credentials are for local development only; never reuse them for deployment.
-The database listens on localhost port 5434. Checks run offline and need it running.
-Run `make db` to start it, or `make db-down` to stop it while keeping its data.
-Real secrets come from environment variables; .env.example has placeholders.
-Never commit captured evidence or personal data to this public repository.
+The database listens on localhost port 5434. Run `make db` to start it, or `make db-down`
+to stop it while keeping its data. Real secrets come from environment variables;
+.env.example has placeholders. Never commit captured evidence or personal data to this
+public repository.
