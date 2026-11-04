@@ -9,7 +9,9 @@
   <div><dt>Grade</dt><dd>{{ source.reliability }} — {{ reliability[source.reliability] }} ({{ source.reliability_reason }})</dd></div>
   {% if source.published %}<div><dt>Published</dt><dd>{{ source.published }}</dd></div>{% endif %}
   <div><dt>Saved</dt><dd>{{ source.fetched_at.strftime("%d %b %Y, %H:%M:%S") }} UTC</dd></div>
-  <div><dt>sha256 of saved bytes</dt><dd><code>{{ source.sha256 }}</code></dd></div>
+  <div><dt>sha256 of saved bytes</dt><dd><code>{{ source.sha256 }}</code>
+    <div class="muted">A fingerprint of the saved copy: if one character changed, this would be
+      completely different.</div></dd></div>
 </dl>
 <p class="hint">This is the text Lantern extracted from its saved copy. Highlighted passages are
   the exact quotes behind claims; the page's own HTML is never shown.</p>
