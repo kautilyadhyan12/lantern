@@ -28,3 +28,22 @@ class Settings(BaseSettings):
         if not valid:
             raise ValueError("Use a postgresql+asyncpg database URL with a host and database name.")
         return value
+
+
+class AppSettings(BaseSettings):
+    """Settings for running investigations. Keys come only from the environment."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="LANTERN_", extra="ignore", hide_input_in_errors=True
+    )
+    tavily_api_key: SecretStr | None = None
+    groq_api_key: SecretStr | None = None
+    groq_model: str = "openai/gpt-oss-120b"
+    cerebras_api_key: SecretStr | None = None
+    cerebras_model: str = "gpt-oss-120b"
+    data_dir: str = "var"
+    user_agent: str = "LanternResearch/0.1 (+https://github.com/kautilyadhyan12/lantern)"
+    daily_run_limit: int = 10
+    max_questions: int = 4
+    max_pages: int = 10
+    max_llm_calls: int = 40
