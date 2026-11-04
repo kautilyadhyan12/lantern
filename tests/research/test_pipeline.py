@@ -95,3 +95,17 @@ async def test_one_site_cannot_reach_high_confidence(tmp_path, domains, monkeypa
     assert finding.confidence == "low"
     assert finding.likelihood == "likely"
     assert finding.likelihood_proposed == "almost certain"
+
+
+async def test_page_choice_skips_video_sites_and_caps_pages_per_site(tmp_path, monkeypatch):
+    urls = [f"https://en.wikipedia.org/wiki/Page{i}" for i in range(4)]
+    urls += ["https://www.youtube.com/watch?v=1", "https://apnews.com/floods"]
+
+    async def search(self, query, limit):
+        return [fakes.Hit(url=url, title="hit", rank=i) for i, url in enumerate(urls, start=1)]
+
+    monkeypatch.setattr(fakes.FakeSearch, "search", search)
+    start, _, _ = run(tmp_path)
+    inv = await start()
+    reading = next(step.message for step in inv.steps if step.message.startswith("Reading"))
+    assert reading == "Reading 3 pages."  # two Wikipedia pages and AP; no YouTube

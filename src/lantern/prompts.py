@@ -38,8 +38,10 @@ EXTRACT = (
 
 ASSESS = (
     f"{COMMON}\nAnswer the key question using ONLY the listed claims. Cite claim refs that "
-    "support the answer and any that contradict it. If the claims do not answer the "
-    "question, set status to unanswerable and explain what is missing. Choose the likelihood "
+    "support the answer and any that contradict it. A partial answer is still an answer: "
+    "state what the claims establish and say what is missing. Set status to unanswerable "
+    "only when no claim addresses the question at all. Do not put claim refs in the answer "
+    "text. Choose the likelihood "
     "that the answer is correct from: almost no chance, very unlikely, unlikely, roughly "
     "even chance, likely, very likely, almost certain."
 )

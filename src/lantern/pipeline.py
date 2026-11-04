@@ -12,7 +12,7 @@ from lantern.capture import extract
 from lantern.egress import FetchError, Page
 from lantern.llm import Model, ModelError
 from lantern.models import Claim, Finding, Investigation, Question, Report, Source, now
-from lantern.report import verify
+from lantern.report import strip_refs, verify
 from lantern.safety import check_brief
 from lantern.search import Searcher, SearchError
 from lantern.store import Store
@@ -34,6 +34,9 @@ SKIP_DOMAINS = {
     "telegram.org",
     "pinterest.com",
 }
+# Video and audio pages have no readable text to quote.
+NO_TEXT_DOMAINS = {"youtube.com", "youtu.be", "vimeo.com", "spotify.com", "soundcloud.com"}
+PER_DOMAIN = 2
 
 
 class PageFetcher(Protocol):
@@ -151,18 +154,27 @@ class Investigator:
                 self.note(f"{question.ref}: searched “{query}” ({len(hits)} results).")
                 for hit in hits:
                     url = canonical(hit.url)
-                    if assessment.registrable_domain(url) in SKIP_DOMAINS:
+                    if assessment.registrable_domain(url) in SKIP_DOMAINS | NO_TEXT_DOMAINS:
                         continue
                     wanted.setdefault(url, set()).add(question.ref)
                     if url not in queue:
                         queue.append(url)
         chosen: list[str] = []
+        per_domain: dict[str, int] = {}
+
+        def usable(url: str) -> bool:
+            domain = assessment.registrable_domain(url)
+            return url not in chosen and per_domain.get(domain, 0) < PER_DOMAIN
+
         while len(chosen) < self.limits.max_pages and any(queues.values()):
             for queue in queues.values():
-                while queue and queue[0] in chosen:
+                while queue and not usable(queue[0]):
                     queue.pop(0)
                 if queue and len(chosen) < self.limits.max_pages:
-                    chosen.append(queue.pop(0))
+                    url = queue.pop(0)
+                    chosen.append(url)
+                    domain = assessment.registrable_domain(url)
+                    per_domain[domain] = per_domain.get(domain, 0) + 1
         return [(url, wanted[url]) for url in chosen]
 
     async def _fetch(self, urls: list[tuple[str, set[str]]]) -> None:
@@ -312,7 +324,7 @@ class Investigator:
         return Finding(
             question_ref=question.ref,
             status="answered",
-            answer=out.answer,
+            answer=strip_refs(out.answer),
             likelihood_proposed=out.likelihood,
             likelihood=likelihood,
             confidence=level,

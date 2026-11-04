@@ -10,6 +10,11 @@ _INLINE = re.compile(r"\s*[\[(]\s*((?:C\d+\s*[,;]?\s*)+)[\])]")
 _REF = re.compile(r"C\d+")
 
 
+def strip_refs(text: str) -> str:
+    """Remove inline claim refs such as "(C1, C2)" from model prose."""
+    return _INLINE.sub("", text).strip()
+
+
 def _mixes_scales(text: str) -> bool:
     lowered = text.lower()
     has_term = any(re.search(rf"\b{re.escape(term)}\b", lowered) for term in TERMS)
