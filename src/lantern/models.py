@@ -41,6 +41,14 @@ class Source(BaseModel):
     question_refs: list[str] = Field(default_factory=list)
 
 
+class Lead(BaseModel):
+    """A post on a site Lantern may not read: listed for a person to check, never evidence."""
+
+    platform: str
+    url: str
+    question_refs: list[str] = Field(default_factory=list)
+
+
 class Claim(BaseModel):
     ref: str
     source_ref: str
@@ -111,6 +119,7 @@ class Investigation(BaseModel):
     steps: list[Step] = Field(default_factory=list)
     questions: list[Question] = Field(default_factory=list)
     sources: list[Source] = Field(default_factory=list)
+    leads: list[Lead] = Field(default_factory=list)
     claims: list[Claim] = Field(default_factory=list)
     findings: list[Finding] = Field(default_factory=list)
     report: Report | None = None

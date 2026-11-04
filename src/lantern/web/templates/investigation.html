@@ -136,6 +136,21 @@
     </details>
   </section>
 
+  {% if inv.leads %}
+  <section>
+    <h2>Leads to check yourself</h2>
+    <p class="muted">These posts appeared in search results on sites whose rules forbid
+      automated reading, so Lantern did not open them and they are <b>not evidence</b> in this
+      report. Open them yourself if you want to check what they say.</p>
+    <ul class="leads">
+      {% for lead in inv.leads %}
+      <li><a href="{{ lead.url }}" rel="noopener noreferrer nofollow" target="_blank">Open on {{ lead.platform }}</a>
+        <span class="muted">post {{ loop.index }} · related to {{ lead.question_refs | join(", ") }}</span></li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
   <section class="method">
     <h2>How this was done</h2>
     <ul>

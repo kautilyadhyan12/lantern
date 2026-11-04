@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
@@ -12,7 +13,7 @@ from lantern import assessment, prompts
 from lantern.capture import extract
 from lantern.egress import FetchError, Page
 from lantern.llm import Model, ModelError
-from lantern.models import Claim, Finding, Investigation, Question, Report, Source, now
+from lantern.models import Claim, Finding, Investigation, Lead, Question, Report, Source, now
 from lantern.report import strip_refs, verify
 from lantern.safety import check_brief
 from lantern.search import Searcher, SearchError
@@ -72,6 +73,29 @@ class Tools:
     searcher: Searcher
     fetcher: PageFetcher
     social: SocialSearch | None = None
+
+
+# Individual posts only (never profile pages), on sites Lantern must not read itself.
+POST_LINKS = {
+    "x.com": ("X", r"^/[^/]+/status/\d+"),
+    "twitter.com": ("X", r"^/[^/]+/status/\d+"),
+    "facebook.com": ("Facebook", r"^/(?:[^/]+/(?:posts|videos)/|permalink\.php|story\.php|watch)"),
+    "instagram.com": ("Instagram", r"^/(?:p|reel)/[^/]+"),
+    "threads.net": ("Threads", r"^/@[^/]+/post/[^/]+"),
+    "reddit.com": ("Reddit", r"^/r/[^/]+/comments/[^/]+"),
+    "tiktok.com": ("TikTok", r"^/@[^/]+/video/\d+"),
+    "linkedin.com": ("LinkedIn", r"^/(?:posts|feed/update)/[^/]+"),
+    "t.me": ("Telegram", r"^/[^/]+/\d+$"),
+}
+MAX_LEADS = 12
+
+
+def post_lead(url: str) -> str | None:
+    """The platform name when `url` is one post on a never-open site, else None."""
+    entry = POST_LINKS.get(assessment.registrable_domain(url))
+    if entry and re.match(entry[1], urlsplit(url).path):
+        return entry[0]
+    return None
 
 
 def blocked_site(url: str) -> str | None:
@@ -183,10 +207,14 @@ class Investigator:
                 for hit in hits:
                     url = canonical(hit.url)
                     if assessment.registrable_domain(url) in SKIP_DOMAINS | NO_TEXT_DOMAINS:
+                        self._lead(url, question.ref)
                         continue
                     wanted.setdefault(url, set()).add(question.ref)
                     if url not in queue:
                         queue.append(url)
+        if self.inv.leads:
+            count = len(self.inv.leads)
+            self.note(f"Listed {count} posts on sites Lantern may not read, to check yourself.")
         chosen: list[str] = []
         per_domain: dict[str, int] = {}
 
@@ -204,6 +232,19 @@ class Investigator:
                     domain = assessment.registrable_domain(url)
                     per_domain[domain] = per_domain.get(domain, 0) + 1
         return [(url, wanted[url]) for url in chosen]
+
+    def _lead(self, url: str, ref: str) -> None:
+        # Only the post link and platform are kept, never the hit's title or snippet.
+        platform = post_lead(url)
+        if platform is None:
+            return
+        for lead in self.inv.leads:
+            if lead.url == url:
+                if ref not in lead.question_refs:
+                    lead.question_refs.append(ref)
+                return
+        if len(self.inv.leads) < MAX_LEADS:
+            self.inv.leads.append(Lead(platform=platform, url=url, question_refs=[ref]))
 
     async def _fetch(self, urls: list[tuple[str, set[str]]]) -> None:
         self.note(f"Reading {len(urls)} pages.")

@@ -116,6 +116,18 @@ def to_markdown(investigation: Investigation) -> str:
             f"grade {source.reliability} ({grade}); "
             f"saved {source.fetched_at:%Y-%m-%d %H:%M} UTC; sha256 `{source.sha256}`"
         )
+    if investigation.leads:
+        platforms = ", ".join(sorted({lead.platform for lead in investigation.leads}))
+        lines += [
+            "",
+            "## Leads to check yourself",
+            "",
+            (
+                f"{len(investigation.leads)} posts on {platforms} appeared in search results. "
+                "Lantern does not open these sites and they are not evidence here; open them "
+                "from the web app."
+            ),
+        ]
     lines += [
         "",
         (
