@@ -142,6 +142,7 @@ class Investigator:
             if await self._allowed():
                 await self._plan()
                 urls = await self._search()
+                await self._find_leads()
                 await self._fetch(urls)
                 await self._social()
                 await self._extract()
@@ -232,6 +233,25 @@ class Investigator:
                     domain = assessment.registrable_domain(url)
                     per_domain[domain] = per_domain.get(domain, 0) + 1
         return [(url, wanted[url]) for url in chosen]
+
+    async def _find_leads(self) -> None:
+        """Ask the search engine for posts on sites Lantern may not read; never open them."""
+        refs = [question.ref for question in self.inv.questions]
+        phrases = self._phrases[:2] or [self.inv.brief[:120]]
+        domains = sorted(POST_LINKS)
+        before = len(self.inv.leads)
+        for phrase in phrases:
+            try:
+                hits = await self.tools.searcher.search(phrase, 10, domains=domains)
+            except SearchError as error:
+                self.note(f"Could not search social media sites for leads: {error}")
+                return
+            self.inv.usage.searches += 1
+            for hit in hits:
+                for ref in refs:
+                    self._lead(canonical(hit.url), ref)
+        found = len(self.inv.leads) - before
+        self.note(f"Searched X, Facebook, Instagram, Reddit and others for posts: {found} leads.")
 
     def _lead(self, url: str, ref: str) -> None:
         # Only the post link and platform are kept, never the hit's title or snippet.

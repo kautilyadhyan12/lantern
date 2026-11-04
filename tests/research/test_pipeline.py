@@ -101,7 +101,7 @@ async def test_page_choice_skips_video_sites_and_caps_pages_per_site(tmp_path, m
     urls = [f"https://en.wikipedia.org/wiki/Page{i}" for i in range(4)]
     urls += ["https://www.youtube.com/watch?v=1", "https://apnews.com/floods"]
 
-    async def search(self, query, limit):
+    async def search(self, query, limit, domains=None):
         return [fakes.Hit(url=url, title="hit", rank=i) for i, url in enumerate(urls, start=1)]
 
     monkeypatch.setattr(fakes.FakeSearch, "search", search)

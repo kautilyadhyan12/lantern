@@ -14,7 +14,9 @@ class Hit:
 
 
 class Searcher(Protocol):
-    async def search(self, query: str, limit: int) -> list[Hit]: ...
+    async def search(
+        self, query: str, limit: int, domains: list[str] | None = None
+    ) -> list[Hit]: ...
 
 
 class SearchError(Exception):
@@ -34,8 +36,10 @@ class TavilySearch:
     async def close(self) -> None:
         await self._client.aclose()
 
-    async def search(self, query: str, limit: int) -> list[Hit]:
-        body = {"query": query, "max_results": limit, "search_depth": "basic"}
+    async def search(self, query: str, limit: int, domains: list[str] | None = None) -> list[Hit]:
+        body: dict[str, object] = {"query": query, "max_results": limit, "search_depth": "basic"}
+        if domains:
+            body["include_domains"] = domains
         try:
             response = await self._client.post(self.endpoint, json=body)
         except httpx.HTTPError as error:

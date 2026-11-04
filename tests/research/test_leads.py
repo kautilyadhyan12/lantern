@@ -53,7 +53,9 @@ async def test_leads_are_listed_not_fetched_and_shown_without_usernames(tmp_path
         *fakes.PAGES,
     ]
 
-    async def search(self, query, limit):
+    async def search(self, query, limit, domains=None):
+        if domains:
+            return []
         return [fakes.Hit(url=url, title="hit", rank=i) for i, url in enumerate(urls, start=1)]
 
     monkeypatch.setattr(FakeSearch, "search", search)
@@ -78,3 +80,16 @@ async def test_leads_are_listed_not_fetched_and_shown_without_usernames(tmp_path
     assert "Open on X" in page
     assert "not evidence" in page
     assert ">https://x.com" not in page
+
+
+async def test_social_sites_are_searched_on_purpose_for_leads(tmp_path):
+    store = Store(tmp_path)
+    searcher = FakeSearch()
+    fetcher = Fetched()
+    tools = Tools(model=FakeModel(), searcher=searcher, fetcher=fetcher)
+    inv = Investigation(id=store.new_id(), brief="What happened in the district floods?")
+    inv = await Investigator(inv, tools, store, Limits()).run()
+    assert searcher.domain_calls
+    assert {"x.com", "facebook.com", "reddit.com"} <= set(searcher.domain_calls[0])
+    assert [lead.url for lead in inv.leads] == ["https://x.com/witness/status/999"]
+    assert not any("x.com" in url for url in fetcher.urls)

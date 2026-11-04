@@ -32,8 +32,13 @@ def html(text: str) -> bytes:
 class FakeSearch:
     def __init__(self) -> None:
         self.queries: list[str] = []
+        self.domain_calls: list[list[str]] = []
 
-    async def search(self, query: str, limit: int) -> list[Hit]:
+    async def search(self, query: str, limit: int, domains: list[str] | None = None) -> list[Hit]:
+        if domains:
+            self.domain_calls.append(domains)
+            urls = ["https://x.com/witness/status/999", "https://x.com/witness"]
+            return [Hit(url=url, title="hit", rank=i) for i, url in enumerate(urls, start=1)]
         self.queries.append(query)
         urls = [*PAGES, "https://www.facebook.com/post/1", "https://blocked.example/page"]
         return [Hit(url=url, title="hit", rank=i) for i, url in enumerate(urls, start=1)]
