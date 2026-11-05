@@ -209,3 +209,5 @@ blockquote {
 .items th, .items td { text-align: left; padding: 0.45rem; border-bottom: 1px solid var(--line); vertical-align: top; }
 .st-ok { color: var(--good); }
 .st-single { color: var(--warn); }
+.continue { display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap; margin-top: 1rem; }
+.continue .muted { flex: 1 1 20rem; }

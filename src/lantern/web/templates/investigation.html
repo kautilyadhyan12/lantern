@@ -42,6 +42,16 @@
   {% endif %}
 </p>
 
+{% if inv.status in ("done", "failed") and inv.questions %}
+<section class="continue">
+  <button type="button" id="continue" data-id="{{ inv.id }}">Continue investigating</button>
+  <span class="muted">Up to 2 more research rounds and 16 more pages on this investigation. It keeps
+    everything found, skips searches and pages already done, then rewrites the report. Counts as one
+    of today's investigations.</span>
+  <p id="continue-error" class="error" hidden></p>
+</section>
+{% endif %}
+
 {% if inv.status in ("queued", "running") %}
 <section class="panel live">
   <h2>Working <span class="spinner" aria-hidden="true"></span></h2>
@@ -219,6 +229,7 @@
     <h2>How this was done</h2>
     <ul>
       <li>Safety: {{ inv.safety }}</li>
+      {% if inv.continued_at %}<li>Continued {{ inv.continued_at | length }} time{{ "" if inv.continued_at | length == 1 else "s" }} after the first pass.</li>{% endif %}
       <li>{{ "Deep investigation" if inv.depth == "deep" else "Quick look" }}: {{ inv.usage.rounds }}
         research round{{ "" if inv.usage.rounds == 1 else "s" }}; later rounds followed up on what
         earlier rounds found.</li>
