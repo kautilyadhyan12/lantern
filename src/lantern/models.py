@@ -40,6 +40,8 @@ class Source(BaseModel):
     reliability: str
     reliability_reason: str
     question_refs: list[str] = Field(default_factory=list)
+    archive_url: str | None = None  # set when read from a Wayback Machine copy
+    archived_at: AwareDatetime | None = None
 
 
 class Lead(BaseModel):
@@ -134,6 +136,7 @@ class Usage(BaseModel):
     pages_fetched: int = 0
     pages_skipped: int = 0
     posts_saved: int = 0
+    archived: int = 0
     llm_calls: int = 0
     tokens_in: int = 0
     tokens_out: int = 0

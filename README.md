@@ -24,6 +24,10 @@ You ask a question. Lantern:
    opted-out accounts and labelled posts are skipped, authors are not stored, and each
    account counts once towards corroboration.
 5. **Preserves every source** (`S1`, …) with the sha256 fingerprint of the bytes it saved.
+   When a site refuses Lantern with an HTTP error or cannot be reached, Lantern reads the
+   Internet Archive's Wayback Machine copy instead (through its availability and CDX
+   services) and cites it as an archived copy of the original page. It never does this
+   when the site's robots.txt says no.
 6. **Extracts claims anchored to exact quotes** (`C1`, …). Code checks that each quote
    appears word for word in the saved page; claims whose quotes cannot be found are dropped.
 7. **Assesses each key question with rules, not model opinion.** Sources get Admiralty
@@ -65,6 +69,7 @@ so free quotas last. Captured evidence is stored under `var/`, which is never co
 | Ratings, independence, confidence, likelihood limits | `src/lantern/assessment.py` |
 | Fixed safety rules | `src/lantern/safety.py` |
 | Social ground reports (Bluesky, Mastodon) | `src/lantern/social.py` |
+| Wayback Machine copies of refused pages | `src/lantern/archive.py` |
 | Model gateway: validated JSON, one retry, provider fallback | `src/lantern/llm.py` |
 | Citation checks and Markdown export | `src/lantern/report.py` |
 | Web app (FastAPI) | `src/lantern/web/` |

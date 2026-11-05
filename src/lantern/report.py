@@ -98,6 +98,12 @@ def to_markdown(investigation: Investigation) -> str:
             f"- **{source.ref}** [{source.title or source.domain}]({source.url}) — "
             f"grade {source.reliability} ({grade}); "
             f"saved {source.fetched_at:%Y-%m-%d %H:%M} UTC; sha256 `{source.sha256}`"
+            + (
+                f"; read from the [Wayback Machine copy]({source.archive_url}) of "
+                f"{source.archived_at:%Y-%m-%d}"
+                if source.archive_url and source.archived_at
+                else ""
+            )
         )
     posts = [lead for lead in investigation.leads if lead.kind == "post"]
     pages = [lead for lead in investigation.leads if lead.kind == "page"]

@@ -6,6 +6,8 @@
 <dl class="facts">
   <div><dt>Ref</dt><dd>{{ source.ref }}</dd></div>
   <div><dt>Original</dt><dd><a href="{{ source.url }}" rel="noopener noreferrer nofollow" target="_blank">{% if source.kind == "post" %}Open the original post{% else %}{{ source.url }}{% endif %}</a></dd></div>
+  {% if source.archive_url %}<div><dt>Read from</dt><dd><a href="{{ source.archive_url }}" rel="noopener noreferrer nofollow" target="_blank">Wayback Machine copy</a>,
+    captured {{ source.archived_at.strftime("%d %b %Y, %H:%M") }} UTC. The site refused Lantern or could not be reached.</dd></div>{% endif %}
   {% if source.kind == "post" %}<div><dt>Type</dt><dd>Ground report: a public social media post. Unverified unless other sources confirm it.</dd></div>{% endif %}
   <div><dt>Grade</dt><dd>{{ source.reliability }} — {{ reliability[source.reliability] }} ({{ source.reliability_reason }})</dd></div>
   {% if source.published %}<div><dt>{{ "Posted" if source.kind == "post" else "Published" }}</dt><dd>{{ source.published }}</dd></div>{% endif %}
