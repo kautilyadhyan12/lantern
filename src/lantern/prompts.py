@@ -59,7 +59,13 @@ EXTRACT = (
     "answer. If the page says something is alleged or claimed by someone, the statement "
     "must say who claims it. When the page reports several separate people, incidents or "
     "events, give each its own claim with its name, date and place. Skip opinions, adverts "
-    "and navigation text. Return no claims if nothing is relevant."
+    "and navigation text. Return no claims if nothing is relevant. When a claim states that "
+    "two named organisations, public figures in their public role, places or events are "
+    "related, add relation: subject and object written exactly as in the quote, their kinds "
+    "(organisation, person_public_role, place, event) and one relation: member_of, "
+    "leader_of, founded, designated_by, linked_to, alias_of, killed_in, located_in, "
+    "reported_by. Never a relation about a private individual or about anyone's religion, "
+    "ethnicity, caste, health, sexuality, political opinion or union membership."
 )
 
 TRIAGE = (
@@ -117,7 +123,12 @@ ASSESS = (
     "text. Choose the likelihood "
     "that the answer is correct from: almost no chance, very unlikely, unlikely, roughly "
     "even chance, likely, very likely, almost certain. Claims from social media posts are "
-    "unverified ground reports: weigh them as such unless other sources confirm them."
+    "unverified ground reports: weigh them as such unless other sources confirm them. If the "
+    "claims together point to a connection between named organisations, public figures, "
+    "places or events that no single claim states (for example that several deaths are "
+    "linked to the same group), you may add it to links with the refs of the claims for and "
+    "against it; use names exactly as the claims write them and a relation from: member_of, "
+    "leader_of, founded, linked_to, killed_in, located_in. Leave links empty otherwise."
 )
 
 WRITE = (
@@ -157,8 +168,20 @@ class ClaimDraft(BaseModel):
     question_refs: list[str]
 
 
+class RelationDraft(BaseModel):
+    subject: str = Field(min_length=1, max_length=200)
+    subject_kind: str = ""
+    relation: str
+    object: str = Field(min_length=1, max_length=200)
+    object_kind: str = ""
+
+
+class PageClaimDraft(ClaimDraft):
+    relation: RelationDraft | None = None
+
+
 class ExtractOut(BaseModel):
-    claims: list[ClaimDraft]
+    claims: list[PageClaimDraft]
 
 
 class PostClaimDraft(ClaimDraft):
@@ -206,6 +229,14 @@ class InventoryOut(BaseModel):
     items: list[ItemDraft] = Field(default_factory=list)
 
 
+class LinkDraft(BaseModel):
+    subject: str = Field(min_length=1, max_length=200)
+    relation: str
+    object: str = Field(min_length=1, max_length=200)
+    supporting: list[str] = Field(default_factory=list)
+    contradicting: list[str] = Field(default_factory=list)
+
+
 class AssessOut(BaseModel):
     status: Literal["answered", "unanswerable"]
     answer: str = Field(min_length=3, max_length=1500)
@@ -213,6 +244,7 @@ class AssessOut(BaseModel):
     supporting: list[str] = Field(default_factory=list)
     contradicting: list[str] = Field(default_factory=list)
     rationale: str = ""
+    links: list[LinkDraft] = Field(default_factory=list)
 
 
 class SentenceOut(BaseModel):

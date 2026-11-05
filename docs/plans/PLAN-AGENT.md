@@ -459,3 +459,28 @@ Each stage is one pull request.
     its results would add triage tokens. It can come back later as its own small change.
   - The contract tests use abridged copies of the real responses fetched today. The people
     in them are invented, so no real person's details are in the public repository.
+- 2026-11-05: AG3 built (entities, links and the links map), on the owner's go-ahead.
+  Details settled while building:
+  - Page extraction may tag a claim with one relation from the fixed vocabulary. It is kept
+    only when both names are written in the claim's anchored quote and both kinds are known
+    (organisation, person_public_role, place, event). Social media posts never state
+    relations. Records add theirs by code: OFAC and UN "designated by" and "Linked To",
+    Wikidata "founded by" and "member of".
+  - Entities and links are rebuilt by code (`core/graph.py`, pure) at the end of every run.
+    Organisations, places and events merge on a shared identifier, name or alias; for
+    organisations, one-letter joining words are ignored. People merge only on an anchor:
+    the same identifier, an explicit `alias_of`, the same source, or the same relation to the
+    same organisation (`03` §8.8 "same employer and role"). A different role is not an
+    anchor, so OFAC's "IQBAL, Muhammad, linked to Lashkar-e-Taiba" stays apart from a news
+    report's "Muhammad Iqbal, member of Lashkar-e-Taiba".
+  - Link status: a record link is "record"; otherwise two or more independent origins make
+    it corroborated, else single source. The assessor may propose "assessed" links from
+    several claims, with claims for (required) and against. They only join existing
+    entities named exactly, never create entities, and are dropped when a stated or record
+    link already says the same. They are shown as Lantern's assessment, not a fact.
+  - The map is inline SVG drawn by `web/linkmap.py`: a deterministic force layout of the 40
+    best-connected entities. Each line is a link to its row in the links table, where the
+    claims open as quotes. Filters by kind and status use the existing script, so the
+    Content-Security-Policy is unchanged. All names are escaped by the templates.
+  - Token cost: the extraction and assessment prompts grew by about 90 and 80 tokens. The
+    relation fields add a few output tokens only to claims that state a relation.

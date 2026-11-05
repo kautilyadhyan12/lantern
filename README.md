@@ -52,7 +52,16 @@ You ask a question. Lantern:
 8. **Writes a verified report.** Every sentence must cite existing claims; sentences that
    do not are removed and listed. Each citation opens the exact quote, highlighted inside
    the saved copy of its source.
-9. **Continues when asked.** "Continue investigating" on a finished report gives the agent
+9. **Maps who is linked to whom.** Relations stated in anchored claims (member of, leader
+   of, founded, designated by, linked to, killed in, located in, reported by) and listed in
+   official records become a links map of organisations, public figures in their public
+   role, places and events, drawn by Lantern's own code. People are joined only through an
+   anchor (an official ID, an explicit "also known as", the same source, or the same role in
+   the same organisation), never on a name alone. Each line opens its evidence and is marked
+   corroborated, single source, record, or assessment (a connection Lantern infers from
+   several claims, shown with the claims for and against it). There are no relations for
+   protected traits.
+10. **Continues when asked.** "Continue investigating" on a finished report gives the agent
    up to two more rounds and 16 more pages on the same investigation, skipping searches and pages already done, keeping
    everything found, and rewriting the report.
 
