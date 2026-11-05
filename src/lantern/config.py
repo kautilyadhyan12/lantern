@@ -42,7 +42,7 @@ class AppSettings(BaseSettings):
     cerebras_api_key: SecretStr | None = None
     cerebras_model: str = "gpt-oss-120b"
     gemini_api_key: SecretStr | None = None
-    gemini_model: str = "gemini-3.8-flash"
+    gemini_model: str = "gemini-3.5-flash-lite"
     data_dir: str = "var"
     user_agent: str = "LanternResearch/0.1 (+https://github.com/kautilyadhyan12/lantern)"
     daily_run_limit: int = 10
