@@ -1,5 +1,19 @@
 # AGENTS.md — Lantern
 
+> **Current way of working (since 2026-11-04).**
+>
+> - Lantern is built in focused stages, one pull request per feature, following its plan in `docs/plans/`. The current plan is `PLAN-AGENT.md`: read it before starting a stage.
+> - The step-by-step loop described below is paused and does not block work: `$plan` to `$smoke`, PROOF and REVIEW files, and Codex review rounds.
+>
+> Still required in every change:
+>
+> - The non-negotiable invariants and the architecture rules.
+> - Secrets only in Codespaces secrets. No personal data or captured evidence in the repository.
+> - Tests for new behaviour. ruff and `mypy --strict` clean.
+> - Work on a branch, and merge through a pull request only with the owner's permission.
+> - Ask before anything that costs money, touches CI, account settings or API keys.
+> - Commits are authored by the owner only: no co-author or tool-attribution lines. Commit messages and pull requests describe the code change only.
+
 Lantern is an open-source intelligence (OSINT) investigation platform. It investigates questions using only public information: the web, news, social posts, satellite images, aircraft and ship tracking, and company and domain records. A brief becomes key questions. Audited tools gather public evidence, and every source used is preserved and hashed. Claims are anchored to exact quotes, and corroboration counts only independent origins. Findings use Admiralty ratings, ICD 203 likelihood terms and rule-based confidence. A report is published only after every sentence has been checked against its citations.
 
 It is a personal, non-commercial project with a public demo for recruiters. The repository is public.
