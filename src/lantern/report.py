@@ -151,7 +151,8 @@ def _finding_lines(investigation: Investigation, report: Report, finding: Findin
             lines += [
                 f"- **{item.name}** ({item.when or 'date unknown'}) — {item.summary} "
                 f"*({item.status}; {len(item.origins)} "
-                f"sources; best grade {item.best_grade}; {', '.join(item.claim_refs)})*"
+                f"source{'' if len(item.origins) == 1 else 's'}; best grade {item.best_grade}; "
+                f"{', '.join(item.claim_refs)})*"
                 for item in rows
             ]
     mentions = [m for m in investigation.mentions if m.question_ref == finding.question_ref]
