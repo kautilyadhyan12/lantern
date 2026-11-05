@@ -9,12 +9,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from lantern import prompts, runtime
-from lantern.agent.loop import Agent
+from lantern.agent import views
+from lantern.agent.loop import SWEEP, Agent
 from lantern.agent.researcher import next_actions
 from lantern.config import AppSettings
 from lantern.core.loop_rules import CONTINUE, DEEP, QUICK, Budget
 from lantern.llm import BudgetError, Gateway, ModelError, Provider, TokenBudget
-from lantern.models import Investigation, Usage
+from lantern.models import Investigation, Question, Usage
 from lantern.pipeline import Investigator, Limits, Tools
 from lantern.report import to_markdown
 from lantern.runtime import budget_for, fast_order, run_investigation
@@ -262,7 +263,7 @@ async def test_the_log_shows_each_step_and_the_report_lists_tools_and_steps(tmp_
     assert "## Method" in markdown
     assert f"took {inv.usage.research_steps} steps over 2 rounds," in markdown
     assert inv.usage.rounds == 2  # Q2 closes in round 2, after Q1 closed in round 1
-    assert "news_search (2), post_links (1), read_page (4), social_search (1), web_search (2)" in (
+    assert "news_search (2), post_links (2), read_page (4), social_search (5), web_search (2)" in (
         markdown
     )
     settings = AppSettings(data_dir=str(tmp_path), tavily_api_key="t", groq_api_key="g")
@@ -549,8 +550,9 @@ async def test_the_researcher_reads_links_from_the_question_and_failures_become_
     runner, _, _ = agent(tmp_path, Researcher(script=script), brief=brief)
     inv = await runner.run()
     assert inv.status == "done", inv.error
-    assert [source.url for source in inv.sources] == [given]
-    assert inv.sources[0].question_refs == ["Q1"]
+    pages = [source for source in inv.sources if source.kind == "page"]
+    assert [source.url for source in pages] == [given]
+    assert pages[0].question_refs == ["Q1"]
     assert inv.claims  # the page the researcher read is extracted like any other
     lead = next(lead for lead in inv.leads if lead.kind == "page")
     assert (lead.platform, lead.question_refs) == ("blocked.example", ["Q1"])
@@ -592,7 +594,7 @@ async def test_social_media_is_searched_only_for_the_subject_of_the_question(tmp
     assert any(m.startswith(f"social_search “RaviKumar”: {refusal}") for m in messages)
     assert "Bluesky: searched “DistrictFloods” (5 posts)." in messages  # a planned hashtag
     assert "Bluesky: searched “relief camps near me” (5 posts)." in messages  # a planned query
-    assert inv.usage.tools["social_search"] == 2
+    assert inv.usage.tools["social_search"] == 4 + 2  # the opening sweep, then two allowed
 
 
 def test_topic_words_are_the_distinctive_words():
@@ -602,3 +604,40 @@ def test_topic_words_are_the_distinctive_words():
         "attacks",
     }
     assert "গুৱাহাটী" in topic_words("গুৱাহাটী বান")
+
+
+@pytest.mark.ac("AG1b-AC7")
+async def test_the_opening_sweep_gathers_posts_and_leads_before_the_first_step(tmp_path):
+    def script(ref, step, user):  # a researcher that never asks for social media
+        if step == 1:
+            return {"calls": [{"tool": "web_search", "args": {"query": f"{ref} district floods"}}]}
+        return DONE
+
+    searcher = FakeSearch()
+    runner, _, model = agent(tmp_path, Researcher(script=script), searcher=searcher)
+    inv = await runner.run()
+    assert inv.status == "done", inv.error
+    messages = [s.message for s in inv.steps]
+    first_step = messages.index("Q1 · step 1 · web_search “Q1 district floods”: no reason given")
+    sweep = messages.index("Looking for ground reports in public social media posts.")
+    assert sweep < first_step
+    assert len([s for s in inv.sources if s.kind == "post"]) == 4
+    assert any(c.statement.startswith("A social media post reported") for c in inv.claims)
+    assert [lead.url for lead in inv.leads if lead.kind == "post"] == [
+        "https://x.com/witness/status/999"
+    ]
+    assert len(searcher.domain_calls) == 1  # post links: one search with the brief
+    first = model.prompts["ResearchStep"][0]
+    assert "Sources saved for Q1 (4;" in first  # the researcher sees the posts already saved
+    budget = runner.gateway.budget
+    assert budget.searches == DEEP.tool_calls + SWEEP - 1 - 4 - 2  # sweep calls on top
+
+
+def test_single_source_items_are_named_for_corroboration():
+    question = Question(ref="Q1", text="Which incidents happened?", kind="list")
+    view = views.question_view(
+        question, 1, ["web_search"], None, [], single=["Embankment collapse"]
+    )
+    assert "Found in only one source so far (search one by name for a second source): " in view
+    assert "Embankment collapse." in view
+    assert "only one source" not in views.question_view(question, 1, [], None, [])

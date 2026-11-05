@@ -387,3 +387,21 @@ Each stage is one pull request.
   reading. Compared with the AG1a fixed quick run, the agent saved fewer posts (1 against
   8) and listed no post links, because it chose one hashtag search and no `post_links`
   call. AG1b-AC8 will show whether this matters over deep runs.
+- 2026-11-05: AG1b-AC8, a small first comparison, with quick looks to save free quota. The
+  organisation question (Wagner Group) was dropped: its fixed run failed with "The AI
+  providers kept failing", and the owner chose to stop there.
+
+  | Question | Mode | Answered | Items | Corroborated | Claims | Pages | Posts | Leads | Tokens | Minutes |
+  |---|---|---|---|---|---|---|---|---|---|---|
+  | Assam floods 2026 | fixed | 2/2 | 3 | 2 | 34 | 9 | 8 | 13 | 37k | 1.9 |
+  | Assam floods 2026 | agent | 2/2 | 3 | 1 | 32 | 8 | 1 | 2 | 36k | 1.8 |
+  | Lashkar-e-Taiba deaths | fixed | 2/2 | 2 | 2 | 8 | 5 | 8 | 14 | 20k | 4.1 |
+  | Lashkar-e-Taiba deaths | agent | 2/2 | 3 | 1 | 8 | 8 | 0 | 2 | 31k | 4.2 |
+
+  The agent matched the fixed rounds on answers, claims and items, and read more pages on
+  the second question. It corroborated fewer items and gathered almost no posts or leads.
+  So the fixed rounds stay. Fix: the agent now opens with the fixed rounds' sweep (post
+  links, then public posts from the planned phrases and hashtags), with its own allowance
+  of 8 calls. Each researcher step names the items found in only one source, and the
+  researcher is told to search one of them for a second source. A short re-check (one pair
+  of quick looks) remains to do when there is free quota.

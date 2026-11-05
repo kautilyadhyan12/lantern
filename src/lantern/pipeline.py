@@ -728,10 +728,10 @@ class Investigator:
 
     # ---- social media ground reports ------------------------------------------------
 
-    async def _social(self) -> None:
+    async def _social(self) -> list[Source]:
         """Collect public posts about the event as ground reports (never account timelines)."""
         if self.tools.social is None:
-            return
+            return []
         self.note("Looking for ground reports in public social media posts.")
         everything = [question.ref for question in self.inv.questions]
         phrases = self._phrases[:2] or [
@@ -746,6 +746,7 @@ class Investigator:
             found += outcome.result.sources if outcome.result else []
         saved = self._keep_posts(found, everything)
         self.note(f"Saved {len(saved)} posts as ground reports, with sha256 fingerprints.")
+        return saved
 
     def _keep_posts(self, found: list[SourceDraft], refs: list[str]) -> list[Source]:
         """Save new posts as ground reports: no repeated text, at most `posts_per_account`

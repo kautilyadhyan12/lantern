@@ -35,6 +35,7 @@ from lantern.tools.gateway import Outcome, describe
 
 SEARCHES = {"web_search", "news_search"}
 LEADS_ONLY = {"post_links"}
+SWEEP = 8  # calls the opening sweep may make (post links and social posts), on top of the budget
 
 
 @dataclass
@@ -78,13 +79,14 @@ class Agent(Investigator):
     def _budget(self) -> RunBudget:
         reads = 2 * self.budget.pages  # read attempts: many sites refuse or fail
         calls = self.budget.tool_calls
-        return RunBudget(tool_calls=calls + reads, searches=calls, pages=reads, records=calls)
+        searches = calls + SWEEP
+        return RunBudget(calls + reads + SWEEP, searches=searches, pages=reads, records=calls)
 
     async def run(self) -> Investigation:
         async def work() -> None:
             if await self._allowed():
                 await self._plan()
-                await self._research()
+                await self._research(sweep=True)
                 await self._conclude()
 
         self._begin()
@@ -117,9 +119,11 @@ class Agent(Investigator):
 
     # ---- the loop ---------------------------------------------------------------------
 
-    async def _research(self) -> None:
+    async def _research(self, *, sweep: bool = False) -> None:
         rounds = stale = 0
         try:
+            if sweep:
+                await self._sweep()
             while (reason := should_stop(self._state(rounds, stale))) is None:
                 before = self._mark()
                 if (reason := await self._question_round(rounds, stale)) is not None:
@@ -132,6 +136,16 @@ class Agent(Investigator):
             self.tools.tokens.researching = False  # the reserve is for the assessment and report
         self.inv.stopped_by = explain(reason, self._state(rounds, stale))
         self.note(self.inv.stopped_by)
+
+    async def _sweep(self) -> None:
+        """The standing first moves, before the researcher's first step: links to posts on
+        sites Lantern does not read, and public posts as ground reports, from the planned
+        phrases and hashtags. They use searches, not AI tokens, apart from reading the posts."""
+        await self._find_leads()
+        posts = await self._social()
+        if posts:
+            await self._extract(posts)
+            await self._relist()
 
     async def _question_round(self, rounds: int, stale: int) -> StopReason | None:
         """One researcher step for each open key question, fewest attempts first; stops
@@ -202,7 +216,18 @@ class Agent(Investigator):
             [
                 views.brief_view(self.inv, self._phrases, self._hashtags),
                 views.question_view(
-                    question, progress.attempts, progress.tools, progress.finding, progress.planned
+                    question,
+                    progress.attempts,
+                    progress.tools,
+                    progress.finding,
+                    progress.planned,
+                    single=[
+                        item.name
+                        for item in self.inv.items
+                        if item.question_ref == question.ref
+                        and item.status == "single source"
+                        and item.in_period
+                    ],
                 ),
                 views.evidence_digest(
                     self.inv,
@@ -261,6 +286,10 @@ class Agent(Investigator):
         found += await self._read(question, list(candidates.items()))
         if found:
             await self._extract(found)
+        await self._relist()
+
+    async def _relist(self) -> None:
+        """Rebuild the item list of each list question that gained claims since its last list."""
         lists = {q.ref for q in self.inv.questions if q.kind == "list"}
         grown = {ref for ref in lists if len(self._claims(ref)) > self._listed.get(ref, 0)}
         if grown:
