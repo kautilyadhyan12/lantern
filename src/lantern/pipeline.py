@@ -13,13 +13,14 @@ import re
 from collections import Counter
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
+from typing import Literal
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel
 
 from lantern import assessment, prompts
 from lantern.archive import Archive
-from lantern.llm import Model, ModelError, QuotaError
+from lantern.llm import Model, ModelError, QuotaError, TokenBudget
 from lantern.models import (
     Claim,
     Finding,
@@ -38,8 +39,8 @@ from lantern.search import Hit, Searcher, SearchError, TimeRange
 from lantern.sites import canonical, post_lead, readable
 from lantern.social import SocialSearch
 from lantern.store import Store
-from lantern.text import find_quote, normalise, relevant_chunks
-from lantern.tools.adapters.social import SocialPosts
+from lantern.text import find_quote, normalise, relevant_chunks, topic_words
+from lantern.tools.adapters.social import SocialArgs, SocialPosts
 from lantern.tools.adapters.web import NewsSearch, PageFetcher, PostLinks, ReadPage, WebSearch
 from lantern.tools.base import RunBudget, SourceDraft, ToolCall, ToolContext
 from lantern.tools.gateway import Outcome, ToolGateway
@@ -56,6 +57,7 @@ MAX_MENTIONS = 40
 CLAIMS_PER_PAGE = 12
 ROUND_SEARCHES = 100  # a backstop for the gateway: the rounds' own limits always bind first
 TIME_RANGES: dict[str, TimeRange] = {"day": "day", "week": "week", "month": "month", "year": "year"}
+Role = Literal["think", "read", "fast"]
 
 
 @dataclass
@@ -100,6 +102,8 @@ class Tools:
     social: SocialSearch | None = None
     reader: Model | None = None  # bulk page reading; defaults to `model`
     archive: Archive | None = None  # archived copies of pages a site refused
+    fast: Model | None = None  # triage and item lists, on a separate free quota
+    tokens: TokenBudget | None = None  # the model gateways' shared token budget
 
 
 @dataclass(frozen=True)
@@ -155,9 +159,16 @@ class Investigator:
         self._attempted |= {lead.url for lead in investigation.leads if lead.kind == "page"}
         # Every search, page, post and lead is reached through the tool gateway.
         self._ctx = ToolContext()
-        self.gateway = ToolGateway(self._registry(), self._budget(), self._given(), self.note)
+        self.gateway = ToolGateway(
+            self._registry(),
+            self._budget(),
+            self._given(),
+            self.note,
+            checks={"social_search": self._on_topic},
+        )
         # Headlines of results that could not be read, kept in memory only for follow-ups.
         self._unread: list[str] = []
+        self._post_texts: set[str] = set()  # normalised post texts saved in this run
         self._reading = asyncio.Semaphore(3)
         self._today = now().date().isoformat()
 
@@ -179,6 +190,21 @@ class Investigator:
         pages = 2 * self.limits.max_pages  # the rounds stop after this many attempts anyway
         return RunBudget(ROUND_SEARCHES + pages, ROUND_SEARCHES, pages, records=0)
 
+    def _on_topic(self, args: SocialArgs) -> str | None:
+        """Social media is searched only for the subject of the research question (words of
+        the question or of the plan made from it), never for a person or account met along
+        the way."""
+        planned = [query for queries in self._planned.values() for query in queries]
+        words = topic_words(self.inv.brief, *self._phrases, *self._hashtags, *planned)
+        text = (args.phrase or args.hashtag or "").casefold()
+        if any(word in text for word in words):
+            return None
+        example = f" such as “{self._phrases[0]}”" if self._phrases else ""
+        return (
+            "Lantern searches social media only for the subject of the research question. Use "
+            f"a phrase with its place or subject name{example}."
+        )
+
     def _given(self) -> set[str]:
         """Links written in the question itself, which Lantern may read."""
         links = re.findall(r"https?://[^\s<>\"']+", self.inv.brief)
@@ -188,19 +214,33 @@ class Investigator:
         self, tool: str, args: dict[str, object], refs: Iterable[str], why: str
     ) -> Outcome:
         call = ToolCall(tool=tool, args=args, question_ref=min(refs, default=""), why=why)
-        return await self.gateway.run(call, self._ctx)
+        return await self._run_call(call)
 
-    async def _ask[T: BaseModel](
-        self, system: str, user: str, output: type[T], *, reading: bool = False
-    ) -> T:
-        """One model call. Every call is told today's date, so "the past year" and dates in
-        searches mean what the user means, not the model's training year."""
-        model = self.reader if reading else self.tools.model
-        dated = (
+    async def _run_call(self, call: ToolCall) -> Outcome:
+        outcome = await self.gateway.run(call, self._ctx)
+        if outcome.status in {"ok", "failed"}:
+            counts = self.inv.usage.tools
+            counts[call.tool] = counts.get(call.tool, 0) + 1
+        return outcome
+
+    def _dated(self, system: str) -> str:
+        """Every model call is told today's date, so "the past year" and dates in searches
+        mean what the user means, not the model's training year."""
+        return (
             f"{system}\nToday's date is {self._today}. Interpret all periods and dates "
             "relative to it, and never assume an earlier year."
         )
-        return await model.structured(dated, user, output)
+
+    def _model(self, role: Role) -> Model:
+        if role == "read":
+            return self.reader
+        return (self.tools.fast if role == "fast" else None) or self.tools.model
+
+    async def _ask[T: BaseModel](
+        self, system: str, user: str, output: type[T], *, role: Role = "think"
+    ) -> T:
+        """One model call, routed by role: thinking, bulk reading, or fast triage."""
+        return await self._model(role).structured(self._dated(system), user, output)
 
     def note(self, message: str) -> None:
         self.inv.log(message)
@@ -467,9 +507,13 @@ class Investigator:
         except ModelError as error:
             self.note(f"Could not scan the search results for names: {error}")
             return
-        index = {f"H{number}": url for number, (url, _) in enumerate(window, start=1)}
+        self._spot(out.items, {f"H{n}": url for n, (url, _) in enumerate(window, start=1)})
+
+    def _spot(self, entries: list[prompts.Spotted], index: dict[str, str]) -> None:
+        """Keep each name the search results mention as an unconfirmed mention."""
+        lists = [question.ref for question in self.inv.questions if question.kind == "list"]
         spotted = []
-        for entry in out.items:
+        for entry in entries if lists else []:
             name = entry.name.strip()
             urls = [index[r] for r in (x.strip().upper() for x in entry.results) if r in index]
             if not name or not urls:
@@ -507,13 +551,7 @@ class Investigator:
         """Pick up to `budget` pages to read: the model triages, code enforces site caps."""
         if budget <= 0 or not candidates:
             return []
-        per_site = Counter(assessment.registrable_domain(url) for url in self._attempted)
-        eligible = [
-            (url, cand)
-            for url, cand in candidates
-            if per_site[assessment.registrable_domain(url)] < PER_DOMAIN
-            and self._worth_trying(assessment.registrable_domain(url))
-        ]
+        eligible = self._eligible(candidates)
         ranked = eligible
         if len(eligible) > budget:
             picked = await self._triage(eligible[:TRIAGE_WINDOW], budget) or []
@@ -522,6 +560,23 @@ class Investigator:
             minimum = (budget + 1) // 2
             extra = [pair for pair in eligible if pair not in picked]
             ranked = picked + extra[: max(0, minimum - len(picked))] if picked else eligible
+        return self._capped(ranked, budget)
+
+    def _eligible(self, candidates: list[tuple[str, Candidate]]) -> list[tuple[str, Candidate]]:
+        """Results on sites still worth trying and below the per-site cap."""
+        per_site = Counter(assessment.registrable_domain(url) for url in self._attempted)
+        return [
+            (url, cand)
+            for url, cand in candidates
+            if per_site[assessment.registrable_domain(url)] < PER_DOMAIN
+            and self._worth_trying(assessment.registrable_domain(url))
+        ]
+
+    def _capped(
+        self, ranked: list[tuple[str, Candidate]], budget: int
+    ) -> list[tuple[str, Candidate]]:
+        """The first `budget` results in order, at most PER_DOMAIN per site overall."""
+        per_site = Counter(assessment.registrable_domain(url) for url in self._attempted)
         chosen = []
         for url, cand in ranked:
             site = assessment.registrable_domain(url)
@@ -685,48 +740,55 @@ class Investigator:
         phrases += [f"#{tag}" for tag in self._hashtags[:1]]
         searches = [{"phrase": phrase} for phrase in phrases]
         searches += [{"hashtag": tag} for tag in self._hashtags]
-        found: list[tuple[SourceDraft, list[str]]] = []
+        found: list[SourceDraft] = []
         for args in searches:
             outcome = await self._call("social_search", dict(args), everything, "ground reports")
-            posts = outcome.result.sources if outcome.result else []
-            found += [(post, everything) for post in posts]
-        seen: set[str] = set()
-        per_origin: dict[str, int] = {}
-        saved = 0
-        for post, refs in found:
-            key = normalise(post.text)[0][:200]
-            if key in seen or per_origin.get(post.origin, 0) >= self.limits.posts_per_account:
-                continue
-            seen.add(key)
-            per_origin[post.origin] = per_origin.get(post.origin, 0) + 1
-            self._save_post(post, refs)
-            saved += 1
-            if saved >= self.limits.max_posts:
-                break
-        self.inv.usage.posts_saved = saved
-        self.note(f"Saved {saved} posts as ground reports, with sha256 fingerprints.")
+            found += outcome.result.sources if outcome.result else []
+        saved = self._keep_posts(found, everything)
+        self.note(f"Saved {len(saved)} posts as ground reports, with sha256 fingerprints.")
 
-    def _save_post(self, post: SourceDraft, refs: list[str]) -> None:
+    def _keep_posts(self, found: list[SourceDraft], refs: list[str]) -> list[Source]:
+        """Save new posts as ground reports: no repeated text, at most `posts_per_account`
+        per account and `max_posts` in the whole investigation."""
+        posts = [source for source in self.inv.sources if source.kind == "post"]
+        per_origin = Counter(source.origin for source in posts)
+        known = {source.url for source in posts}
+        saved: list[Source] = []
+        for post in found:
+            key = normalise(post.text)[0][:200]
+            if len(posts) + len(saved) >= self.limits.max_posts:
+                break
+            if key in self._post_texts or post.url in known:
+                continue
+            if per_origin[post.origin] >= self.limits.posts_per_account:
+                continue
+            self._post_texts.add(key)
+            per_origin[post.origin] += 1
+            saved.append(self._save_post(post, refs))
+        self.inv.usage.posts_saved += len(saved)
+        return saved
+
+    def _save_post(self, post: SourceDraft, refs: list[str]) -> Source:
         # The saved copy keeps the post itself, not who wrote it.
         platform = post.origin.split(":", 1)[0]
-        self.inv.sources.append(
-            Source(
-                ref=f"S{len(self.inv.sources) + 1}",
-                url=post.url,
-                domain=urlsplit(post.url).hostname or platform,
-                kind="post",
-                origin=post.origin,
-                title=post.title,
-                published=post.published,
-                fetched_at=now(),
-                sha256=self.store.put_blob(post.body),
-                text_sha256=self.store.put_text(post.text),
-                size=len(post.body),
-                reliability="D",
-                reliability_reason="Social media post: an unverified ground report",
-                question_refs=sorted(refs),
-            )
+        source = Source(
+            ref=f"S{len(self.inv.sources) + 1}",
+            url=post.url,
+            domain=urlsplit(post.url).hostname or platform,
+            kind="post",
+            origin=post.origin,
+            title=post.title,
+            published=post.published,
+            fetched_at=now(),
+            sha256=self.store.put_blob(post.body),
+            text_sha256=self.store.put_text(post.text),
+            size=len(post.body),
+            reliability="D",
+            reliability_reason="Social media post: an unverified ground report",
+            question_refs=sorted(refs),
         )
+        self.inv.sources.append(source)
+        return source
 
     # ---- claims ---------------------------------------------------------------------
 
@@ -765,7 +827,7 @@ class Investigator:
             )
             async with self._reading:
                 try:
-                    out = await self._ask(prompts.EXTRACT, user, prompts.ExtractOut, reading=True)
+                    out = await self._ask(prompts.EXTRACT, user, prompts.ExtractOut, role="read")
                 except QuotaError:
                     raise
                 except ModelError as error:
@@ -804,7 +866,7 @@ class Investigator:
             async with self._reading:
                 try:
                     out = await self._ask(
-                        prompts.EXTRACT_POSTS, user, prompts.ExtractPostsOut, reading=True
+                        prompts.EXTRACT_POSTS, user, prompts.ExtractPostsOut, role="read"
                     )
                 except QuotaError:
                     raise
@@ -840,10 +902,12 @@ class Investigator:
 
     # ---- everything found for list questions -----------------------------------------
 
-    async def _inventory(self) -> None:
-        """Rebuild the list of every item found for each list question, weak sources included."""
+    async def _inventory(self, refs: Iterable[str] | None = None) -> None:
+        """Rebuild the list of every item found for each list question (or only those in
+        `refs`), weak sources included."""
+        wanted = None if refs is None else set(refs)
         for question in self.inv.questions:
-            if question.kind != "list":
+            if question.kind != "list" or (wanted is not None and question.ref not in wanted):
                 continue
             claims = [c for c in self.inv.claims if question.ref in c.question_refs][:80]
             if not claims:
@@ -851,7 +915,7 @@ class Investigator:
             user = f"List-type key question {question.ref}: {question.text}\n\nClaims:\n"
             user += "\n".join(self._claim_line(claim) for claim in claims)
             try:
-                out = await self._ask(prompts.INVENTORY, user, prompts.InventoryOut)
+                out = await self._ask(prompts.INVENTORY, user, prompts.InventoryOut, role="fast")
             except QuotaError:
                 raise
             except ModelError as error:
@@ -994,12 +1058,7 @@ class Investigator:
         best = min((s.reliability for s in sources if s), default=None)
         level, why = assessment.confidence(len(domains), best, bool(contradicting))
         likelihood = assessment.clamp_likelihood(out.likelihood or "", len(domains))
-        for claim in claims:
-            if claim.ref in supporting or claim.ref in contradicting:
-                claim.credibility = assessment.credibility(
-                    len(domains), bool(contradicting), claim.ref in supporting
-                )
-        return Finding(
+        finding = Finding(
             question_ref=question.ref,
             status="answered",
             answer=strip_refs(out.answer),
@@ -1012,6 +1071,20 @@ class Investigator:
             domains=domains,
             rationale=out.rationale,
         )
+        self._rate(finding, claims)
+        return finding
+
+    @staticmethod
+    def _rate(finding: Finding, claims: list[Claim]) -> None:
+        """Set the credibility of the claims a finding cites, from its corroboration."""
+        cited = set(finding.supporting) | set(finding.contradicting)
+        for claim in claims:
+            if claim.ref in cited:
+                claim.credibility = assessment.credibility(
+                    len(finding.domains),
+                    bool(finding.contradicting),
+                    claim.ref in finding.supporting,
+                )
 
     async def _write(self) -> None:
         answered = [f for f in self.inv.findings if f.status == "answered"]

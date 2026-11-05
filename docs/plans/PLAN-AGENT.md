@@ -347,3 +347,43 @@ Each stage is one pull request.
 - 2026-11-05: AG1a live check, a quick run on the 2026 Assam floods: 6 searches, 9 pages read
   (3 from Wayback Machine copies), 8 posts, 13 leads, 34 anchored claims, both key questions
   answered, about 37k model tokens.
+- 2026-11-05: AG1b built. The researcher agent is on by default; `LANTERN_AGENT=0` restores
+  the fixed rounds, which are unchanged. The existing tests pass unchanged; 48 new tests
+  cover the loop rules (property tests), the researcher step and its retry, triage, the
+  feedback of refusals, the live log and method section, the injection canary, quick, deep
+  and continue budgets, archive copies, and the token budget. Details settled while building:
+  - A round gives each open key question one researcher step, in turn (fewest attempts
+    first, then the planner's order). Steps run one after another, not in parallel, so the
+    log reads in order and the free models' per-minute limits are not hit twice as fast.
+  - The page budget counts pages saved. Read attempts may reach twice that, as in the fixed
+    rounds, because many sites refuse. Each step reads an even share of the pages over the
+    first three rounds: at least 3, at most 8.
+  - The tool-call budget counts the calls the researcher proposes. Pages read from triage
+    picks count against the page budget instead.
+  - A fact question closes when it is assessed with high confidence, after 3 steps, or when
+    the researcher says it is done. A list question closes when the researcher says so or
+    after 2 steps that found nothing new. Only fact questions are re-assessed during
+    research; the final assessment reuses any finding whose evidence has not changed.
+  - Stop conditions are checked in the order of `03` §2.1: the budgets at 85% first, then
+    all questions closed, the round limit, and no progress for 2 rounds.
+  - The model gateways share one token budget. During research they refuse calls past 85%;
+    the rest opens for the assessment and the report. The fixed rounds have no token budget.
+  - The researcher can now choose social media phrases itself, so the tool gateway gained a
+    per-tool policy check. Social media is searched only for phrases that contain a
+    distinctive word of the research question or of the plan made from it, never for a
+    name met along the way (`07` invariant 4).
+  - Triage and item lists go to `groq:openai/gpt-oss-20b`, then fall back to the main
+    models. Re-checked today: both Groq models allow 1,000 requests a day and 8,000 tokens a
+    minute on this key, counted separately.
+  - The AI call cap (`LANTERN_MAX_LLM_CALLS`) rose from 100 to 200 as a backstop; the token
+    budget binds first.
+  - AG1b-AC8 (the six-run comparison) is still to do. It needs free quota over two or three
+    days, so the fixed rounds stay until it is recorded here.
+- 2026-11-05: AG1b live check, a quick look on the 2026 Assam floods (the AG1a check's
+  topic): 2 researcher steps, 4 searches and 1 social search, 8 pages saved (1 from a
+  Wayback Machine copy), 1 post, 32 anchored claims, 3 items (1 corroborated), both key
+  questions answered (high and moderate confidence), about 36k model tokens, 1.8 minutes.
+  All three routes were used: gpt-oss-120b, gpt-oss-20b for triage and item lists, Gemini for
+  reading. Compared with the AG1a fixed quick run, the agent saved fewer posts (1 against
+  8) and listed no post links, because it chose one hashtag search and no `post_links`
+  call. AG1b-AC8 will show whether this matters over deep runs.

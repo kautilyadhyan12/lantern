@@ -77,6 +77,7 @@ def to_markdown(investigation: Investigation) -> str:
         lines += _finding_lines(investigation, report, finding)
     if report.gaps:
         lines += ["## What could not be determined", "", *(f"- {gap}" for gap in report.gaps), ""]
+    lines += _method_lines(investigation)
     lines += ["## Claims", ""]
     for claim in investigation.claims:
         lines.append(
@@ -171,3 +172,28 @@ def _finding_lines(investigation: Investigation, report: Report, finding: Findin
         ]
     lines.append("")
     return lines
+
+
+def _method_lines(investigation: Investigation) -> list[str]:
+    """How the research was done: the agent's steps, the tools it used, what ended it."""
+    usage = investigation.usage
+    if not usage.research_steps:
+        return []
+    tools = ", ".join(f"{name} ({count})" for name, count in sorted(usage.tools.items()))
+    lines = [
+        "## Method",
+        "",
+        (
+            f"- A researcher agent took {_count(usage.research_steps, 'step')} over "
+            f"{_count(usage.rounds, 'round')}, choosing its own tool calls; code checked every "
+            "call before it ran."
+        ),
+        f"- Tools used: {tools or 'none'}.",
+    ]
+    if investigation.stopped_by:
+        lines.append(f"- What ended research: {investigation.stopped_by}")
+    return [*lines, ""]
+
+
+def _count(number: int, noun: str) -> str:
+    return f"{number} {noun}{'' if number == 1 else 's'}"

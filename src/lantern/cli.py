@@ -75,7 +75,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     run = commands.add_parser("run", help="Investigate a question and save a cited report")
     run.add_argument("brief", help="The research question, in quotes")
     run.add_argument(
-        "--quick", action="store_true", help="One round of about 10 pages instead of a deep run"
+        "--quick", action="store_true", help="One round of up to 10 pages instead of a deep run"
     )
     again = commands.add_parser("continue", help="Continue a finished investigation")
     again.add_argument("id", help="The investigation id (from the web app or var/)")

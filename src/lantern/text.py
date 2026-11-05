@@ -113,3 +113,28 @@ def relevant_chunks(text: str, terms: list[str], size: int = 10000, limit: int =
 
     best = sorted(range(len(parts)), key=lambda index: (-score(parts[index]), index))[:limit]
     return [parts[index] for index in sorted(best)]
+
+
+_COMMON = (
+    "about after also been before being both could does during each from have into many "
+    "more most other over such than that their them then there these they this those "
+    "through under were what when where which while will with would year years week month "
+    "today latest news report reports happened"
+)
+_COMMON_WORDS = frozenset(_COMMON.split())
+
+
+def topic_words(*texts: str) -> set[str]:
+    """The distinctive words of some texts (four letters or more, common words left out),
+    in lower case: the names of places, organisations and subjects they mention."""
+    found = set()
+    for text in texts:
+        word: list[str] = []
+        for char in f"{text.casefold()} ":
+            if unicodedata.category(char)[0] in "LM":  # letters and combining vowel signs
+                word.append(char)
+                continue
+            if len(word) >= 4 and "".join(word) not in _COMMON_WORDS:
+                found.add("".join(word))
+            word = []
+    return found

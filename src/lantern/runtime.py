@@ -3,16 +3,20 @@
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 
+from lantern.agent.loop import Agent
 from lantern.archive import Wayback
 from lantern.config import AppSettings
+from lantern.core.loop_rules import CONTINUE, DEEP, QUICK, Budget
 from lantern.egress import Fetcher
-from lantern.llm import Gateway, ModelError, Provider
+from lantern.llm import Gateway, ModelError, Provider, TokenBudget
 from lantern.models import Investigation
 from lantern.pipeline import Investigator, Limits, Tools
 from lantern.search import SearchError, TavilySearch
 from lantern.sites import blocked_site
 from lantern.social import PublicSocial
 from lantern.store import Store
+
+GROQ = "https://api.groq.com/openai/v1"
 
 
 def providers(settings: AppSettings) -> list[Provider]:
@@ -36,7 +40,7 @@ def providers(settings: AppSettings) -> list[Provider]:
         found.append(
             Provider(
                 "groq",
-                "https://api.groq.com/openai/v1",
+                GROQ,
                 settings.groq_api_key.get_secret_value(),
                 settings.groq_model,
                 extra={"reasoning_effort": "low"},
@@ -62,6 +66,23 @@ def reading_order(found: list[Provider]) -> list[Provider]:
     return sorted(found, key=lambda provider: provider.name != "gemini")
 
 
+def fast_order(found: list[Provider], settings: AppSettings) -> list[Provider]:
+    """For triage and item lists: Groq's smaller model first, which has its own free daily
+    quota, then the same providers as for thinking (shared, so their waits apply)."""
+    if not settings.groq_api_key:
+        return found
+    key = settings.groq_api_key.get_secret_value()
+    fast = Provider("groq", GROQ, key, settings.fast_model, extra={"reasoning_effort": "low"})
+    return [fast, *found]
+
+
+def budget_for(investigation: Investigation, *, resume: bool) -> Budget:
+    """The agent's budget: a continuation gets its own; otherwise by the chosen depth."""
+    if resume:
+        return CONTINUE
+    return QUICK if investigation.depth == "quick" else DEEP
+
+
 def missing_keys(settings: AppSettings) -> list[str]:
     missing = []
     if not settings.tavily_api_key:
@@ -72,12 +93,18 @@ def missing_keys(settings: AppSettings) -> list[str]:
 
 
 @asynccontextmanager
-async def open_tools(settings: AppSettings, investigation: Investigation) -> AsyncIterator[Tools]:
-    """The real model gateways, search, fetcher, social search and archive, closed after."""
-    assert settings.tavily_api_key is not None  # noqa: S101  # checked by missing_keys first
-    found = providers(settings)
-    model = Gateway(found, investigation.usage, settings.max_llm_calls)
-    reader = Gateway(reading_order(found), investigation.usage, settings.max_llm_calls)
+async def open_tools(
+    settings: AppSettings, investigation: Investigation, tokens: TokenBudget | None = None
+) -> AsyncIterator[Tools]:
+    """The real model gateways, search, fetcher, social search and archive, closed after.
+    With a token budget (the agent), every gateway shares it, and triage and item lists go
+    to a fast model of their own."""
+    if settings.tavily_api_key is None:
+        raise SearchError("Web search has no key. Set LANTERN_TAVILY_API_KEY.")
+    found, usage, calls = providers(settings), investigation.usage, settings.max_llm_calls
+    model = Gateway(found, usage, calls, tokens=tokens)
+    reader = Gateway(reading_order(found), usage, calls, tokens=tokens)
+    fast = Gateway(fast_order(found, settings), usage, calls, tokens=tokens) if tokens else None
     searcher = TavilySearch(settings.tavily_api_key.get_secret_value())
     fetcher = Fetcher(settings.user_agent, blocked=blocked_site)
     social = (
@@ -93,10 +120,14 @@ async def open_tools(settings: AppSettings, investigation: Investigation) -> Asy
             social=social,
             reader=reader,
             archive=Wayback(fetcher) if settings.archive_enabled else None,
+            fast=fast,
+            tokens=tokens,
         )
     finally:
         await model.close()
         await reader.close()
+        if fast:
+            await fast.close()
         await searcher.close()
         await fetcher.close()
         if social:
@@ -123,9 +154,16 @@ async def run_investigation(
         max_questions=settings.max_questions,
         max_posts=settings.max_posts,
     )
+    budget = budget_for(investigation, resume=resume)
+    used = investigation.usage.tokens_in + investigation.usage.tokens_out
+    tokens = TokenBudget(budget.tokens, start=used) if settings.agent else None
     try:
-        async with open_tools(settings, investigation) as tools:
-            investigator = Investigator(investigation, tools, store, limits, on_change)
+        async with open_tools(settings, investigation, tokens) as tools:
+            investigator = (
+                Agent(investigation, tools, store, limits, on_change, budget=budget)
+                if settings.agent
+                else Investigator(investigation, tools, store, limits, on_change)
+            )
             return await (investigator.resume() if resume else investigator.run())
     except (ModelError, SearchError) as error:
         investigation.status, investigation.error = "failed", str(error)

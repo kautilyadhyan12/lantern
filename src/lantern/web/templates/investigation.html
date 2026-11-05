@@ -230,9 +230,18 @@
     <ul>
       <li>Safety: {{ inv.safety }}</li>
       {% if inv.continued_at %}<li>Continued {{ inv.continued_at | length }} time{{ "" if inv.continued_at | length == 1 else "s" }} after the first pass.</li>{% endif %}
+      {% if inv.usage.research_steps %}
+      <li>{{ "Deep investigation" if inv.depth == "deep" else "Quick look" }}: a researcher agent took
+        {{ inv.usage.research_steps }} step{{ "" if inv.usage.research_steps == 1 else "s" }} over
+        {{ inv.usage.rounds }} round{{ "" if inv.usage.rounds == 1 else "s" }}, choosing its own tool
+        calls for each key question; every call was checked by code before it ran.</li>
+      <li>Tools used: {% for name, count in inv.usage.tools | dictsort %}{{ name }} ({{ count }}){{ ", " if not loop.last }}{% endfor %}.</li>
+      {% if inv.stopped_by %}<li>What ended research: {{ inv.stopped_by }}</li>{% endif %}
+      {% else %}
       <li>{{ "Deep investigation" if inv.depth == "deep" else "Quick look" }}: {{ inv.usage.rounds }}
         research round{{ "" if inv.usage.rounds == 1 else "s" }}; later rounds followed up on what
         earlier rounds found.</li>
+      {% endif %}
       <li>{{ inv.usage.searches }} web and news searches; {{ inv.usage.pages_fetched }} pages saved,
         {{ inv.usage.pages_skipped }} skipped (robots.txt, errors or no readable text).</li>
       <li>{{ inv.usage.posts_saved }} public social media posts saved as ground reports, from
