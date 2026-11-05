@@ -100,7 +100,33 @@ function startContinue() {
   });
 }
 
+function startMapFilters() {
+  const filters = document.getElementById("map-filters");
+  if (!filters) return;
+  const apply = () => {
+    const off = (attribute) =>
+      new Set(
+        [...filters.querySelectorAll(`input[${attribute}]`)]
+          .filter((box) => !box.checked)
+          .map((box) => box.getAttribute(attribute)),
+      );
+    const kinds = off("data-kind");
+    const statuses = off("data-status");
+    document.querySelectorAll(".linkmap .node").forEach((node) => {
+      node.classList.toggle("off", kinds.has(node.dataset.kind));
+    });
+    document.querySelectorAll(".linkmap [data-kinds]").forEach((item) => {
+      const hidden =
+        statuses.has(item.dataset.status) ||
+        item.dataset.kinds.split(" ").some((kind) => kinds.has(kind));
+      item.classList.toggle("off", hidden);
+    });
+  };
+  filters.addEventListener("change", apply);
+}
+
 startForm();
 startContinue();
+startMapFilters();
 startPolling();
 startCitations();

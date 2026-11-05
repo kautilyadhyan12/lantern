@@ -77,6 +77,7 @@ def to_markdown(investigation: Investigation) -> str:
         lines += _finding_lines(investigation, report, finding)
     if report.gaps:
         lines += ["## What could not be determined", "", *(f"- {gap}" for gap in report.gaps), ""]
+    lines += _link_lines(investigation)
     lines += _method_lines(investigation)
     lines += ["## Claims", ""]
     for claim in investigation.claims:
@@ -197,3 +198,25 @@ def _method_lines(investigation: Investigation) -> list[str]:
 
 def _count(number: int, noun: str) -> str:
     return f"{number} {noun}{'' if number == 1 else 's'}"
+
+
+def _link_lines(investigation: Investigation) -> list[str]:
+    """The links between entities, each with its status and evidence."""
+    if not investigation.links:
+        return []
+    name = {entity.ref: entity.name for entity in investigation.entities}
+    lines = ["## Links", ""]
+    for link in investigation.links:
+        relation = link.relation.replace("_", " ")
+        if link.status == "assessment":
+            against = f"; against {', '.join(link.against)}" if link.against else ""
+            evidence = f"Lantern's assessment, not a stated fact: for {', '.join(link.claim_refs)}"
+            evidence += against
+        else:
+            count = _count(len(link.origins), "independent source")
+            evidence = f"{link.status}; {count}; {', '.join(link.claim_refs)}"
+        lines.append(
+            f"- **{link.ref}** {name.get(link.subject, link.subject)} — {relation} → "
+            f"{name.get(link.object, link.object)} *({evidence})*"
+        )
+    return [*lines, ""]

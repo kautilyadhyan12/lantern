@@ -20,6 +20,7 @@ from pydantic import BaseModel
 
 from lantern import assessment, prompts
 from lantern.archive import Archive
+from lantern.core import graph
 from lantern.llm import Model, ModelError, QuotaError, TokenBudget
 from lantern.models import (
     Claim,
@@ -31,6 +32,7 @@ from lantern.models import (
     Question,
     Report,
     Source,
+    Triple,
     now,
 )
 from lantern.report import strip_refs, verify
@@ -320,9 +322,24 @@ class Investigator:
         for question in self.inv.questions:
             question.status = "open"
         await self._assess()
+        self._map()
         await self._write()
         self.inv.status = "done"
         self.note("Finished.")
+
+    def _map(self) -> None:
+        """Entities and links, rebuilt by code from every relation and assessed connection."""
+        assessed = [triple for finding in self.inv.findings for triple in finding.links]
+        source_of = {claim.ref: claim.source_ref for claim in self.inv.claims}
+        origin_of = {
+            claim.ref: source.origin or source.domain
+            for claim in self.inv.claims
+            if (source := self.inv.source(claim.source_ref))
+        }
+        built = graph.build([*self.inv.relations, *assessed], source_of, origin_of)
+        self.inv.entities, self.inv.links = built
+        if self.inv.entities:
+            self.note(f"Mapped {len(built[0])} entities and {len(built[1])} links between them.")
 
     async def _guarded(self, work: Callable[[], Awaitable[None]]) -> Investigation:
         self.inv.status = "running"
@@ -822,13 +839,17 @@ class Investigator:
             return
         self.note("Pulling out claims with exact quotes.")
         before = len(self.inv.claims)
-        results = await asyncio.gather(
-            *(self._extract_page(source) for source in pages), self._extract_posts(posts)
+        page_results, post_claims = await asyncio.gather(
+            asyncio.gather(*(self._extract_page(source) for source in pages)),
+            self._extract_posts(posts),
         )
-        for claims in results:
-            for claim in claims:
-                claim.ref = f"C{len(self.inv.claims) + 1}"
-                self.inv.claims.append(claim)
+        pairs = [pair for result in page_results for pair in result]
+        for claim, triple in [*pairs, *((claim, None) for claim in post_claims)]:
+            claim.ref = f"C{len(self.inv.claims) + 1}"
+            self.inv.claims.append(claim)
+            if triple is not None:  # a relation the claim states, kept with its claim ref
+                triple.claim_refs = [claim.ref]
+                self.inv.relations.append(triple)
         added = len(self.inv.claims) - before
         dropped = self.inv.usage.claims_dropped
         self.note(
@@ -836,10 +857,10 @@ class Investigator:
             f"{dropped} dropped so far because their quote was not found."
         )
 
-    async def _extract_page(self, source: Source) -> list[Claim]:
+    async def _extract_page(self, source: Source) -> list[tuple[Claim, Triple | None]]:
         refs = {question.ref for question in self.inv.questions}
         text = self.store.text(source.text_sha256) or ""
-        found: dict[tuple[int, int], Claim] = {}
+        found: dict[tuple[int, int], tuple[Claim, Triple | None]] = {}
         terms = [self.inv.brief, *(q.text for q in self.inv.questions)]
         terms += [item.name for item in self.inv.items]
         for part in relevant_chunks(text, terms, limit=self.limits.chunks_per_page):
@@ -862,15 +883,26 @@ class Investigator:
                 if span is None or not linked or span in found:
                     self.inv.usage.claims_dropped += 1
                     continue
-                found[span] = Claim(
+                quote = text[span[0] : span[1]]
+                claim = Claim(
                     ref="",
                     source_ref=source.ref,
                     question_refs=linked,
                     statement=draft.statement.strip(),
-                    quote=text[span[0] : span[1]],
+                    quote=quote,
                     start=span[0],
                     end=span[1],
                 )
+                relation = draft.relation
+                triple = relation and graph.stated(
+                    quote,
+                    subject=relation.subject,
+                    subject_kind=relation.subject_kind,
+                    relation=relation.relation,
+                    obj=relation.object,
+                    object_kind=relation.object_kind,
+                )
+                found[span] = (claim, triple or None)
         self.note(f"{source.ref} ({source.domain}): {len(found)} claims anchored.")
         return list(found.values())
 
@@ -1102,8 +1134,22 @@ class Investigator:
         best = min((s.reliability for s in sources if s), default=None)
         level, why = assessment.confidence(len(domains), best, bool(contradicting))
         likelihood = assessment.clamp_likelihood(out.likelihood or "", len(domains))
+        links = [
+            triple
+            for draft in out.links
+            if (
+                triple := graph.assessed(
+                    draft.subject,
+                    draft.relation,
+                    draft.object,
+                    [ref for ref in dict.fromkeys(draft.supporting) if ref in valid],
+                    [ref for ref in dict.fromkeys(draft.contradicting) if ref in valid],
+                )
+            )
+        ]
         finding = Finding(
             question_ref=question.ref,
+            links=links,
             status="answered",
             answer=strip_refs(out.answer),
             likelihood_proposed=out.likelihood,

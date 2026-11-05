@@ -1,7 +1,7 @@
 """Domain records of an investigation, stored as one JSON document."""
 
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import AwareDatetime, BaseModel, Field
 
@@ -95,6 +95,65 @@ class Claim(BaseModel):
     credibility: int = 6
 
 
+EntityKind = Literal["organisation", "person_public_role", "place", "event"]
+RelationName = Literal[
+    "member_of",
+    "leader_of",
+    "founded",
+    "designated_by",
+    "linked_to",
+    "alias_of",
+    "killed_in",
+    "located_in",
+    "reported_by",
+]
+# The fixed relation vocabulary. There are no relations for protected traits (religion,
+# ethnicity, caste, health, sexuality, political opinion, union membership), by design.
+RELATIONS: tuple[str, ...] = get_args(RelationName)
+KINDS: tuple[str, ...] = get_args(EntityKind)
+
+
+class Party(BaseModel):
+    """One side of a relation, named as the evidence or the record names it."""
+
+    name: str
+    kind: EntityKind
+    ids: list[str] = Field(default_factory=list)  # "wikidata:Q736955", "ofac:7140", "un:QDe.118"
+    aliases: list[str] = Field(default_factory=list)
+
+
+class Triple(BaseModel):
+    """A relation stated in one anchored claim, listed in one record, or proposed by the
+    assessor from several claims (with the claims against it)."""
+
+    subject: Party
+    relation: RelationName
+    object: Party
+    claim_refs: list[str]
+    against: list[str] = Field(default_factory=list)
+    basis: Literal["stated", "record", "assessed"]
+
+
+class Entity(BaseModel):
+    ref: str  # E1, E2, ...
+    kind: EntityKind
+    name: str
+    aliases: list[str] = Field(default_factory=list)
+    ids: list[str] = Field(default_factory=list)
+
+
+class Link(BaseModel):
+    ref: str  # L1, L2, ...
+    subject: str  # an entity ref
+    relation: RelationName
+    object: str
+    claim_refs: list[str]
+    against: list[str] = Field(default_factory=list)
+    basis: Literal["stated", "record", "assessed"]
+    status: Literal["corroborated", "single source", "record", "assessment"]
+    origins: list[str] = Field(default_factory=list)
+
+
 class Finding(BaseModel):
     question_ref: str
     status: Literal["answered", "unanswerable"]
@@ -107,6 +166,7 @@ class Finding(BaseModel):
     contradicting: list[str] = Field(default_factory=list)
     domains: list[str] = Field(default_factory=list)
     rationale: str = ""
+    links: list[Triple] = Field(default_factory=list)  # connections the assessor proposed
 
 
 class Sentence(BaseModel):
@@ -168,6 +228,9 @@ class Investigation(BaseModel):
     items: list[Item] = Field(default_factory=list)
     mentions: list[Mention] = Field(default_factory=list)
     claims: list[Claim] = Field(default_factory=list)
+    relations: list[Triple] = Field(default_factory=list)  # stated in claims or listed in records
+    entities: list[Entity] = Field(default_factory=list)  # built from the relations by code
+    links: list[Link] = Field(default_factory=list)
     findings: list[Finding] = Field(default_factory=list)
     report: Report | None = None
     usage: Usage = Field(default_factory=Usage)

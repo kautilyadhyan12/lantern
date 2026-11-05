@@ -21,6 +21,7 @@ from urllib.parse import quote, urlencode
 from pydantic import BaseModel, Field
 
 from lantern.egress import FetchError
+from lantern.models import Triple
 from lantern.text import name_words
 from lantern.tools.adapters.sanctions import DataFetcher
 from lantern.tools.base import SourceDraft, ToolArgs, ToolContext, ToolError, ToolKind, ToolResult
@@ -163,6 +164,13 @@ class WikiLookup:
             lines.append(f"Wikidata describes {name} ({qid}) as: {description}.")
         if others:
             lines.append(f"Wikidata lists these other names for {name}: {'; '.join(others)}.")
+        kind = (
+            "person_public_role"
+            if human
+            else _kind([labels.get(v.get("id"), "") for v in _values(claims, "P31")])
+        )
+        me = {"name": name, "kind": kind, "ids": [f"wikidata:{qid}"], "aliases": others}
+        relations: list[tuple[int, Triple]] = []
         for prop, sentence in FACTS.items():
             if human and prop == "P31":
                 continue
@@ -170,6 +178,7 @@ class WikiLookup:
             shown = [_date(v) if prop == "P570" else labels.get(v.get("id"), "") for v in values]
             if shown := [item for item in shown if item]:
                 lines.append(sentence.format(name=name, value="; ".join(shown)))
+                relations += _relations(prop, me, values, labels, len(lines) - 1)
         extract = "" if human else " ".join(str(summary.get("extract", "")).split())
         page = summary.get("content_urls", {}).get("desktop", {}).get("page", "")
         text = "\n".join(lines + ([f"Wikipedia summary ({page}): {extract}"] if extract else []))
@@ -184,4 +193,39 @@ class WikiLookup:
             origin="wikidata.org",
             record_claims=tuple(lines),
             grade=GRADE,
+            relations=tuple(relations),
         )
+
+
+PLACES = ("city", "country", "province", "district", "village", "town", "region", "state")
+EVENTS = ("attack", "bombing", "massacre", "war", "battle", "flood", "earthquake", "incident")
+
+
+def _kind(types: list[str]) -> str:
+    """Place, event or organisation, from the labels of an entry's "instance of" values."""
+    text = " ".join(types).lower()
+    if any(word in text for word in PLACES):
+        return "place"
+    if any(word in text for word in EVENTS):
+        return "event"
+    return "organisation"
+
+
+def _relations(
+    prop: str, me: dict[str, Any], values: list[Any], labels: dict[str, str], index: int
+) -> list[tuple[int, Triple]]:
+    """Links by code from Wikidata's "founded by" and "member of" values."""
+    found = []
+    for value in values:
+        label = labels.get(value.get("id", "")) if isinstance(value, dict) else None
+        if not label or prop not in {"P112", "P463"}:
+            continue
+        other = {"name": label, "ids": [f"wikidata:{value['id']}"]}
+        if prop == "P112":  # the founder is most often a person; people merge only on anchors
+            data = {"subject": {**other, "kind": "person_public_role"}, "relation": "founded"}
+            data["object"] = me
+        else:
+            data = {"subject": me, "relation": "member_of"}
+            data["object"] = {**other, "kind": "organisation"}
+        found.append((index, Triple.model_validate({**data, "claim_refs": [], "basis": "record"})))
+    return found

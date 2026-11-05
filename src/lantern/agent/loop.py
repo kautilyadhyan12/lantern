@@ -382,13 +382,15 @@ class Agent(Investigator):
             question_refs=[ref],
         )
         self.inv.sources.append(source)
-        for statement in draft.record_claims:
+        claim_of: dict[int, str] = {}
+        for index, statement in enumerate(draft.record_claims):
             span = find_quote(draft.text, statement)
             if span is None:
                 continue
+            claim_of[index] = f"C{len(self.inv.claims) + 1}"
             self.inv.claims.append(
                 Claim(
-                    ref=f"C{len(self.inv.claims) + 1}",
+                    ref=claim_of[index],
                     source_ref=source.ref,
                     question_refs=[ref],
                     statement=statement,
@@ -397,6 +399,10 @@ class Agent(Investigator):
                     end=span[1],
                 )
             )
+        for index, triple in draft.relations:  # links the record lists, kept with its claim
+            if index in claim_of:
+                kept = triple.model_copy(deep=True, update={"claim_refs": [claim_of[index]]})
+                self.inv.relations.append(kept)
         return source
 
     async def _read(

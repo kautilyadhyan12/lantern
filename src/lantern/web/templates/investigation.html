@@ -152,6 +152,60 @@
   </section>
   {% endif %}
 
+  {% if nodes %}
+  <section class="linkmap">
+    <h2>Links map</h2>
+    <p class="muted">Drawn by code from claims anchored in saved sources and from official
+      records. People are joined only through an anchor (an official ID, an explicit
+      "also known as", the same source, or the same role in the same organisation), never on a
+      name alone. Select a line to see its evidence.</p>
+    <div class="map-filters" id="map-filters">
+      <span>Show:</span>
+      {% for kind in ["organisation", "person_public_role", "place", "event"] %}
+      <label><input type="checkbox" data-kind="{{ kind }}" checked> {{ kind | replace("_", " ") | replace("person public role", "person (public role)") }}</label>
+      {% endfor %}
+      {% for status in ["corroborated", "single source", "record", "assessment"] %}
+      <label><input type="checkbox" data-status="{{ status }}" checked> {{ status }}</label>
+      {% endfor %}
+    </div>
+    <svg class="map" viewBox="0 0 {{ map_size[0] }} {{ map_size[1] }}" role="img" aria-label="Links between the people, organisations, places and events found">
+      {% for edge in edges %}{% set link = edge.link %}
+      <a href="#{{ link.ref }}" class="edge" data-status="{{ link.status }}" data-kinds="{{ edge.kinds }}">
+        <title>{{ entity[link.subject].name }} — {{ link.relation | replace("_", " ") }} → {{ entity[link.object].name }} ({{ link.status }})</title>
+        <line class="st-{{ link.status | replace(' ', '-') }}" x1="{{ edge.x1 }}" y1="{{ edge.y1 }}" x2="{{ edge.x2 }}" y2="{{ edge.y2 }}"></line>
+      </a>
+      {% endfor %}
+      {% for node in nodes %}
+      <g class="node k-{{ node.entity.kind }}" data-kind="{{ node.entity.kind }}">
+        <title>{{ node.entity.ref }} {{ node.entity.name }}{% if node.entity.aliases %} (also: {{ node.entity.aliases[:5] | join("; ") }}){% endif %}</title>
+        <circle cx="{{ node.x }}" cy="{{ node.y }}" r="8"></circle>
+        <text x="{{ node.x + 11 }}" y="{{ node.y + 4 }}">{{ node.entity.name | truncate(28, True, "…") }}</text>
+      </g>
+      {% endfor %}
+    </svg>
+    <div class="table-wrap">
+    <table class="links">
+      <thead><tr><th>Link</th><th>From</th><th>Relation</th><th>To</th><th>Status</th><th>Evidence</th></tr></thead>
+      <tbody>
+      {% for link in inv.links %}
+      <tr id="{{ link.ref }}" data-status="{{ link.status }}" data-kinds="{{ entity[link.subject].kind }} {{ entity[link.object].kind }}">
+        <td>{{ link.ref }}</td>
+        <td>{{ entity[link.subject].name }} <span class="muted">{{ link.subject }}</span></td>
+        <td>{{ link.relation | replace("_", " ") }}</td>
+        <td>{{ entity[link.object].name }} <span class="muted">{{ link.object }}</span></td>
+        <td><span class="chip st-{{ 'ok' if link.status in ('corroborated', 'record') else 'single' }}">{{ link.status }}</span>
+          {% if link.status == "assessment" %}<div class="muted">Lantern's assessment, not a fact stated by a source.</div>
+          {% elif link.origins %}<div class="muted">{{ link.origins | length }} independent source{{ "" if link.origins | length == 1 else "s" }}</div>{% endif %}</td>
+        <td>{% if link.status == "assessment" %}For: {% endif %}{{ cite(link.claim_refs) }}
+          {% if link.against %}<div>Against: {{ cite(link.against) }}</div>{% endif %}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </section>
+  {% endif %}
+
   <section>
     <h2>Sources</h2>
     <div class="table-wrap">

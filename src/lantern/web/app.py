@@ -18,6 +18,7 @@ from lantern.models import Claim, Investigation, Source, now
 from lantern.report import to_markdown
 from lantern.runtime import continue_investigation, missing_keys, run_investigation
 from lantern.store import Store
+from lantern.web import linkmap
 
 HERE = Path(__file__).parent
 Runner = Callable[[Investigation, AppSettings, Store], Coroutine[Any, Any, Investigation]]
@@ -140,8 +141,13 @@ def create_app(  # noqa: PLR0915  # routes share one store and settings via clos
     async def page(request: Request, investigation_id: str) -> Response:
         item = load(investigation_id)
         report = item.report
+        nodes, edges = linkmap.view(item)
         context = {
             "inv": item,
+            "nodes": nodes,
+            "edges": edges,
+            "entity": {entity.ref: entity for entity in item.entities},
+            "map_size": (linkmap.WIDTH, linkmap.HEIGHT),
             "claims": {claim.ref: claim for claim in item.claims},
             "sources": {source.ref: source for source in item.sources},
             "sections": {s.question_ref: s for s in report.sections} if report else {},
