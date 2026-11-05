@@ -8,20 +8,17 @@ claims; code checks every quote, counts independent origins and sets confidence.
 """
 
 import asyncio
-import json
 import logging
+import re
 from collections import Counter
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
-from typing import Protocol
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel
 
 from lantern import assessment, prompts
-from lantern.archive import ARCHIVABLE, Archive, Copy
-from lantern.capture import extract
-from lantern.egress import FetchError, Page
+from lantern.archive import Archive
 from lantern.llm import Model, ModelError, QuotaError
 from lantern.models import (
     Claim,
@@ -38,10 +35,15 @@ from lantern.models import (
 from lantern.report import strip_refs, verify
 from lantern.safety import check_brief
 from lantern.search import Hit, Searcher, SearchError, TimeRange
-from lantern.sites import POST_LINKS, canonical, post_lead, readable
-from lantern.social import Post, SocialSearch
+from lantern.sites import canonical, post_lead, readable
+from lantern.social import SocialSearch
 from lantern.store import Store
 from lantern.text import find_quote, normalise, relevant_chunks
+from lantern.tools.adapters.social import SocialPosts
+from lantern.tools.adapters.web import NewsSearch, PageFetcher, PostLinks, ReadPage, WebSearch
+from lantern.tools.base import RunBudget, SourceDraft, ToolCall, ToolContext
+from lantern.tools.gateway import Outcome, ToolGateway
+from lantern.tools.registry import Registry
 
 log = logging.getLogger(__name__)
 
@@ -52,12 +54,8 @@ TRIAGE_WINDOW = 40
 DISCOVER_WINDOW = 60
 MAX_MENTIONS = 40
 CLAIMS_PER_PAGE = 12
-REFUSALS = ("HTTP 401", "HTTP 403", "HTTP 429", "robots.txt")  # the site said no: stop asking
+ROUND_SEARCHES = 100  # a backstop for the gateway: the rounds' own limits always bind first
 TIME_RANGES: dict[str, TimeRange] = {"day": "day", "week": "week", "month": "month", "year": "year"}
-
-
-class PageFetcher(Protocol):
-    async def fetch(self, url: str) -> Page: ...
 
 
 @dataclass
@@ -155,12 +153,42 @@ class Investigator:
         self._searched_keys = {text.casefold() for text in self._searched}
         self._attempted = {canonical(s.url) for s in investigation.sources if s.kind == "page"}
         self._attempted |= {lead.url for lead in investigation.leads if lead.kind == "page"}
-        self._refusing: set[str] = set()  # sites that refused Lantern once in this run
-        self._robots_no: set[str] = set()  # sites whose robots.txt said no: never archived
+        # Every search, page, post and lead is reached through the tool gateway.
+        self._ctx = ToolContext()
+        self.gateway = ToolGateway(self._registry(), self._budget(), self._given(), self.note)
         # Headlines of results that could not be read, kept in memory only for follow-ups.
         self._unread: list[str] = []
         self._reading = asyncio.Semaphore(3)
         self._today = now().date().isoformat()
+
+    def _registry(self) -> Registry:
+        tools, limit = self.tools, self.limits.results_per_query
+        registry = Registry(
+            [
+                WebSearch(tools.searcher, limit),
+                NewsSearch(tools.searcher, limit),
+                PostLinks(tools.searcher),
+                ReadPage(tools.fetcher, tools.archive),
+            ]
+        )
+        if tools.social is not None:
+            registry.register(SocialPosts(tools.social, self.limits.posts_per_query))
+        return registry
+
+    def _budget(self) -> RunBudget:
+        pages = 2 * self.limits.max_pages  # the rounds stop after this many attempts anyway
+        return RunBudget(ROUND_SEARCHES + pages, ROUND_SEARCHES, pages, records=0)
+
+    def _given(self) -> set[str]:
+        """Links written in the question itself, which Lantern may read."""
+        links = re.findall(r"https?://[^\s<>\"']+", self.inv.brief)
+        return {canonical(link.rstrip(".,;:!?)]}")) for link in links}
+
+    async def _call(
+        self, tool: str, args: dict[str, object], refs: Iterable[str], why: str
+    ) -> Outcome:
+        call = ToolCall(tool=tool, args=args, question_ref=min(refs, default=""), why=why)
+        return await self.gateway.run(call, self._ctx)
 
     async def _ask[T: BaseModel](
         self, system: str, user: str, output: type[T], *, reading: bool = False
@@ -201,6 +229,7 @@ class Investigator:
         far, without repeating searches or pages, then a fresh assessment and report."""
         saved = sum(1 for source in self.inv.sources if source.kind == "page")
         self.limits.max_pages = saved + pages
+        self.gateway.budget = self._budget()
         start = self.inv.usage.rounds + 1
 
         async def work() -> None:
@@ -381,25 +410,20 @@ class Investigator:
             key = query.text.casefold()
             if key in self._searched_keys:
                 continue
-            try:
-                hits = await self.tools.searcher.search(
-                    query.text,
-                    self.limits.results_per_query,
-                    news=query.news,
-                    time_range=self._time_range if query.news else None,
-                )
-            except SearchError as error:
-                if not self._searched:
-                    raise
-                self.note(f"Search stopped early: {error}")
-                break
+            args: dict[str, object] = {"query": query.text}
+            if query.news:
+                args["time_range"] = self._time_range
+            tool = "news_search" if query.news else "web_search"
+            outcome = await self._call(tool, args, query.refs, "a search planned for this round")
+            if outcome.result is None:  # never a repeat: those were skipped above
+                if outcome.status == "failed" and not self._searched:
+                    raise SearchError(outcome.reason)
+                break  # search is failing or out of budget: read what was found
             self._searched_keys.add(key)
             self._searched.append(query.text)
             self.inv.usage.searches += 1
-            label = "news" if query.news else "web"
-            self.note(f"Searched the {label}: “{query.text}” ({len(hits)} results).")
             group = []
-            for hit in hits:
+            for hit in outcome.result.hits:
                 url = canonical(hit.url)
                 if not readable(url):
                     for ref in query.refs:
@@ -511,37 +535,9 @@ class Investigator:
 
     def _worth_trying(self, domain: str) -> bool:
         """A site that refused is tried again only through its archived copies."""
-        if domain in self._robots_no:
+        if domain in self._ctx.robots_no:
             return False
-        return domain not in self._refusing or self.tools.archive is not None
-
-    async def _read(self, url: str, domain: str) -> tuple[Page, Copy | None]:
-        """The page itself, or its Wayback Machine copy when the site refused or could not
-        be reached. Never an archive copy when robots.txt said no."""
-        archive = self.tools.archive
-        if domain in self._refusing and archive is not None:
-            copy = await archive.copy(url)
-            if copy is None:
-                msg = "The site refused Lantern earlier in this run; no archived copy was found."
-                raise FetchError(msg, "refused")
-            return copy.page, copy
-        try:
-            return await self.tools.fetcher.fetch(url), None
-        except FetchError as error:
-            if error.kind == "robots":
-                self._robots_no.add(domain)
-            if any(sign in str(error) for sign in REFUSALS):
-                self._refusing.add(domain)
-            if archive is None or error.kind not in ARCHIVABLE:
-                raise
-            copy = await archive.copy(url)
-            if copy is None:
-                raise FetchError(f"{error} No archived copy was found.", error.kind) from error
-            self.note(
-                f"{domain}: {error} Read the Wayback Machine copy from "
-                f"{copy.archived_at:%d %b %Y} instead."
-            )
-            return copy.page, copy
+        return domain not in self._ctx.refusing or self.tools.archive is not None
 
     async def _triage(
         self, window: list[tuple[str, Candidate]], budget: int
@@ -582,45 +578,19 @@ class Investigator:
 
         async def one(url: str, cand: Candidate) -> Source | None:
             self._attempted.add(url)
-            domain = assessment.registrable_domain(url)
             async with limit:
-                try:
-                    page, copy = await self._read(url, domain)
-                except FetchError as error:
-                    self.inv.usage.pages_skipped += 1
-                    self.note(f"Skipped {domain}: {error}")
-                    self._page_lead(url, cand.refs, str(error))
-                    self._unread.append(f"{cand.hit.title[:160]} ({domain})")
-                    return None
-            extracted = await asyncio.to_thread(extract, page)
-            if extracted is None:
+                outcome = await self._call(
+                    "read_page", {"url": url}, cand.refs, "chosen from the search results"
+                )
+            drafts = outcome.result.sources if outcome.result else []
+            if not drafts:
                 self.inv.usage.pages_skipped += 1
-                self.note(f"Skipped {domain}: no readable text.")
-                self._page_lead(url, cand.refs, "Lantern found no readable text on the page.")
+                if outcome.status == "failed":
+                    self._page_lead(url, cand.refs, outcome.reason)
+                domain = assessment.registrable_domain(url)
+                self._unread.append(f"{cand.hit.title[:160]} ({domain})")
                 return None
-            # An archived copy is cited as the original page, read through the archive.
-            original = url if copy else page.url
-            grade, why = assessment.rate_source(original)
-            if copy:
-                why += "; read from a Wayback Machine copy"
-                self.inv.usage.archived += 1
-            return Source(
-                ref="",
-                url=original,
-                domain=assessment.registrable_domain(original),
-                origin=assessment.registrable_domain(original),
-                title=extracted.title,
-                published=extracted.published or cand.hit.published,
-                fetched_at=now(),
-                sha256=self.store.put_blob(page.body),
-                text_sha256=self.store.put_text(extracted.text),
-                size=len(page.body),
-                reliability=grade,
-                reliability_reason=why,
-                question_refs=sorted(cand.refs),
-                archive_url=copy.archive_url if copy else None,
-                archived_at=copy.archived_at if copy else None,
-            )
+            return self._page_source(drafts[0], cand)
 
         results = await asyncio.gather(*(one(url, cand) for url, cand in chosen))
         saved = []
@@ -634,26 +604,45 @@ class Investigator:
         self.note(f"Saved {len(saved)} pages with their sha256 fingerprints.")
         return saved
 
+    def _page_source(self, draft: SourceDraft, cand: Candidate) -> Source:
+        grade, why = assessment.rate_source(draft.url)
+        if draft.archive_url:
+            why += "; read from a Wayback Machine copy"
+            self.inv.usage.archived += 1
+        return Source(
+            ref="",
+            url=draft.url,
+            domain=assessment.registrable_domain(draft.url),
+            origin=draft.origin,
+            title=draft.title,
+            published=draft.published or cand.hit.published,
+            fetched_at=now(),
+            sha256=self.store.put_blob(draft.body),
+            text_sha256=self.store.put_text(draft.text),
+            size=len(draft.body),
+            reliability=grade,
+            reliability_reason=why,
+            question_refs=sorted(cand.refs),
+            archive_url=draft.archive_url,
+            archived_at=draft.archived_at,
+        )
+
     # ---- links Lantern lists but does not read -------------------------------------
 
     async def _find_leads(self) -> None:
         """Ask the search engine for posts on sites Lantern may not read; never open them."""
         refs = [question.ref for question in self.inv.questions]
         phrases = self._phrases[:2] or [self.inv.brief[:120]]
-        domains = sorted(POST_LINKS)
-        before = len(self.inv.leads)
         for phrase in phrases:
-            try:
-                hits = await self.tools.searcher.search(phrase, 10, domains=domains)
-            except SearchError as error:
-                self.note(f"Could not search social media sites for leads: {error}")
+            outcome = await self._call(
+                "post_links", {"phrase": phrase}, refs, "posts on sites Lantern may not read"
+            )
+            if outcome.result is None:
                 return
             self.inv.usage.searches += 1
-            for hit in hits:
+            for hit in outcome.result.hits:
                 for ref in refs:
                     self._post_lead(canonical(hit.url), ref)
-        found = len(self.inv.leads) - before
-        self.note(f"Searched X, Facebook, Instagram, Reddit and others for posts: {found} leads.")
 
     def _post_lead(self, url: str, ref: str) -> None:
         # Only the post link and platform are kept, never the hit's title or snippet.
@@ -686,23 +675,20 @@ class Investigator:
 
     async def _social(self) -> None:
         """Collect public posts about the event as ground reports (never account timelines)."""
-        social = self.tools.social
-        if social is None:
+        if self.tools.social is None:
             return
         self.note("Looking for ground reports in public social media posts.")
-        found: list[tuple[Post, list[str]]] = []
         everything = [question.ref for question in self.inv.questions]
         phrases = self._phrases[:2] or [
             (self._planned.get(q.ref) or [q.text])[0] for q in self.inv.questions
         ]
         phrases += [f"#{tag}" for tag in self._hashtags[:1]]
-        for phrase in phrases:
-            posts = await social.search(phrase, self.limits.posts_per_query)
-            self.note(f"Bluesky: searched “{phrase}” ({len(posts)} posts).")
-            found += [(post, everything) for post in posts]
-        for tag in self._hashtags:
-            posts = await social.hashtag(tag, self.limits.posts_per_query)
-            self.note(f"Mastodon: #{tag} ({len(posts)} public posts).")
+        searches = [{"phrase": phrase} for phrase in phrases]
+        searches += [{"hashtag": tag} for tag in self._hashtags]
+        found: list[tuple[SourceDraft, list[str]]] = []
+        for args in searches:
+            outcome = await self._call("social_search", dict(args), everything, "ground reports")
+            posts = outcome.result.sources if outcome.result else []
             found += [(post, everything) for post in posts]
         seen: set[str] = set()
         per_origin: dict[str, int] = {}
@@ -720,29 +706,22 @@ class Investigator:
         self.inv.usage.posts_saved = saved
         self.note(f"Saved {saved} posts as ground reports, with sha256 fingerprints.")
 
-    def _save_post(self, post: Post, refs: list[str]) -> None:
+    def _save_post(self, post: SourceDraft, refs: list[str]) -> None:
         # The saved copy keeps the post itself, not who wrote it.
-        record = {
-            "platform": post.platform,
-            "url": post.url,
-            "posted_at": post.posted_at,
-            "language": post.language,
-            "text": post.text,
-        }
-        body = json.dumps(record, ensure_ascii=False, sort_keys=True).encode()
+        platform = post.origin.split(":", 1)[0]
         self.inv.sources.append(
             Source(
                 ref=f"S{len(self.inv.sources) + 1}",
                 url=post.url,
-                domain=urlsplit(post.url).hostname or post.platform,
+                domain=urlsplit(post.url).hostname or platform,
                 kind="post",
                 origin=post.origin,
-                title=f"{post.platform.capitalize()} post",
-                published=post.posted_at or None,
+                title=post.title,
+                published=post.published,
                 fetched_at=now(),
-                sha256=self.store.put_blob(body),
+                sha256=self.store.put_blob(post.body),
                 text_sha256=self.store.put_text(post.text),
-                size=len(body),
+                size=len(post.body),
                 reliability="D",
                 reliability_reason="Social media post: an unverified ground report",
                 question_refs=sorted(refs),

@@ -332,3 +332,15 @@ Each stage is one pull request.
 
 - Plan written 2026-11-05.
 - 2026-11-05: owner approved decisions 1–4; token budgets and model routing by role added.
+- 2026-11-05: AG1a built. The five tools wrap the existing search, page reading and social
+  code, and the fixed rounds reach them only through the tool gateway. The 163 existing tests
+  pass unchanged; 20 new tests cover the registry, each gateway check and its order, pacing
+  with a fake clock, and the wrapped tools. Details settled while building:
+  - `RunBudget` lives in `tools/base.py`, because the registry's menu needs it too.
+  - `ToolContext` holds the sites that refused Lantern, or whose robots.txt said no, during
+    the run, so the archive rules stay exactly as they were.
+  - For the fixed rounds, the gateway's budget is a backstop (100 searches, twice the page
+    limit in reads): the rounds' own limits always stop first.
+  - Links written in the question are known to the gateway from the start.
+  - The log gains one line per page read; failed or refused calls are shown as
+    `tool “argument”: failed. reason`, the style the AG1b live log will use.
