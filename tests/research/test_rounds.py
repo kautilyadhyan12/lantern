@@ -4,11 +4,12 @@ from fastapi.testclient import TestClient
 
 from lantern.config import AppSettings
 from lantern.llm import ModelError, Provider
-from lantern.models import Investigation
+from lantern.models import Investigation, now
 from lantern.pipeline import Investigator, Limits, Tools
 from lantern.report import to_markdown
 from lantern.runtime import reading_order
 from lantern.store import Store
+from lantern.text import relevant_chunks
 from lantern.web.app import create_app
 
 from . import fakes
@@ -158,3 +159,91 @@ def test_the_web_form_sends_the_chosen_depth(tmp_path):
     )
     client.post("/api/investigations", json={"brief": "What happened in the floods?"})
     assert seen == ["quick", "deep"]
+
+
+async def test_every_model_call_is_told_todays_date(tmp_path):
+    model = FakeModel()
+    run, _ = investigate(tmp_path, model, Limits())
+    await run
+    today = now().date().isoformat()
+    for name in ("GateOut", "PlanOut", "ExtractOut", "AssessOut", "ReportOut"):
+        assert all(today in system for system in model.systems[name]), name
+
+
+async def test_the_list_of_items_never_shrinks_between_rounds(tmp_path, monkeypatch):
+    monkeypatch.setattr(fakes, "PAGES", {**fakes.PAGES, NEW_PAGE: NEW_TEXT})
+
+    class Forgetful(FakeModel):
+        async def structured(self, system, user, output):
+            out = await super().structured(system, user, output)
+            if output.__name__ == "InventoryOut" and self.calls.count("InventoryOut") > 1:
+                out.items = out.items[:1]  # a later answer forgets most items
+            return out
+
+    model = Forgetful(kinds=("fact", "list"), followups=[["second incident found dead"]])
+    run, _ = investigate(tmp_path, model, Limits.for_depth("deep"), DeepSearch())
+    inv = await run
+    first = model.prompts["InventoryOut"][0]
+    first_claims = {
+        line.split(" ")[0] for line in first.splitlines() if line[:1] == "C" and line[1:2].isdigit()
+    }
+    kept = {ref for item in inv.items for ref in item.claim_refs}
+    assert first_claims <= kept
+
+
+def test_long_pages_are_read_where_they_mention_the_question():
+    filler = "\n".join("Unrelated history paragraph about something else." for _ in range(400))
+    target = "The commander was found dead in Lahore, police said."
+    text = f"{filler}\n{target}\n{filler}"
+    parts = relevant_chunks(text, ["Which commanders were found dead in Lahore?"], size=3000)
+    assert len(parts) == 1
+    assert target in parts[0]
+
+
+async def test_a_site_that_refuses_once_is_not_asked_again(tmp_path):
+    class Refusing(FakeFetcher):
+        def __init__(self):
+            self.urls = []
+
+        async def fetch(self, url):
+            self.urls.append(url)
+            if "apnews.com" in url:
+                raise fakes.FetchError("The page returned HTTP 403.")
+            return await super().fetch(url)
+
+    class TwoAp(DeepSearch):
+        async def search(self, query, limit, domains=None, *, news=False, time_range=None):
+            if query == "second incident found dead":
+                self.options.append((query, news, time_range))
+                return [fakes.Hit(url="https://apnews.com/other", title="t", rank=1)]
+            return await super().search(query, limit, domains, news=news, time_range=time_range)
+
+    store = Store(tmp_path)
+    fetcher = Refusing()
+    tools = Tools(
+        model=FakeModel(followups=[["second incident found dead"]]),
+        searcher=TwoAp(),
+        fetcher=fetcher,
+    )
+    inv = Investigation(id=store.new_id(), brief="What happened in the district floods?")
+    await Investigator(inv, tools, store, Limits.for_depth("deep")).run()
+    assert [url for url in fetcher.urls if "apnews.com" in url] == ["https://apnews.com/floods"]
+
+
+async def test_a_cautious_triage_still_reads_half_the_budget(tmp_path, monkeypatch):
+    many = {
+        f"https://site{i}.example/report": fakes.PAGES["https://apnews.com/floods"]
+        for i in range(8)
+    }
+    monkeypatch.setattr(fakes, "PAGES", many)
+
+    class Cautious(FakeModel):
+        async def structured(self, system, user, output):
+            if output.__name__ == "TriageOut":
+                return output.model_validate({"read": ["H1"]})
+            return await super().structured(system, user, output)
+
+    run, _ = investigate(tmp_path, Cautious(), Limits(first_round_pages=6))
+    inv = await run
+    reading = next(step.message for step in inv.steps if step.message.startswith("Reading"))
+    assert reading == "Reading 3 pages."

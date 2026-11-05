@@ -29,7 +29,8 @@ PLAN = (
     "names, aliases and spellings, and where useful the local language of the place (for "
     "example Urdu, Hindi, Assamese, Arabic). Set news to true when the question is about "
     "events reported in the news, and time_range to the period it covers (day, week, month "
-    "or year), or null when it has no recent period. Also give up to three hashtags "
+    "or year), or null when it has no recent period. Only put a year in a query when it "
+    "helps, and then use the real years of that period. Also give up to three hashtags "
     "(without #) that people on the ground would use when posting about it on social media, "
     "and up to two short everyday phrases (two to four words, no dates) that such people "
     "would write in their posts; each phrase must contain the place or subject name, for "
@@ -61,7 +62,8 @@ EXTRACT = (
 
 TRIAGE = (
     f"{COMMON}\nYou are choosing which search results an investigator should read next. "
-    "Choose up to {count} results by their ref. Prefer results that report specific people, "
+    "Choose {count} results by their ref (fewer only when the rest are clearly unrelated). "
+    "Prefer results that report specific people, "
     "incidents, dates or places relevant to the key questions; primary and official "
     "sources; outlets independent of each other; and results about items not found yet or "
     "found in only one source. Skip copies of the same story, opinion pieces and unrelated "

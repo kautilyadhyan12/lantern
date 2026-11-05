@@ -59,3 +59,57 @@ def chunks(text: str, size: int = 10000, overlap: int = 400, limit: int = 1) -> 
             break
         start = max(end - overlap, start + 1)
     return parts
+
+
+_STOPWORDS = {
+    "which",
+    "what",
+    "when",
+    "where",
+    "who",
+    "whom",
+    "have",
+    "been",
+    "with",
+    "from",
+    "that",
+    "this",
+    "were",
+    "their",
+    "there",
+    "about",
+    "into",
+    "after",
+    "before",
+    "year",
+    "years",
+    "past",
+    "publicly",
+    "known",
+    "reported",
+    "they",
+    "them",
+    "these",
+    "those",
+    "does",
+}
+
+
+def relevant_chunks(text: str, terms: list[str], size: int = 10000, limit: int = 1) -> list[str]:
+    """The `limit` chunks of a long text that mention the given terms most, in page order."""
+    parts = chunks(text, size=size, limit=200)
+    if len(parts) <= limit:
+        return parts
+    words = {
+        word
+        for term in terms
+        for word in normalise(term)[0].split()
+        if len(word) > 3 and word not in _STOPWORDS
+    }
+
+    def score(part: str) -> int:
+        lowered = normalise(part)[0]
+        return sum(lowered.count(word) for word in words)
+
+    best = sorted(range(len(parts)), key=lambda index: (-score(parts[index]), index))[:limit]
+    return [parts[index] for index in sorted(best)]

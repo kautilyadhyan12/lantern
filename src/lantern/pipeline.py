@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from typing import Protocol
 from urllib.parse import urlsplit
 
+from pydantic import BaseModel
+
 from lantern import assessment, prompts
 from lantern.capture import extract
 from lantern.egress import FetchError, Page
@@ -27,7 +29,7 @@ from lantern.search import Hit, Searcher, SearchError, TimeRange
 from lantern.sites import POST_LINKS, canonical, post_lead, readable
 from lantern.social import Post, SocialSearch
 from lantern.store import Store
-from lantern.text import chunks, find_quote, normalise
+from lantern.text import find_quote, normalise, relevant_chunks
 
 log = logging.getLogger(__name__)
 
@@ -36,6 +38,7 @@ MAX_POST_LEADS = 12
 MAX_PAGE_LEADS = 15
 TRIAGE_WINDOW = 40
 CLAIMS_PER_PAGE = 12
+REFUSALS = ("HTTP 401", "HTTP 403", "HTTP 429", "robots.txt")  # the site said no: stop asking
 TIME_RANGES: dict[str, TimeRange] = {"day": "day", "week": "week", "month": "month", "year": "year"}
 
 
@@ -57,6 +60,7 @@ class Limits:
     max_posts: int = 8
     posts_per_query: int = 20
     posts_per_account: int = 2
+    chunks_per_page: int = 1
 
     @classmethod
     def for_depth(cls, depth: str, *, max_questions: int = 4, max_posts: int = 8) -> "Limits":
@@ -72,6 +76,7 @@ class Limits:
             round_pages=8,
             queries_per_question=3,
             results_per_query=8,
+            chunks_per_page=2,
         )
 
 
@@ -122,7 +127,21 @@ class Investigator:
         self._searched: list[str] = []
         self._searched_keys: set[str] = set()
         self._attempted: set[str] = set()
+        self._refusing: set[str] = set()  # sites that refused Lantern once in this run
         self._reading = asyncio.Semaphore(3)
+        self._today = now().date().isoformat()
+
+    async def _ask[T: BaseModel](
+        self, system: str, user: str, output: type[T], *, reading: bool = False
+    ) -> T:
+        """One model call. Every call is told today's date, so "the past year" and dates in
+        searches mean what the user means, not the model's training year."""
+        model = self.reader if reading else self.tools.model
+        dated = (
+            f"{system}\nToday's date is {self._today}. Interpret all periods and dates "
+            "relative to it, and never assume an earlier year."
+        )
+        return await model.structured(dated, user, output)
 
     def note(self, message: str) -> None:
         self.inv.log(message)
@@ -165,7 +184,7 @@ class Investigator:
         self.note("Checking the question against the safety rules.")
         reason = check_brief(self.inv.brief)
         if reason is None:
-            gate = await self.tools.model.structured(
+            gate = await self._ask(
                 prompts.GATE, f"Research question: {self.inv.brief}", prompts.GateOut
             )
             if not gate.allowed:
@@ -182,9 +201,7 @@ class Investigator:
         system = prompts.PLAN.format(
             count=f"2 to {self.limits.max_questions}", queries=self.limits.queries_per_question
         )
-        plan = await self.tools.model.structured(
-            system, f"Research question: {self.inv.brief}", prompts.PlanOut
-        )
+        plan = await self._ask(system, f"Research question: {self.inv.brief}", prompts.PlanOut)
         for number, item in enumerate(plan.questions[: self.limits.max_questions], start=1):
             question = Question(ref=f"Q{number}", text=item.text.strip(), kind=item.kind)
             self.inv.questions.append(question)
@@ -220,7 +237,7 @@ class Investigator:
         )
         system = prompts.FOLLOWUP.format(count=self.limits.followup_queries)
         try:
-            out = await self.tools.model.structured(system, user, prompts.FollowupOut)
+            out = await self._ask(system, user, prompts.FollowupOut)
         except QuotaError:
             raise
         except ModelError as error:
@@ -338,11 +355,16 @@ class Investigator:
             (url, cand)
             for url, cand in candidates
             if per_site[assessment.registrable_domain(url)] < PER_DOMAIN
+            and assessment.registrable_domain(url) not in self._refusing
         ]
         ranked = eligible
         if len(eligible) > budget:
-            picked = await self._triage(eligible[:TRIAGE_WINDOW], budget)
-            ranked = picked if picked else eligible
+            picked = await self._triage(eligible[:TRIAGE_WINDOW], budget) or []
+            # Read at least half the budget: top up with the search order if the model
+            # picked too few, so one cautious answer cannot starve a round.
+            minimum = (budget + 1) // 2
+            extra = [pair for pair in eligible if pair not in picked]
+            ranked = picked + extra[: max(0, minimum - len(picked))] if picked else eligible
         chosen = []
         for url, cand in ranked:
             site = assessment.registrable_domain(url)
@@ -371,9 +393,7 @@ class Investigator:
             f"Search results:\n" + "\n".join(lines)
         )
         try:
-            out = await self.tools.model.structured(
-                prompts.TRIAGE.format(count=budget), user, prompts.TriageOut
-            )
+            out = await self._ask(prompts.TRIAGE.format(count=budget), user, prompts.TriageOut)
         except QuotaError:
             raise
         except ModelError as error:
@@ -403,6 +423,8 @@ class Investigator:
                     self.inv.usage.pages_skipped += 1
                     self.note(f"Skipped {domain}: {error}")
                     self._page_lead(url, cand.refs, str(error))
+                    if any(sign in str(error) for sign in REFUSALS):
+                        self._refusing.add(domain)
                     return None
             extracted = await asyncio.to_thread(extract, page)
             if extracted is None:
@@ -581,7 +603,9 @@ class Investigator:
         refs = {question.ref for question in self.inv.questions}
         text = self.store.text(source.text_sha256) or ""
         found: dict[tuple[int, int], Claim] = {}
-        for part in chunks(text):
+        terms = [self.inv.brief, *(q.text for q in self.inv.questions)]
+        terms += [item.name for item in self.inv.items]
+        for part in relevant_chunks(text, terms, limit=self.limits.chunks_per_page):
             user = (
                 f'Key questions:\n{self._menu()}\n\n<page url="{source.url}" '
                 f'title="{source.title or ""}" published="{source.published or ""}">\n'
@@ -589,7 +613,7 @@ class Investigator:
             )
             async with self._reading:
                 try:
-                    out = await self.reader.structured(prompts.EXTRACT, user, prompts.ExtractOut)
+                    out = await self._ask(prompts.EXTRACT, user, prompts.ExtractOut, reading=True)
                 except QuotaError:
                     raise
                 except ModelError as error:
@@ -627,8 +651,8 @@ class Investigator:
             user = f"Key questions:\n{self._menu()}\n\n{body}"
             async with self._reading:
                 try:
-                    out = await self.reader.structured(
-                        prompts.EXTRACT_POSTS, user, prompts.ExtractPostsOut
+                    out = await self._ask(
+                        prompts.EXTRACT_POSTS, user, prompts.ExtractPostsOut, reading=True
                     )
                 except QuotaError:
                     raise
@@ -675,15 +699,20 @@ class Investigator:
             user = f"List-type key question {question.ref}: {question.text}\n\nClaims:\n"
             user += "\n".join(self._claim_line(claim) for claim in claims)
             try:
-                out = await self.tools.model.structured(
-                    prompts.INVENTORY, user, prompts.InventoryOut
-                )
+                out = await self._ask(prompts.INVENTORY, user, prompts.InventoryOut)
             except QuotaError:
                 raise
             except ModelError as error:
                 self.note(f"Could not update the list for {question.ref}: {error}")
                 continue
             items = self._items(question, claims, out)
+            # Never lose an item: keep any earlier item whose claims the new list left out.
+            covered = {ref for item in items for ref in item.claim_refs}
+            for old in [i for i in self.inv.items if i.question_ref == question.ref]:
+                if not covered & set(old.claim_refs):
+                    items.append(old)
+                    covered |= set(old.claim_refs)
+            items.sort(key=lambda item: (-len(item.origins), item.name.casefold()))
             self.inv.items = [i for i in self.inv.items if i.question_ref != question.ref] + items
             corroborated = sum(item.status == "corroborated" for item in items)
             self.note(
@@ -762,7 +791,7 @@ class Investigator:
             "Claims:\n" + "\n".join(self._claim_line(claim) for claim in claims)
         )
         try:
-            out = await self.tools.model.structured(prompts.ASSESS, user, prompts.AssessOut)
+            out = await self._ask(prompts.ASSESS, user, prompts.AssessOut)
         except QuotaError:
             raise
         except ModelError as error:
@@ -823,7 +852,7 @@ class Investigator:
                 f"{self._items_text(finding.question_ref)}{claims}"
             )
         user = f"Research question: {self.inv.brief}\n\nFindings:\n" + "\n\n".join(parts)
-        draft = await self.tools.model.structured(prompts.WRITE, user, prompts.ReportOut)
+        draft = await self._ask(prompts.WRITE, user, prompts.ReportOut)
         report: Report = verify(draft, self.inv)
         self.inv.report = report
         self.note(f"Checked every sentence: kept the cited ones, removed {len(report.removed)}.")

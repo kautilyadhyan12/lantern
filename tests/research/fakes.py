@@ -80,10 +80,12 @@ class FakeModel:
         self.followups = list(followups or [])
         self.calls: list[str] = []
         self.prompts: dict[str, list[str]] = {}
+        self.systems: dict[str, list[str]] = {}
 
     async def structured[T: BaseModel](self, system: str, user: str, output: type[T]) -> T:
         self.calls.append(output.__name__)
         self.prompts.setdefault(output.__name__, []).append(user)
+        self.systems.setdefault(output.__name__, []).append(system)
         data: object
         if output is prompts.GateOut:
             data = {"allowed": self.allowed, "reason": "The subject is a private individual."}
