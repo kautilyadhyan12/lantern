@@ -19,6 +19,7 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel
 
 from lantern import assessment, prompts
+from lantern.archive import ARCHIVABLE, Archive, Copy
 from lantern.capture import extract
 from lantern.egress import FetchError, Page
 from lantern.llm import Model, ModelError, QuotaError
@@ -100,6 +101,7 @@ class Tools:
     fetcher: PageFetcher
     social: SocialSearch | None = None
     reader: Model | None = None  # bulk page reading; defaults to `model`
+    archive: Archive | None = None  # archived copies of pages a site refused
 
 
 @dataclass(frozen=True)
@@ -152,6 +154,7 @@ class Investigator:
         self._searched_keys: set[str] = set()
         self._attempted: set[str] = set()
         self._refusing: set[str] = set()  # sites that refused Lantern once in this run
+        self._robots_no: set[str] = set()  # sites whose robots.txt said no: never archived
         # Headlines of results that could not be read, kept in memory only for follow-ups.
         self._unread: list[str] = []
         self._reading = asyncio.Semaphore(3)
@@ -443,7 +446,7 @@ class Investigator:
             (url, cand)
             for url, cand in candidates
             if per_site[assessment.registrable_domain(url)] < PER_DOMAIN
-            and assessment.registrable_domain(url) not in self._refusing
+            and self._worth_trying(assessment.registrable_domain(url))
         ]
         ranked = eligible
         if len(eligible) > budget:
@@ -463,6 +466,40 @@ class Investigator:
             if len(chosen) >= budget:
                 break
         return chosen
+
+    def _worth_trying(self, domain: str) -> bool:
+        """A site that refused is tried again only through its archived copies."""
+        if domain in self._robots_no:
+            return False
+        return domain not in self._refusing or self.tools.archive is not None
+
+    async def _read(self, url: str, domain: str) -> tuple[Page, Copy | None]:
+        """The page itself, or its Wayback Machine copy when the site refused or could not
+        be reached. Never an archive copy when robots.txt said no."""
+        archive = self.tools.archive
+        if domain in self._refusing and archive is not None:
+            copy = await archive.copy(url)
+            if copy is None:
+                msg = "The site refused Lantern earlier in this run; no archived copy was found."
+                raise FetchError(msg, "refused")
+            return copy.page, copy
+        try:
+            return await self.tools.fetcher.fetch(url), None
+        except FetchError as error:
+            if error.kind == "robots":
+                self._robots_no.add(domain)
+            if any(sign in str(error) for sign in REFUSALS):
+                self._refusing.add(domain)
+            if archive is None or error.kind not in ARCHIVABLE:
+                raise
+            copy = await archive.copy(url)
+            if copy is None:
+                raise FetchError(f"{error} No archived copy was found.", error.kind) from error
+            self.note(
+                f"{domain}: {error} Read the Wayback Machine copy from "
+                f"{copy.archived_at:%d %b %Y} instead."
+            )
+            return copy.page, copy
 
     async def _triage(
         self, window: list[tuple[str, Candidate]], budget: int
@@ -506,14 +543,12 @@ class Investigator:
             domain = assessment.registrable_domain(url)
             async with limit:
                 try:
-                    page = await self.tools.fetcher.fetch(url)
+                    page, copy = await self._read(url, domain)
                 except FetchError as error:
                     self.inv.usage.pages_skipped += 1
                     self.note(f"Skipped {domain}: {error}")
                     self._page_lead(url, cand.refs, str(error))
                     self._unread.append(f"{cand.hit.title[:160]} ({domain})")
-                    if any(sign in str(error) for sign in REFUSALS):
-                        self._refusing.add(domain)
                     return None
             extracted = await asyncio.to_thread(extract, page)
             if extracted is None:
@@ -521,12 +556,17 @@ class Investigator:
                 self.note(f"Skipped {domain}: no readable text.")
                 self._page_lead(url, cand.refs, "Lantern found no readable text on the page.")
                 return None
-            grade, why = assessment.rate_source(page.url)
+            # An archived copy is cited as the original page, read through the archive.
+            original = url if copy else page.url
+            grade, why = assessment.rate_source(original)
+            if copy:
+                why += "; read from a Wayback Machine copy"
+                self.inv.usage.archived += 1
             return Source(
                 ref="",
-                url=page.url,
-                domain=assessment.registrable_domain(page.url),
-                origin=assessment.registrable_domain(page.url),
+                url=original,
+                domain=assessment.registrable_domain(original),
+                origin=assessment.registrable_domain(original),
                 title=extracted.title,
                 published=extracted.published or cand.hit.published,
                 fetched_at=now(),
@@ -536,6 +576,8 @@ class Investigator:
                 reliability=grade,
                 reliability_reason=why,
                 question_refs=sorted(cand.refs),
+                archive_url=copy.archive_url if copy else None,
+                archived_at=copy.archived_at if copy else None,
             )
 
         results = await asyncio.gather(*(one(url, cand) for url, cand in chosen))

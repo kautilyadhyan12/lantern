@@ -10,6 +10,7 @@ import ipaddress
 import socket
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import Literal
 from urllib.parse import urljoin, urlsplit, urlunsplit
 from urllib.robotparser import RobotFileParser
 
@@ -23,8 +24,24 @@ ROBOTS_TTL = 24 * 3600.0
 HOST_INTERVAL = 1.0
 
 
+FailureKind = Literal[
+    "refused",  # the site answered with an HTTP error (blocked, missing, server error)
+    "unreachable",  # timeouts, connection failures, unknown host
+    "robots",  # robots.txt says automated reading is not allowed
+    "blocked_site",  # a site whose terms forbid automated reading
+    "unsafe",  # scheme, port, credentials or a private address
+    "unsupported",  # not a web page or plain text
+    "too_large",
+    "other",
+]
+
+
 class FetchError(Exception):
     """A page could not be fetched; the message says why in plain words."""
+
+    def __init__(self, message: str, kind: FailureKind = "other") -> None:
+        super().__init__(message)
+        self.kind: FailureKind = kind
 
 
 @dataclass(frozen=True)
@@ -44,8 +61,10 @@ def is_public(address: str) -> bool:
 
 
 async def system_resolver(host: str, port: int) -> list[str]:
+    """Every address of `host`, IPv4 first: many networks cannot reach IPv6."""
     infos = await asyncio.get_running_loop().getaddrinfo(host, port, type=socket.SOCK_STREAM)
-    return sorted({str(info[4][0]) for info in infos})
+    found = {str(info[4][0]) for info in infos}
+    return sorted(found, key=lambda address: (ipaddress.ip_address(address).version, address))
 
 
 class Fetcher:
@@ -81,25 +100,27 @@ class Fetcher:
     async def close(self) -> None:
         await self._client.aclose()
 
-    async def fetch(self, url: str) -> Page:
-        """Fetch a page that robots.txt allows; only text and HTML are accepted."""
+    async def fetch(self, url: str, accept: tuple[str, ...] = TEXT_TYPES) -> Page:
+        """Fetch a page that robots.txt allows; only the `accept` content types are kept."""
         status, headers, body, final = await self._follow(url, robots=True)
         if status != 200:
-            raise FetchError(f"The page returned HTTP {status}.")
+            raise FetchError(f"The page returned HTTP {status}.", "refused")
         content_type = headers.get("content-type", "").split(";")[0].strip().lower()
-        if content_type not in TEXT_TYPES:
+        if content_type not in accept:
             shown = content_type or "unknown"
-            raise FetchError(f"Lantern reads web pages and plain text only, not {shown}.")
+            msg = f"Lantern reads web pages and plain text only, not {shown}."
+            raise FetchError(msg, "unsupported")
         return Page(url=final, content_type=content_type, body=body)
 
     async def _follow(self, url: str, *, robots: bool) -> tuple[int, httpx.Headers, bytes, str]:
         for _ in range(MAX_REDIRECTS + 1):
             reason = self._blocked(url) if self._blocked else None
             if reason:
-                raise FetchError(reason)
+                raise FetchError(reason, "blocked_site")
             await self._target(url)
             if robots and not await self._allowed(url):
-                raise FetchError("The site's robots.txt does not allow automated reading.")
+                msg = "The site's robots.txt does not allow automated reading."
+                raise FetchError(msg, "robots")
             status, headers, body = await self._once(url)
             location = headers.get("location")
             if status in {301, 302, 303, 307, 308} and location:
@@ -113,18 +134,19 @@ class Fetcher:
         parts = urlsplit(url)
         host = parts.hostname
         if parts.scheme not in {"http", "https"} or not host:
-            raise FetchError("Only http and https web addresses can be fetched.")
+            raise FetchError("Only http and https web addresses can be fetched.", "unsafe")
         if parts.username or parts.password:
-            raise FetchError("Web addresses with embedded credentials are refused.")
+            raise FetchError("Web addresses with embedded credentials are refused.", "unsafe")
         port = parts.port or (443 if parts.scheme == "https" else 80)
         if port not in ALLOWED_PORTS:
-            raise FetchError("Only the standard web ports (80 and 443) are allowed.")
+            raise FetchError("Only the standard web ports (80 and 443) are allowed.", "unsafe")
         try:
             addresses = await self._resolver(host, port)
         except OSError as error:
-            raise FetchError(f"The site {host} could not be found.") from error
+            raise FetchError(f"The site {host} could not be found.", "unreachable") from error
         if not addresses or not all(is_public(address) for address in addresses):
-            raise FetchError(f"{host} points to a private or internal address; refused.")
+            msg = f"{host} points to a private or internal address; refused."
+            raise FetchError(msg, "unsafe")
         address = addresses[0]
         netloc = f"[{address}]:{port}" if ":" in address else f"{address}:{port}"
         pinned = urlunsplit((parts.scheme, netloc, parts.path or "/", parts.query, ""))
@@ -144,9 +166,10 @@ class Fetcher:
             async with asyncio.timeout(self._total_timeout):
                 return await self._read(pinned, headers, extensions)
         except TimeoutError as error:
-            raise FetchError("The site took too long to answer.") from error
+            raise FetchError("The site took too long to answer.", "unreachable") from error
         except httpx.HTTPError as error:
-            raise FetchError(f"Could not connect to {host}: {type(error).__name__}.") from error
+            msg = f"Could not connect to {host}: {type(error).__name__}."
+            raise FetchError(msg, "unreachable") from error
 
     async def _read(
         self, url: str, headers: dict[str, str], extensions: dict[str, str]
@@ -159,7 +182,8 @@ class Fetcher:
                 body.extend(piece)
                 if len(body) > self._max_bytes:
                     limit = self._max_bytes // 1_000_000
-                    raise FetchError(f"The page is larger than {limit} MB; skipped.")
+                    msg = f"The page is larger than {limit} MB; skipped."
+                    raise FetchError(msg, "too_large")
             return response.status_code, response.headers, bytes(body)
         finally:
             await response.aclose()
@@ -184,9 +208,11 @@ class Fetcher:
                 status, _, body, _ = await self._follow(f"{key}/robots.txt", robots=False)
             except FetchError as error:
                 msg = f"Could not check the site's robots.txt ({error}); skipped."
-                raise FetchError(msg) from error
+                kind = error.kind if error.kind in {"unsafe", "blocked_site"} else "unreachable"
+                raise FetchError(msg, kind) from error
             if status >= 500:
-                return False
+                msg = f"The site's robots.txt could not be read (HTTP {status}); skipped."
+                raise FetchError(msg, "unreachable")
             parser.parse(body.decode("utf-8", "replace").splitlines() if status == 200 else [])
             cached = (now, parser)
             self._robots[key] = cached

@@ -153,8 +153,10 @@
         <td class="ref">{{ s.ref }}</td>
         <td><a href="/investigations/{{ inv.id }}/sources/{{ s.ref }}">{{ s.title or s.domain }}</a>
           {% if s.kind == "post" %}<span class="badge">ground report</span>{% endif %}
+          {% if s.archive_url %}<span class="badge">archived copy</span>{% endif %}
           <div class="muted">{{ s.domain }}{% if s.kind == "post" and s.published %} · posted {{ s.published[:16] | replace("T", " ") }} UTC{% endif %}
-            · <a href="{{ s.url }}" rel="noopener noreferrer nofollow" target="_blank">original</a></div></td>
+            · <a href="{{ s.url }}" rel="noopener noreferrer nofollow" target="_blank">original</a>
+            {% if s.archive_url %}· <a href="{{ s.archive_url }}" rel="noopener noreferrer nofollow" target="_blank">Wayback copy, {{ s.archived_at.strftime("%d %b %Y") }}</a>{% endif %}</div></td>
         <td><span class="grade g-{{ s.reliability }}" title="{{ reliability[s.reliability] }}: {{ s.reliability_reason }}">{{ s.reliability }}</span></td>
         <td>{{ s.fetched_at.strftime("%d %b %H:%M") }}</td>
         <td><code title="{{ s.sha256 }}">{{ s.sha256[:12] }}…</code></td>
@@ -225,6 +227,9 @@
       <li>{{ inv.usage.posts_saved }} public social media posts saved as ground reports, from
         Bluesky search and Mastodon hashtags. Only posts about the event are searched, never
         anyone's account; authors' names are not stored, and each account counts once as a source.</li>
+      {% if inv.usage.archived %}<li>{{ inv.usage.archived }} page{{ "" if inv.usage.archived == 1 else "s" }} read from Internet
+        Archive (Wayback Machine) copies, because the site refused Lantern or could not be reached.
+        Archive copies are never used when a site's robots.txt says no.</li>{% endif %}
       <li>{{ inv.claims | length }} claims anchored to exact quotes; {{ inv.usage.claims_dropped }}
         proposed claims dropped because their quote was not found word for word.</li>
       <li>Source grades use the Admiralty scale (A–F) from fixed rules. Likelihood uses the
@@ -251,6 +256,7 @@
   <p class="card-statement">{{ claim.statement }}</p>
   <blockquote>“{{ claim.quote }}”</blockquote>
   {% if src %}
+  {% if src.archive_url %}<p class="muted">Read from the Wayback Machine copy captured {{ src.archived_at.strftime("%d %b %Y") }}, because the site refused Lantern or could not be reached.</p>{% endif %}
   {% if src.kind == "post" %}<p class="muted">Ground report from a public social media post{% if src.published %}, posted {{ src.published[:16] | replace("T", " ") }} UTC{% endif %}. Unverified unless other sources confirm it.</p>{% endif %}
   <p class="muted">{{ src.ref }} · {{ src.title or src.domain }} · {{ src.domain }} ·
     grade {{ src.reliability }} ({{ reliability[src.reliability] }}) ·

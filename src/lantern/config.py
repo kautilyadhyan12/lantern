@@ -49,5 +49,6 @@ class AppSettings(BaseSettings):
     max_questions: int = 4
     max_llm_calls: int = 100
     social_enabled: bool = True
+    archive_enabled: bool = True
     max_posts: int = 8
     mastodon_instance: str = "https://mastodon.social"

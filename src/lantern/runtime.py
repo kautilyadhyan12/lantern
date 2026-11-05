@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 
+from lantern.archive import Wayback
 from lantern.config import AppSettings
 from lantern.egress import Fetcher
 from lantern.llm import Gateway, ModelError, Provider
@@ -100,7 +101,15 @@ async def run_investigation(
         else None
     )
     try:
-        tools = Tools(model=model, searcher=searcher, fetcher=fetcher, social=social, reader=reader)
+        archive = Wayback(fetcher) if settings.archive_enabled else None
+        tools = Tools(
+            model=model,
+            searcher=searcher,
+            fetcher=fetcher,
+            social=social,
+            reader=reader,
+            archive=archive,
+        )
         return await Investigator(investigation, tools, store, limits, on_change).run()
     except SearchError as error:
         investigation.status, investigation.error = "failed", str(error)
