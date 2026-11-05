@@ -26,6 +26,7 @@ MAX_REDIRECTS = 5
 TEXT_TYPES = ("text/html", "application/xhtml+xml", "text/plain")
 ROBOTS_TTL = 24 * 3600.0
 HOST_INTERVAL = 1.0
+PAGE_ACCEPT = "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.1"
 
 
 FailureKind = Literal[
@@ -122,7 +123,7 @@ class Fetcher:
         """Download from an official data service: an API or a published data file. No
         robots.txt check (see the module docstring); every other check applies, with this
         call's own size cap and time limit."""
-        limits = (max_bytes, seconds)
+        limits = (max_bytes, seconds, f"{', '.join(accept)}, */*;q=0.1")
         status, headers, body, final = await self._follow(url, robots=False, limits=limits)
         if status != 200:
             raise FetchError(f"The data service answered HTTP {status}.", "refused")
@@ -135,7 +136,7 @@ class Fetcher:
         return Page(url=final, content_type=content_type, body=body)
 
     async def _follow(
-        self, url: str, *, robots: bool, limits: tuple[int, float] | None = None
+        self, url: str, *, robots: bool, limits: tuple[int, float, str] | None = None
     ) -> tuple[int, httpx.Headers, bytes, str]:
         for _ in range(MAX_REDIRECTS + 1):
             reason = self._blocked(url) if self._blocked else None
@@ -177,17 +178,20 @@ class Fetcher:
         return pinned, host, port, address
 
     async def _once(
-        self, url: str, limits: tuple[int, float] | None = None
+        self, url: str, limits: tuple[int, float, str] | None = None
     ) -> tuple[int, httpx.Headers, bytes]:
+        """One request. `limits` (size cap, seconds, Accept header) override the defaults."""
         pinned, host, port, _ = await self._target(url)
         parts = urlsplit(url)
         headers = {
             "Host": host if parts.port is None else f"{host}:{port}",
             "User-Agent": self._agent,
-            "Accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.1",
+            "Accept": limits[2] if limits else PAGE_ACCEPT,
         }
         extensions = {"sni_hostname": host} if parts.scheme == "https" else {}
-        max_bytes, timeout = limits or (self._max_bytes, self._total_timeout)
+        max_bytes, timeout = (
+            (limits[0], limits[1]) if limits else (self._max_bytes, self._total_timeout)
+        )
         await self._pace(host)
         try:
             async with asyncio.timeout(timeout):

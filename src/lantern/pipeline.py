@@ -217,11 +217,12 @@ class Investigator:
         """Records are looked up only for a name written in the research question or in the
         evidence found so far, never for a name the model brings itself."""
         fields = args.model_dump()
-        wanted = " ".join(name_words(str(fields.get("name") or fields.get("query") or "")))
+        asked = fields.get("name") or fields.get("query") or fields.get("domain") or ""
+        wanted = " ".join(name_words(str(asked)))
         texts = [self.inv.brief, *(q.text for q in self.inv.questions)]
         texts += [text for c in self.inv.claims for text in (c.statement, c.quote)]
         texts += [i.name for i in self.inv.items] + [m.name for m in self.inv.mentions]
-        texts += [source.title or "" for source in self.inv.sources]
+        texts += [text for s in self.inv.sources for text in (s.title or "", s.url)]
         if wanted and any(f" {wanted} " in f" {' '.join(name_words(t))} " for t in texts):
             return None
         return (

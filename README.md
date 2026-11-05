@@ -14,8 +14,10 @@ You ask a question. Lantern:
    up to four tool calls with a one-line reason each: web and news search (within the
    period the question covers, and in local languages where useful), social media ground
    reports, links to posts, reading a page, the official US (OFAC) and UN Security Council
-   sanctions lists, and Wikipedia and Wikidata for background and other names and
-   spellings. The reasons are shown live. A tool gateway
+   sanctions lists, Wikipedia and Wikidata for background and other names and spellings,
+   the GLEIF register of legal entities (identifiers and parent companies), and domain
+   registry records over RDAP (when a site was registered, and by which registrar, never
+   who registered it). The reasons are shown live. A tool gateway
    checks every call before it runs: the tool must exist, the arguments must be valid, a
    page to read must be a link Lantern already knows, social media is searched only for the
    question's subject, records are looked up only for names already in the evidence, and
@@ -64,6 +66,10 @@ You ask a question. Lantern:
 10. **Continues when asked.** "Continue investigating" on a finished report gives the agent
    up to two more rounds and 16 more pages on the same investigation, skipping searches and pages already done, keeping
    everything found, and rewriting the report.
+
+To compare finished investigations side by side (answers, items, corroboration, pages,
+posts, records, links, tokens, minutes), with no network or AI calls:
+`uv run python -m scripts.compare_runs <id> <id> ...`.
 
 ## Try it
 

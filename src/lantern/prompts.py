@@ -64,8 +64,9 @@ EXTRACT = (
     "related, add relation: subject and object written exactly as in the quote, their kinds "
     "(organisation, person_public_role, place, event) and one relation: member_of, "
     "leader_of, founded, designated_by, linked_to, alias_of, killed_in, located_in, "
-    "reported_by. Never a relation about a private individual or about anyone's religion, "
-    "ethnicity, caste, health, sexuality, political opinion or union membership."
+    "reported_by, subsidiary_of. Never a relation about a private individual or about "
+    "anyone's religion, ethnicity, caste, health, sexuality, political opinion or union "
+    "membership."
 )
 
 TRIAGE = (
@@ -281,7 +282,9 @@ RESEARCH = (
     "on sites Lantern cannot read. Use sanctions_search when an organisation or person in "
     "the case file may be designated or banned, and wiki_lookup for background and for the "
     "other names and spellings of an organisation, place or public figure, then search those "
-    "names; give both a name exactly as the case file writes it. "
+    "names; use company_lookup for a company's official register entry and parent "
+    "companies, and domain_lookup for when a website's domain was registered and by which "
+    "registrar; give these tools a name or domain exactly as the case file writes it. "
     "Lantern has already searched social media and post links "
     "once with the planned phrases, so use those tools only with new phrases. read_page "
     "only reads links Lantern already knows. Never repeat a search already made. When a "
