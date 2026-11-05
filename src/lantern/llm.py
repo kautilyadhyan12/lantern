@@ -6,6 +6,7 @@ against a Pydantic model. An invalid reply gets one retry with the error, then f
 
 import asyncio
 import json
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -14,7 +15,9 @@ from pydantic import BaseModel, ValidationError
 
 from lantern.models import Usage
 
-MAX_WAIT = 65.0
+MAX_WAIT = 65.0  # a longer wait means the free allowance is used up for now
+PATIENCE = 180.0  # seconds one step keeps retrying busy providers before it gives up
+MAX_ATTEMPTS = 30
 
 
 class ModelError(Exception):
@@ -53,6 +56,7 @@ class Provider:
     available_at: float = 0.0
     extra: dict[str, str] = field(default_factory=dict)
     problem: str | None = None
+    last_failure: str = ""  # what went wrong on the latest failed call, in plain words
 
 
 class _TooLargeError(Exception):
@@ -64,13 +68,16 @@ class Model(Protocol):
 
 
 class Gateway:
-    def __init__(
+    def __init__(  # noqa: PLR0913  # clock and sleep are injectable so tests need no real waits
         self,
         providers: list[Provider],
         usage: Usage,
         max_calls: int,
         transport: httpx.AsyncBaseTransport | None = None,
         tokens: TokenBudget | None = None,
+        *,
+        clock: Callable[[], float] | None = None,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
         if not providers:
             msg = "No AI model is configured. Set LANTERN_GROQ_API_KEY or LANTERN_CEREBRAS_API_KEY."
@@ -79,6 +86,8 @@ class Gateway:
         self._usage = usage
         self._max_calls = max_calls
         self._tokens = tokens
+        self._clock = clock or (lambda: asyncio.get_running_loop().time())
+        self._sleep = sleep
         self._client = httpx.AsyncClient(
             transport=transport, timeout=httpx.Timeout(120.0, connect=10.0)
         )
@@ -125,11 +134,13 @@ class Gateway:
             phase = "research" if self._tokens.researching else "this investigation"
             msg = f"The AI token budget for {phase} is used up ({used:,} tokens)."
             raise BudgetError(msg)
-        loop = asyncio.get_running_loop()
+        start = self._clock()
         too_large: set[str] = set()
-        for _attempt in range(8):
+        for _attempt in range(MAX_ATTEMPTS):
             usable = [
-                item for item in self._providers if not item.problem and item.name not in too_large
+                item
+                for item in self._providers
+                if not item.problem and _label(item) not in too_large
             ]
             if not usable:
                 problems = [
@@ -139,7 +150,7 @@ class Gateway:
                 msg = f"No AI provider could take this step: {'; '.join(problems)}."
                 raise ModelError(msg)
             provider = min(usable, key=lambda item: item.available_at)
-            wait = provider.available_at - loop.time()
+            wait = provider.available_at - self._clock()
             if wait > MAX_WAIT:
                 names = ", ".join(item.name for item in usable)
                 msg = (
@@ -147,20 +158,27 @@ class Gateway:
                     "try again later or tomorrow."
                 )
                 raise QuotaError(msg)
+            if self._clock() - start + max(0.0, wait) > PATIENCE:
+                break
             if wait > 0:
-                await asyncio.sleep(wait)
+                await self._sleep(wait)
             try:
                 result = await self._call(provider, messages)
             except _TooLargeError:
-                too_large.add(provider.name)
+                too_large.add(_label(provider))
                 continue
             if result is not None:
                 return result
-        msg = "The AI providers kept failing. Try again in a few minutes."
+        failures = "; ".join(
+            f"{_label(item)}: {item.last_failure}" for item in self._providers if item.last_failure
+        )
+        msg = (
+            f"The AI providers kept failing for {(self._clock() - start) / 60:.0f} minutes "
+            f"({failures or 'no answer'}). Try again in a few minutes."
+        )
         raise ModelError(msg)
 
     async def _call(self, provider: Provider, messages: list[dict[str, str]]) -> str | None:
-        loop = asyncio.get_running_loop()
         body: dict[str, object] = {
             "model": provider.model,
             "messages": messages,
@@ -174,12 +192,15 @@ class Gateway:
                 json=body,
                 headers={"Authorization": f"Bearer {provider.api_key}"},
             )
-        except httpx.HTTPError:
-            provider.available_at = loop.time() + 5
+        except httpx.HTTPError as error:
+            provider.available_at = self._clock() + 5
+            provider.last_failure = f"could not be reached ({type(error).__name__})"
             return None
         if response.status_code == 429 or response.status_code >= 500:
             retry = _retry_after(response)
-            provider.available_at = loop.time() + (retry if retry is not None else 10.0)
+            provider.available_at = self._clock() + (retry if retry is not None else 10.0)
+            busy = "busy or rate-limited" if response.status_code == 429 else "server error"
+            provider.last_failure = f"HTTP {response.status_code}, {busy}"
             return None
         if response.status_code in {401, 403}:
             key = f"LANTERN_{provider.name.upper()}_API_KEY"
@@ -197,11 +218,16 @@ class Gateway:
         usage = data.get("usage") or {}
         self._usage.tokens_in += int(usage.get("prompt_tokens") or 0)
         self._usage.tokens_out += int(usage.get("completion_tokens") or 0)
-        label = f"{provider.name}:{provider.model}"
+        label = _label(provider)
+        provider.last_failure = ""
         if label not in self._usage.providers:
             self._usage.providers.append(label)
         content = data["choices"][0]["message"].get("content") or ""
         return _strip_fences(str(content))
+
+
+def _label(provider: Provider) -> str:
+    return f"{provider.name}:{provider.model}"
 
 
 def _retry_after(response: httpx.Response) -> float | None:

@@ -507,9 +507,14 @@ def test_runtime_choices():
     assert [p.model for p in order] == ["small", "big"]
     assert fast_order([], AppSettings()) == []
     quick = Investigation(id="a", brief="x", depth="quick")
-    assert budget_for(quick, resume=False) is QUICK
-    assert budget_for(quick, resume=True) is CONTINUE
-    assert budget_for(Investigation(id="a", brief="x"), resume=False) is DEEP
+    defaults = AppSettings()
+    assert budget_for(quick, defaults, resume=False) == QUICK
+    assert budget_for(quick, defaults, resume=True) == CONTINUE
+    assert budget_for(Investigation(id="a", brief="x"), defaults, resume=False) == DEEP
+    small = AppSettings(quick_tokens=20_000, deep_tokens=70_000, continue_tokens=10_000)
+    assert budget_for(quick, small, resume=False).tokens == 20_000
+    assert budget_for(quick, small, resume=True).tokens == 10_000
+    assert budget_for(Investigation(id="a", brief="x"), small, resume=False).tokens == 70_000
 
 
 async def test_the_agent_is_used_unless_switched_off(tmp_path, monkeypatch):
@@ -643,3 +648,21 @@ def test_single_source_items_are_named_for_corroboration():
     assert "Found in only one source so far (search one by name for a second source): " in view
     assert "Embankment collapse." in view
     assert "only one source" not in views.question_view(question, 1, [], None, [])
+
+
+async def test_an_empty_item_list_from_the_fast_model_is_asked_again(tmp_path):
+    class Lazy(Researcher):
+        async def structured(self, system, user, output):
+            if output is prompts.InventoryOut:
+                self.calls.append(output.__name__)
+                return output.model_validate({"items": []})
+            return await super().structured(system, user, output)
+
+    thinker, fast = Researcher(kinds=("fact", "list")), Lazy()
+    runner, _, _ = agent(tmp_path, thinker, fast=fast)
+    inv = await runner.run()
+    assert inv.status == "done", inv.error
+    assert "InventoryOut" in fast.calls
+    assert "InventoryOut" in thinker.calls
+    assert [item for item in inv.items if item.question_ref == "Q2"]
+    assert any("the fast model listed no usable items" in s.message for s in inv.steps)

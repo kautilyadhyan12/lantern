@@ -31,9 +31,11 @@ class Budget:
     tokens: int
 
 
-QUICK = Budget("Quick look", rounds=1, pages=10, tool_calls=15, seconds=300, tokens=60_000)
-DEEP = Budget("Deep investigation", rounds=6, pages=30, tool_calls=60, seconds=900, tokens=200_000)
-CONTINUE = Budget("Continuation", rounds=2, pages=16, tool_calls=25, seconds=480, tokens=100_000)
+# Token limits are the defaults of the settings LANTERN_QUICK_TOKENS, LANTERN_DEEP_TOKENS and
+# LANTERN_CONTINUE_TOKENS, kept low because the free AI allowances are small.
+QUICK = Budget("Quick look", rounds=1, pages=10, tool_calls=15, seconds=300, tokens=40_000)
+DEEP = Budget("Deep investigation", rounds=6, pages=30, tool_calls=60, seconds=900, tokens=100_000)
+CONTINUE = Budget("Continuation", rounds=2, pages=16, tool_calls=25, seconds=480, tokens=50_000)
 
 
 @dataclass(frozen=True)

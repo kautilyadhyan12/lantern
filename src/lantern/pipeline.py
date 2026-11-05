@@ -915,14 +915,10 @@ class Investigator:
                 continue
             user = f"List-type key question {question.ref}: {question.text}\n\nClaims:\n"
             user += "\n".join(self._claim_line(claim) for claim in claims)
-            try:
-                out = await self._ask(prompts.INVENTORY, user, prompts.InventoryOut, role="fast")
-            except QuotaError:
-                raise
-            except ModelError as error:
-                self.note(f"Could not update the list for {question.ref}: {error}")
+            drafted = await self._draft_items(question, claims, user)
+            if drafted is None:
                 continue
-            items = self._items(question, claims, out)
+            items = drafted
             # Never lose an item: keep any earlier item whose claims the new list left out.
             covered = {ref for item in items for ref in item.claim_refs}
             for old in [i for i in self.inv.items if i.question_ref == question.ref]:
@@ -943,6 +939,31 @@ class Investigator:
                 f"{question.ref}: {len(current)} items found so far ({corroborated} corroborated, "
                 f"{len(current) - corroborated} from a single source{note})."
             )
+
+    async def _draft_items(
+        self, question: Question, claims: list[Claim], user: str
+    ) -> list[Item] | None:
+        """The items the claims describe, drafted by the fast model. When it fails or lists
+        nothing usable, the main model is asked once. None when no model could answer."""
+        roles: list[Role] = ["fast", "think"] if self.tools.fast is not None else ["think"]
+        drafted: list[Item] | None = None
+        problem = ""
+        for role in roles:
+            try:
+                out = await self._ask(prompts.INVENTORY, user, prompts.InventoryOut, role=role)
+            except QuotaError:
+                raise
+            except ModelError as error:
+                problem = str(error)
+                continue
+            drafted = self._items(question, claims, out)
+            if drafted:
+                break
+            if role == "fast":
+                self.note(f"{question.ref}: the fast model listed no usable items; asking again.")
+        if drafted is None:
+            self.note(f"Could not update the list for {question.ref}: {problem}")
+        return drafted
 
     def _items(
         self, question: Question, claims: list[Claim], out: prompts.InventoryOut

@@ -169,23 +169,24 @@ def test_pages_are_shared_across_steps():
 
 
 def test_depth_budgets_match_the_plan():
+    # Token limits were lowered by the owner on 2026-11-05 to save free AI allowance.
     assert (QUICK.rounds, QUICK.pages, QUICK.tool_calls, QUICK.seconds, QUICK.tokens) == (
         1,
         10,
         15,
         300,
-        60_000,
+        40_000,
     )
     assert (DEEP.rounds, DEEP.pages, DEEP.tool_calls, DEEP.seconds, DEEP.tokens) == (
         6,
         30,
         60,
         900,
-        200_000,
+        100_000,
     )
     assert (CONTINUE.rounds, CONTINUE.pages, CONTINUE.tool_calls, CONTINUE.tokens) == (
         2,
         16,
         25,
-        100_000,
+        50_000,
     )

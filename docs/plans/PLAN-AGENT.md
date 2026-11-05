@@ -405,3 +405,19 @@ Each stage is one pull request.
   of 8 calls. Each researcher step names the items found in only one source, and the
   researcher is told to search one of them for a second source. A short re-check (one pair
   of quick looks) remains to do when there is free quota.
+- 2026-11-05: re-check of the sweep, one agent quick look on the Lashkar-e-Taiba question,
+  capped at 40k tokens by the owner. It used about 25k tokens. Posts and post links came
+  back to the fixed rounds' level (8 posts and 12 links, against 0 and 2 before the fix),
+  with 11 claims. Two other problems showed up:
+  - The report was not written. The run stopped at "Writing the report" with "The AI
+    providers kept failing", exactly where a fixed run had failed an hour earlier. Both
+    providers answered normally a minute later. The likely cause is Groq's 8,000 tokens a
+    minute, after two assessments in a row, combined with a retry limit of 8 attempts. Fix:
+    the model gateway now keeps retrying busy providers for up to 3 minutes (at most 30
+    attempts), and its final error names what each provider answered.
+  - The item list stayed empty, although the claims named four people. The fast model
+    returned no usable items. Fix: when it fails or lists nothing usable, the main model is
+    asked once.
+- 2026-11-05: owner decision: lower token limits, because this is a demo on free
+  allowances. Quick look 40k, deep 100k, continue 50k. They are now settings
+  (`LANTERN_QUICK_TOKENS`, `LANTERN_DEEP_TOKENS`, `LANTERN_CONTINUE_TOKENS`).
