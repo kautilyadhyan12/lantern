@@ -260,6 +260,8 @@ async def test_the_log_shows_each_step_and_the_report_lists_tools_and_steps(tmp_
     assert inv.stopped_by == "Every key question was answered or closed."
     markdown = to_markdown(inv)
     assert "## Method" in markdown
+    assert f"took {inv.usage.research_steps} steps over 2 rounds," in markdown
+    assert inv.usage.rounds == 2  # Q2 closes in round 2, after Q1 closed in round 1
     assert "news_search (2), post_links (1), read_page (4), social_search (1), web_search (2)" in (
         markdown
     )

@@ -184,11 +184,16 @@ def _method_lines(investigation: Investigation) -> list[str]:
         "## Method",
         "",
         (
-            f"- A researcher agent took {usage.research_steps} steps over {usage.rounds} "
-            "rounds, choosing its own tool calls; code checked every call before it ran."
+            f"- A researcher agent took {_count(usage.research_steps, 'step')} over "
+            f"{_count(usage.rounds, 'round')}, choosing its own tool calls; code checked every "
+            "call before it ran."
         ),
         f"- Tools used: {tools or 'none'}.",
     ]
     if investigation.stopped_by:
         lines.append(f"- What ended research: {investigation.stopped_by}")
     return [*lines, ""]
+
+
+def _count(number: int, noun: str) -> str:
+    return f"{number} {noun}{'' if number == 1 else 's'}"

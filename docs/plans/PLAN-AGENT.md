@@ -379,3 +379,11 @@ Each stage is one pull request.
     budget binds first.
   - AG1b-AC8 (the six-run comparison) is still to do. It needs free quota over two or three
     days, so the fixed rounds stay until it is recorded here.
+- 2026-11-05: AG1b live check, a quick look on the 2026 Assam floods (the AG1a check's
+  topic): 2 researcher steps, 4 searches and 1 social search, 8 pages saved (1 from a
+  Wayback Machine copy), 1 post, 32 anchored claims, 3 items (1 corroborated), both key
+  questions answered (high and moderate confidence), about 36k model tokens, 1.8 minutes.
+  All three routes were used: gpt-oss-120b, gpt-oss-20b for triage and item lists, Gemini for
+  reading. Compared with the AG1a fixed quick run, the agent saved fewer posts (1 against
+  8) and listed no post links, because it chose one hashtag search and no `post_links`
+  call. AG1b-AC8 will show whether this matters over deep runs.
