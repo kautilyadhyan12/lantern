@@ -344,3 +344,6 @@ Each stage is one pull request.
   - Links written in the question are known to the gateway from the start.
   - The log gains one line per page read; failed or refused calls are shown as
     `tool “argument”: failed. reason`, the style the AG1b live log will use.
+- 2026-11-05: AG1a live check, a quick run on the 2026 Assam floods: 6 searches, 9 pages read
+  (3 from Wayback Machine copies), 8 posts, 13 leads, 34 anchored claims, both key questions
+  answered, about 37k model tokens.
