@@ -22,7 +22,18 @@ from lantern import assessment, prompts
 from lantern.capture import extract
 from lantern.egress import FetchError, Page
 from lantern.llm import Model, ModelError, QuotaError
-from lantern.models import Claim, Finding, Investigation, Item, Lead, Question, Report, Source, now
+from lantern.models import (
+    Claim,
+    Finding,
+    Investigation,
+    Item,
+    Lead,
+    Mention,
+    Question,
+    Report,
+    Source,
+    now,
+)
 from lantern.report import strip_refs, verify
 from lantern.safety import check_brief
 from lantern.search import Hit, Searcher, SearchError, TimeRange
@@ -37,6 +48,8 @@ PER_DOMAIN = 3  # pages per site in one investigation, so corroboration stays in
 MAX_POST_LEADS = 12
 MAX_PAGE_LEADS = 15
 TRIAGE_WINDOW = 40
+DISCOVER_WINDOW = 60
+MAX_MENTIONS = 40
 CLAIMS_PER_PAGE = 12
 REFUSALS = ("HTTP 401", "HTTP 403", "HTTP 429", "robots.txt")  # the site said no: stop asking
 TIME_RANGES: dict[str, TimeRange] = {"day": "day", "week": "week", "month": "month", "year": "year"}
@@ -104,6 +117,17 @@ class Candidate:
     refs: set[str]
 
 
+def same_item(first: str, second: str) -> bool:
+    """Whether two names probably mean the same item: one contains the other's words, or
+    they share two or more words (spellings and middle names vary)."""
+
+    def words(name: str) -> set[str]:
+        return {word for word in normalise(name)[0].replace("-", " ").split() if len(word) > 2}
+
+    a, b = words(first), words(second)
+    return bool(a and b) and (a <= b or b <= a or len(a & b) >= 2)
+
+
 class Investigator:
     def __init__(
         self,
@@ -164,6 +188,7 @@ class Investigator:
                     await self._round(number, queries)
                     if self._pages_left() <= 0:
                         break
+                self._settle_mentions()
                 await self._assess()
                 await self._write()
                 self.inv.status = "done"
@@ -278,6 +303,9 @@ class Investigator:
                 lines.append(f"  item: {item.name} — {item.status}, {len(item.origins)} sources")
             if not items:
                 lines += [f"  claim: {claim.statement[:160]}" for claim in claims[:12]]
+            for mention in [m for m in self._unconfirmed() if m.question_ref == question.ref]:
+                when = f" ({mention.when})" if mention.when else ""
+                lines.append(f"  seen only in search results, not confirmed: {mention.name}{when}")
         return "\n".join(lines)
 
     # ---- one research round -------------------------------------------------------
@@ -291,6 +319,7 @@ class Investigator:
     async def _round(self, number: int, queries: list[Query]) -> None:
         self.inv.usage.rounds = number
         candidates = await self._search(queries)
+        await self._discover(candidates)
         size = self.limits.first_round_pages if number == 1 else self.limits.round_pages
         chosen = await self._choose(candidates, min(size, self._pages_left()))
         sources = await self._fetch(chosen)
@@ -347,6 +376,61 @@ class Investigator:
             if index < len(group)
         ]
         return [(url, candidates[url]) for url in ordered]
+
+    async def _discover(self, candidates: list[tuple[str, Candidate]]) -> None:
+        """Note every item the search results name, so later rounds can chase each one."""
+        lists = [question.ref for question in self.inv.questions if question.kind == "list"]
+        if not lists or not candidates:
+            return
+        window = candidates[:DISCOVER_WINDOW]
+        lines = []
+        for number, (url, cand) in enumerate(window, start=1):
+            when = f", {cand.hit.published}" if cand.hit.published else ""
+            lines.append(
+                f"H{number} [{assessment.registrable_domain(url)}{when}] "
+                f"{cand.hit.title[:150]} — {cand.hit.snippet[:220]}"
+            )
+        user = f"Key questions:\n{self._menu()}\n\nSearch results:\n" + "\n".join(lines)
+        try:
+            out = await self._ask(prompts.DISCOVER, user, prompts.DiscoverOut)
+        except QuotaError:
+            raise
+        except ModelError as error:
+            self.note(f"Could not scan the search results for names: {error}")
+            return
+        index = {f"H{number}": url for number, (url, _) in enumerate(window, start=1)}
+        spotted = []
+        for entry in out.items:
+            name = entry.name.strip()
+            urls = [index[r] for r in (x.strip().upper() for x in entry.results) if r in index]
+            if not name or not urls:
+                continue  # a name no result actually mentions is not kept
+            ref = entry.question_ref.strip().upper()
+            self._mention(name, ref if ref in lists else lists[0], entry.when.strip(), urls)
+            spotted.append(name)
+        if spotted:
+            shown = ", ".join(spotted[:12]) + ("…" if len(spotted) > 12 else "")
+            self.note(f"Spotted {len(spotted)} possible items in the search results: {shown}.")
+
+    def _mention(self, name: str, ref: str, when: str, urls: list[str]) -> None:
+        for mention in self.inv.mentions:
+            if mention.question_ref == ref and same_item(mention.name, name):
+                mention.urls = list(dict.fromkeys(mention.urls + urls))[:5]
+                mention.when = mention.when or when
+                return
+        if len(self.inv.mentions) < MAX_MENTIONS:
+            self.inv.mentions.append(Mention(question_ref=ref, name=name, when=when, urls=urls[:5]))
+
+    def _unconfirmed(self) -> list[Mention]:
+        return [
+            mention
+            for mention in self.inv.mentions
+            if not any(same_item(item.name, mention.name) for item in self.inv.items)
+        ]
+
+    def _settle_mentions(self) -> None:
+        """Keep only mentions no read page confirmed; the confirmed ones are items now."""
+        self.inv.mentions = self._unconfirmed()
 
     async def _choose(
         self, candidates: list[tuple[str, Candidate]], budget: int

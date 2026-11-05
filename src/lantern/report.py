@@ -3,7 +3,7 @@
 import re
 
 from lantern.assessment import CONFIDENCE_WORDS, LIKELIHOOD, RELIABILITY, TERMS
-from lantern.models import Investigation, Removed, Report, Section, Sentence
+from lantern.models import Finding, Investigation, Removed, Report, Section, Sentence
 from lantern.prompts import ReportOut, SentenceOut
 
 _INLINE = re.compile(r"\s*[\[(]\s*((?:C\d+\s*[,;]?\s*)+)[\])]")
@@ -69,38 +69,12 @@ def _cited(sentence: Sentence) -> str:
 def to_markdown(investigation: Investigation) -> str:
     """The report as Markdown, with the claims and sources it relies on."""
     report = investigation.report or Report()
-    ranges = dict(LIKELIHOOD)
     lines = [f"# {investigation.brief}", "", f"Status: {investigation.status}.", ""]
     if investigation.status == "refused":
         return "\n".join([*lines, f"Refused: {investigation.safety}", ""])
     lines += ["## Bottom line", "", *(_cited(s) for s in report.bottom_line), ""]
     for finding in investigation.findings:
-        question = investigation.question(finding.question_ref)
-        lines += [f"## {finding.question_ref}. {question.text if question else ''}", ""]
-        if finding.status == "answered":
-            section = next(
-                (s for s in report.sections if s.question_ref == finding.question_ref), None
-            )
-            lines += [_cited(s) for s in section.sentences] if section else []
-            likelihood = finding.likelihood or ""
-            lines += [
-                "",
-                f"- Answer: {finding.answer}",
-                f"- Likelihood: {likelihood} ({ranges.get(likelihood, '')})",
-                f"- Analytic confidence: {finding.confidence} — {finding.confidence_reason}.",
-            ]
-        else:
-            lines.append(f"Could not be determined. {finding.answer}")
-        items = [i for i in investigation.items if i.question_ref == finding.question_ref]
-        if items:
-            lines += ["", f"### Everything found ({len(items)})", ""]
-            lines += [
-                f"- **{item.name}** ({item.when or 'date unknown'}) — {item.summary} "
-                f"*({item.status}; {len(item.origins)} "
-                f"sources; best grade {item.best_grade}; {', '.join(item.claim_refs)})*"
-                for item in items
-            ]
-        lines.append("")
+        lines += _finding_lines(investigation, report, finding)
     if report.gaps:
         lines += ["## What could not be determined", "", *(f"- {gap}" for gap in report.gaps), ""]
     lines += ["## Claims", ""]
@@ -147,3 +121,42 @@ def to_markdown(investigation: Investigation) -> str:
         "",
     ]
     return "\n".join(lines)
+
+
+def _finding_lines(investigation: Investigation, report: Report, finding: Finding) -> list[str]:
+    """One key question's section: sentences, assessment, items and unconfirmed mentions."""
+    ranges = dict(LIKELIHOOD)
+    lines: list[str] = []
+    question = investigation.question(finding.question_ref)
+    lines += [f"## {finding.question_ref}. {question.text if question else ''}", ""]
+    if finding.status == "answered":
+        section = next((s for s in report.sections if s.question_ref == finding.question_ref), None)
+        lines += [_cited(s) for s in section.sentences] if section else []
+        likelihood = finding.likelihood or ""
+        lines += [
+            "",
+            f"- Answer: {finding.answer}",
+            f"- Likelihood: {likelihood} ({ranges.get(likelihood, '')})",
+            f"- Analytic confidence: {finding.confidence} — {finding.confidence_reason}.",
+        ]
+    else:
+        lines.append(f"Could not be determined. {finding.answer}")
+    items = [i for i in investigation.items if i.question_ref == finding.question_ref]
+    if items:
+        lines += ["", f"### Everything found ({len(items)})", ""]
+        lines += [
+            f"- **{item.name}** ({item.when or 'date unknown'}) — {item.summary} "
+            f"*({item.status}; {len(item.origins)} "
+            f"sources; best grade {item.best_grade}; {', '.join(item.claim_refs)})*"
+            for item in items
+        ]
+    mentions = [m for m in investigation.mentions if m.question_ref == finding.question_ref]
+    if mentions:
+        lines += ["", f"### Also seen in search results, not confirmed ({len(mentions)})", ""]
+        lines += [
+            f"- {mention.name} ({mention.when or 'date unknown'}): "
+            + ", ".join(f"<{url}>" for url in mention.urls)
+            for mention in mentions
+        ]
+    lines.append("")
+    return lines

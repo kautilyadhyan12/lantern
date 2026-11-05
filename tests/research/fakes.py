@@ -116,6 +116,13 @@ class FakeModel:
                 "queries": [{"query": q, "question_ref": "Q2", "news": True} for q in queries],
                 "done": not queries,
             }
+        elif output is prompts.DiscoverOut:
+            data = {
+                "items": [
+                    {"name": "Embankment collapse", "question_ref": "Q2", "results": ["H1"]},
+                    {"name": "Invented from memory", "question_ref": "Q2", "results": []},
+                ]
+            }
         elif output is prompts.InventoryOut:
             groups: dict[str, list[str]] = {}
             for line in user.splitlines():

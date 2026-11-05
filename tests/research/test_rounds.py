@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from lantern.config import AppSettings
 from lantern.llm import ModelError, Provider
 from lantern.models import Investigation, Item, now
-from lantern.pipeline import Investigator, Limits, Tools
+from lantern.pipeline import Investigator, Limits, Tools, same_item
 from lantern.report import to_markdown
 from lantern.runtime import reading_order
 from lantern.store import Store
@@ -286,3 +286,51 @@ async def test_blocked_headlines_guide_follow_ups_but_are_never_saved(tmp_path):
     saved = "".join(path.read_text("utf-8", "replace") for path in store.root.rglob("*.*"))
     assert fakes.HIT_TITLE not in saved
     assert inv.status == "done"
+
+
+def test_same_item_matches_spelling_variants_but_not_different_people():
+    assert same_item("Muhammad Sarwar", "Chaudhry Muhammad Sarwar")
+    assert same_item("Bilal Arif Sarafi", "Bilal Arif Salafi")
+    assert not same_item("Muhammad Sarwar", "Muhammad Hanif")
+    assert not same_item("", "Anyone")
+
+
+async def test_names_in_search_results_become_unconfirmed_mentions(tmp_path):
+    model = FakeModel(kinds=("fact", "list"))
+    run, store = investigate(tmp_path, model, Limits())
+    inv = await run
+    assert [m.name for m in inv.mentions] == ["Embankment collapse"]  # the invented one is dropped
+    assert inv.mentions[0].urls == ["https://www.reuters.com/floods"]
+    saved = (store.root / "investigations" / f"{inv.id}.json").read_text()
+    assert fakes.HIT_TITLE not in saved
+    assert fakes.HIT_SNIPPET not in saved
+    settings = AppSettings(data_dir=str(tmp_path), tavily_api_key="t", groq_api_key="g")
+    page = TestClient(create_app(settings)).get(f"/investigations/{inv.id}").text
+    assert "Also seen in search results, not confirmed" in page
+    assert "### Also seen in search results" in to_markdown(inv)
+
+
+async def test_unconfirmed_mentions_are_chased_and_confirmed_ones_become_items(tmp_path):
+    class Confirms(FakeModel):
+        async def structured(self, system, user, output):
+            out = await super().structured(system, user, output)
+            if output.__name__ == "InventoryOut":
+                out.items[0].name = "Embankment collapse"
+            return out
+
+    model = Confirms(kinds=("fact", "list"), followups=[["second incident found dead"]])
+    run, _ = investigate(tmp_path, model, Limits.for_depth("deep"), DeepSearch())
+    inv = await run
+    follow_up = model.prompts["FollowupOut"][0]
+    assert "item: Embankment collapse" in follow_up
+    assert "not confirmed: Embankment collapse" not in follow_up
+    assert any(item.name == "Embankment collapse" for item in inv.items)
+    assert inv.mentions == []
+
+
+async def test_follow_ups_are_told_about_unconfirmed_mentions(tmp_path):
+    model = FakeModel(kinds=("fact", "list"), followups=[["second incident found dead"]])
+    run, _ = investigate(tmp_path, model, Limits.for_depth("deep"), DeepSearch())
+    await run
+    follow_up = model.prompts["FollowupOut"][0]
+    assert "seen only in search results, not confirmed: Embankment collapse" in follow_up

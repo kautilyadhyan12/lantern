@@ -56,6 +56,18 @@ class Lead(BaseModel):
     reason: str = ""
 
 
+class Mention(BaseModel):
+    """A possible item named in search results that no page Lantern read has confirmed.
+
+    Only the name, the period as reported and the result links are kept, never the
+    results' titles or snippets. Mentions are leads, not evidence."""
+
+    question_ref: str
+    name: str
+    when: str = ""
+    urls: list[str] = Field(default_factory=list)
+
+
 class Item(BaseModel):
     """One thing found for a list question (a person, incident or event), with its evidence."""
 
@@ -143,6 +155,7 @@ class Investigation(BaseModel):
     sources: list[Source] = Field(default_factory=list)
     leads: list[Lead] = Field(default_factory=list)
     items: list[Item] = Field(default_factory=list)
+    mentions: list[Mention] = Field(default_factory=list)
     claims: list[Claim] = Field(default_factory=list)
     findings: list[Finding] = Field(default_factory=list)
     report: Report | None = None

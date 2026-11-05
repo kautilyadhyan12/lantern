@@ -24,7 +24,9 @@ PLAN = (
     f"{COMMON}\nYou are planning an investigation. Split the research question into "
     "{count} key questions that together answer it, each answerable from public sources. "
     "Set a key question's kind to 'list' when it asks for every instance of something "
-    "(every person, incident or event), otherwise 'fact'. For each key question give up "
+    "(every person, incident or event), otherwise 'fact'. Never split one list into "
+    "overlapping list questions: ask for the whole list once, and use fact questions for "
+    "details such as circumstances or responses. For each key question give up "
     "to {queries} varied web search queries (keywords, not sentences): different wordings, "
     "names, aliases and spellings, and where useful the local language of the place (for "
     "example Urdu, Hindi, Assamese, Arabic). Set news to true when the question is about "
@@ -77,11 +79,23 @@ FOLLOWUP = (
     "to corroborate them; search for further items not found yet (other names, aliases and "
     "spellings, other places and dates, and other ways the same kind of event is described, "
     "such as 'found dead' or 'died mysteriously' for 'killed'); local-language searches; and "
-    "primary sources such as police, officials, courts and official statements. Headlines "
+    "primary sources such as police, officials, courts and official statements. Items seen "
+    "only in search results are not confirmed yet: search each by name to find a page that "
+    "can be read. Headlines "
     "of pages that could not be read are listed: search for those people and incidents on "
     "other outlets. Never "
     "repeat a search already made. Set news to true for searches about reported events. "
     "Set done to true when nothing important is missing."
+)
+
+DISCOVER = (
+    f"{COMMON}\nYou are scanning search results the way an investigator scans headlines. "
+    "List every specific item (one person, incident or event) that may answer the "
+    "list-type key questions and is named in the titles or snippets below. Merge different "
+    "spellings of the same item. For each give its name as written, the key question ref, "
+    "when it happened as stated (or 'unknown') and the refs of the results that mention "
+    "it. Only list what the results actually name; never add anything from memory. Leave "
+    "out items clearly outside the period the question asks about."
 )
 
 INVENTORY = (
@@ -175,6 +189,17 @@ class ItemDraft(BaseModel):
     summary: str = Field(min_length=1, max_length=600)
     when: str = Field(default="", max_length=80)
     claims: list[str]
+
+
+class Spotted(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    question_ref: str = ""
+    when: str = Field(default="", max_length=80)
+    results: list[str] = Field(default_factory=list)
+
+
+class DiscoverOut(BaseModel):
+    items: list[Spotted] = Field(default_factory=list)
 
 
 class InventoryOut(BaseModel):

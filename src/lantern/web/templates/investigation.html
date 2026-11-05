@@ -108,6 +108,19 @@
     </table>
     </div>
     {% endif %}
+    {% set mentions = inv.mentions | selectattr("question_ref", "equalto", finding.question_ref) | list %}
+    {% if mentions %}
+    <h4 class="items-title">Also seen in search results, not confirmed: {{ mentions | length }}</h4>
+    <p class="muted">Named in search result headlines, but no page Lantern could read confirms them,
+      often because the site blocks automated reading. They are leads, not evidence: open the
+      results to check.</p>
+    <ul class="leads">
+      {% for mention in mentions %}
+      <li><b>{{ mention.name }}</b>{% if mention.when %} <span class="muted">({{ mention.when }})</span>{% endif %} —
+        {% for url in mention.urls %}<a href="{{ url }}" rel="noopener noreferrer nofollow" target="_blank">result {{ loop.index }}</a>{{ ", " if not loop.last }}{% endfor %}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
   </section>
   {% endfor %}
 
