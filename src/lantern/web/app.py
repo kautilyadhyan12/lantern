@@ -146,6 +146,7 @@ def create_app(  # noqa: PLR0915  # routes share one store and settings via clos
             "inv": item,
             "nodes": nodes,
             "edges": edges,
+            "namesakes": linkmap.namesakes(item.entities),
             "entity": {entity.ref: entity for entity in item.entities},
             "map_size": (linkmap.WIDTH, linkmap.HEIGHT),
             "claims": {claim.ref: claim for claim in item.claims},

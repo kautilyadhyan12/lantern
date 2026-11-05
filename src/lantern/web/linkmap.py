@@ -5,6 +5,7 @@ import math
 from collections import Counter
 from dataclasses import dataclass
 
+from lantern.core.graph import name_key
 from lantern.models import Entity, Investigation, Link
 
 WIDTH, HEIGHT, MARGIN = 960, 560, 60
@@ -101,3 +102,16 @@ def view(inv: Investigation) -> tuple[list[Node], list[Edge]]:
         for link in links
     ]
     return nodes, edges
+
+
+def namesakes(entities: list[Entity]) -> list[tuple[str, int]]:
+    """Names shared by several people who stay apart because nothing anchors them together,
+    with how many separate people carry each."""
+    holders: dict[str, set[str]] = {}
+    for entity in entities:
+        if entity.kind == "person_public_role":
+            for name in (entity.name, *entity.aliases):
+                holders.setdefault(name_key(name), set()).add(entity.ref)
+    groups = {frozenset(refs) for refs in holders.values() if len(refs) > 1}
+    shown = {entity.ref: entity.name for entity in entities}
+    return sorted((shown[min(group, key=lambda ref: int(ref[1:]))], len(group)) for group in groups)

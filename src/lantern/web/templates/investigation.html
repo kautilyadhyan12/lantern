@@ -159,6 +159,9 @@
       records. People are joined only through an anchor (an official ID, an explicit
       "also known as", the same source, or the same role in the same organisation), never on a
       name alone. Select a line to see its evidence.</p>
+    {% if namesakes %}<p class="muted">Shown as separate people because no official ID, "also
+      known as" claim, shared source or shared role connects them, so they may or may not be the
+      same person: {% for name, count in namesakes %}{{ name }} ({{ count }} people){{ "; " if not loop.last }}{% endfor %}.</p>{% endif %}
     <div class="map-filters" id="map-filters">
       <span>Show:</span>
       {% for kind in ["organisation", "person_public_role", "place", "event"] %}

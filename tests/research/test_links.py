@@ -374,6 +374,17 @@ def test_the_layout_is_deterministic_and_inside_the_drawing(tmp_path):
     assert linkmap.view(Investigation(id="x", brief="y")) == ([], [])
 
 
+def test_people_sharing_a_name_without_an_anchor_are_explained():
+    entities = [
+        Entity(ref="E1", kind=PERSON, name="HAFIZ MUHAMMAD SAEED", ids=["un:QDi.263"]),
+        Entity(ref="E2", kind=PERSON, name="Hafiz Muhammad Saeed", ids=["wikidata:Q2735272"]),
+        Entity(ref="E3", kind=PERSON, name="SAEED, Muhammad", aliases=["SAEED, Hafiz Muhammad"]),
+        Entity(ref="E4", kind=PERSON, name="KHAN, Hafiz Saeed"),
+        Entity(ref="E5", kind=ORG, name="Saeed Trust"),
+    ]
+    assert linkmap.namesakes(entities) == [("HAFIZ MUHAMMAD SAEED", 3)]
+
+
 def test_a_page_without_links_has_no_map(tmp_path):
     store = Store(tmp_path)
     inv = Investigation(id=store.new_id(), brief="Floods?", status="done")
