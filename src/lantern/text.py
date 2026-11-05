@@ -138,3 +138,18 @@ def topic_words(*texts: str) -> set[str]:
                 found.add("".join(word))
             word = []
     return found
+
+
+def name_words(text: str) -> list[str]:
+    """The words of a name in lower case, without accents or punctuation, so "IQBAL,
+    Muhammad", "Muhammad Iqbal" and "muḥammad iqbal" share their words."""
+    decomposed = unicodedata.normalize("NFKD", text.casefold())
+    plain = "".join(char for char in decomposed if not unicodedata.combining(char))
+    words, word = [], []
+    for char in f"{plain} ":
+        if char.isalnum():
+            word.append(char)
+        elif word:
+            words.append("".join(word))
+            word = []
+    return words

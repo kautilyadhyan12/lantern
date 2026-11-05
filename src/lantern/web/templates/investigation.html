@@ -163,6 +163,7 @@
         <td class="ref">{{ s.ref }}</td>
         <td><a href="/investigations/{{ inv.id }}/sources/{{ s.ref }}">{{ s.title or s.domain }}</a>
           {% if s.kind == "post" %}<span class="badge">ground report</span>{% endif %}
+          {% if s.kind == "record" %}<span class="badge">official record</span>{% endif %}
           {% if s.archive_url %}<span class="badge">archived copy</span>{% endif %}
           <div class="muted">{{ s.domain }}{% if s.kind == "post" and s.published %} · posted {{ s.published[:16] | replace("T", " ") }} UTC{% endif %}
             · <a href="{{ s.url }}" rel="noopener noreferrer nofollow" target="_blank">original</a>

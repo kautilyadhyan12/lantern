@@ -55,5 +55,6 @@ class AppSettings(BaseSettings):
     continue_tokens: int = 50_000  # AI tokens one continuation may use
     social_enabled: bool = True
     archive_enabled: bool = True
+    records_enabled: bool = True  # the agent's sanctions-list and Wikidata tools
     max_posts: int = 8
     mastodon_instance: str = "https://mastodon.social"

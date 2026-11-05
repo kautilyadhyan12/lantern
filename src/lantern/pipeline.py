@@ -39,10 +39,10 @@ from lantern.search import Hit, Searcher, SearchError, TimeRange
 from lantern.sites import canonical, post_lead, readable
 from lantern.social import SocialSearch
 from lantern.store import Store
-from lantern.text import find_quote, normalise, relevant_chunks, topic_words
+from lantern.text import find_quote, name_words, normalise, relevant_chunks, topic_words
 from lantern.tools.adapters.social import SocialArgs, SocialPosts
 from lantern.tools.adapters.web import NewsSearch, PageFetcher, PostLinks, ReadPage, WebSearch
-from lantern.tools.base import RunBudget, SourceDraft, ToolCall, ToolContext
+from lantern.tools.base import RunBudget, SourceDraft, Tool, ToolCall, ToolContext
 from lantern.tools.gateway import Outcome, ToolGateway
 from lantern.tools.registry import Registry
 
@@ -103,6 +103,7 @@ class Tools:
     reader: Model | None = None  # bulk page reading; defaults to `model`
     archive: Archive | None = None  # archived copies of pages a site refused
     fast: Model | None = None  # triage and item lists, on a separate free quota
+    records: tuple[Tool, ...] = ()  # official records and reference tools (the agent's)
     tokens: TokenBudget | None = None  # the model gateways' shared token budget
 
 
@@ -164,7 +165,10 @@ class Investigator:
             self._budget(),
             self._given(),
             self.note,
-            checks={"social_search": self._on_topic},
+            checks={
+                "social_search": self._on_topic,
+                **{tool.name: self._in_evidence for tool in tools.records},
+            },
         )
         # Headlines of results that could not be read, kept in memory only for follow-ups.
         self._unread: list[str] = []
@@ -184,6 +188,8 @@ class Investigator:
         )
         if tools.social is not None:
             registry.register(SocialPosts(tools.social, self.limits.posts_per_query))
+        for tool in tools.records:
+            registry.register(tool)
         return registry
 
     def _budget(self) -> RunBudget:
@@ -203,6 +209,22 @@ class Investigator:
         return (
             "Lantern searches social media only for the subject of the research question. Use "
             f"a phrase with its place or subject name{example}."
+        )
+
+    def _in_evidence(self, args: BaseModel) -> str | None:
+        """Records are looked up only for a name written in the research question or in the
+        evidence found so far, never for a name the model brings itself."""
+        fields = args.model_dump()
+        wanted = " ".join(name_words(str(fields.get("name") or fields.get("query") or "")))
+        texts = [self.inv.brief, *(q.text for q in self.inv.questions)]
+        texts += [text for c in self.inv.claims for text in (c.statement, c.quote)]
+        texts += [i.name for i in self.inv.items] + [m.name for m in self.inv.mentions]
+        texts += [source.title or "" for source in self.inv.sources]
+        if wanted and any(f" {wanted} " in f" {' '.join(name_words(t))} " for t in texts):
+            return None
+        return (
+            "Lantern looks up records only for names that appear in the research question or "
+            "in the evidence found so far. Use the name exactly as the case file writes it."
         )
 
     def _given(self) -> set[str]:

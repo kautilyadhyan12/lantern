@@ -3,6 +3,7 @@
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import replace
+from pathlib import Path
 
 from lantern.agent.loop import Agent
 from lantern.archive import Wayback
@@ -16,6 +17,9 @@ from lantern.search import SearchError, TavilySearch
 from lantern.sites import blocked_site
 from lantern.social import PublicSocial
 from lantern.store import Store
+from lantern.tools.adapters.sanctions import SanctionsSearch
+from lantern.tools.adapters.wiki import WikiLookup
+from lantern.tools.base import Tool
 
 GROQ = "https://api.groq.com/openai/v1"
 
@@ -77,6 +81,15 @@ def fast_order(found: list[Provider], settings: AppSettings) -> list[Provider]:
     return [fast, *found]
 
 
+def record_tools(settings: AppSettings, fetcher: Fetcher) -> tuple[Tool, ...]:
+    """The agent's official-record tools: sanctions lists (cached a day under the data
+    folder) and Wikipedia/Wikidata background."""
+    if not settings.records_enabled:
+        return ()
+    lists = Path(settings.data_dir) / "cache" / "lists"
+    return (SanctionsSearch(fetcher, lists), WikiLookup(fetcher))
+
+
 def budget_for(investigation: Investigation, settings: AppSettings, *, resume: bool) -> Budget:
     """The agent's budget: a continuation gets its own; otherwise by the chosen depth. The
     token limits come from settings."""
@@ -126,6 +139,7 @@ async def open_tools(
             archive=Wayback(fetcher) if settings.archive_enabled else None,
             fast=fast,
             tokens=tokens,
+            records=record_tools(settings, fetcher) if tokens else (),
         )
     finally:
         await model.close()

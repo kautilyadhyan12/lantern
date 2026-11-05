@@ -3,6 +3,10 @@
 Every hop is checked: http(s) on standard ports, every resolved address public, the
 connection pinned to the checked address (no DNS rebinding), robots.txt obeyed, the
 bot identified, per-host pacing, timeouts and a size cap.
+
+Official data services (sanctions lists, Wikipedia and Wikidata APIs) are read with
+`fetch_data`: the same checks except robots.txt, which governs crawling ordinary web pages
+(invariant 7), not documented APIs and downloads published for automated use.
 """
 
 import asyncio
@@ -112,7 +116,27 @@ class Fetcher:
             raise FetchError(msg, "unsupported")
         return Page(url=final, content_type=content_type, body=body)
 
-    async def _follow(self, url: str, *, robots: bool) -> tuple[int, httpx.Headers, bytes, str]:
+    async def fetch_data(
+        self, url: str, accept: tuple[str, ...], *, max_bytes: int, seconds: float = 60.0
+    ) -> Page:
+        """Download from an official data service: an API or a published data file. No
+        robots.txt check (see the module docstring); every other check applies, with this
+        call's own size cap and time limit."""
+        limits = (max_bytes, seconds)
+        status, headers, body, final = await self._follow(url, robots=False, limits=limits)
+        if status != 200:
+            raise FetchError(f"The data service answered HTTP {status}.", "refused")
+        content_type = headers.get("content-type", "").split(";")[0].strip().lower()
+        if content_type not in accept:
+            shown = content_type or "unknown"
+            raise FetchError(
+                f"The data service sent {shown}, not the expected data.", "unsupported"
+            )
+        return Page(url=final, content_type=content_type, body=body)
+
+    async def _follow(
+        self, url: str, *, robots: bool, limits: tuple[int, float] | None = None
+    ) -> tuple[int, httpx.Headers, bytes, str]:
         for _ in range(MAX_REDIRECTS + 1):
             reason = self._blocked(url) if self._blocked else None
             if reason:
@@ -121,7 +145,7 @@ class Fetcher:
             if robots and not await self._allowed(url):
                 msg = "The site's robots.txt does not allow automated reading."
                 raise FetchError(msg, "robots")
-            status, headers, body = await self._once(url)
+            status, headers, body = await self._once(url, limits)
             location = headers.get("location")
             if status in {301, 302, 303, 307, 308} and location:
                 url = urljoin(url, location)
@@ -152,7 +176,9 @@ class Fetcher:
         pinned = urlunsplit((parts.scheme, netloc, parts.path or "/", parts.query, ""))
         return pinned, host, port, address
 
-    async def _once(self, url: str) -> tuple[int, httpx.Headers, bytes]:
+    async def _once(
+        self, url: str, limits: tuple[int, float] | None = None
+    ) -> tuple[int, httpx.Headers, bytes]:
         pinned, host, port, _ = await self._target(url)
         parts = urlsplit(url)
         headers = {
@@ -161,10 +187,11 @@ class Fetcher:
             "Accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.1",
         }
         extensions = {"sni_hostname": host} if parts.scheme == "https" else {}
+        max_bytes, timeout = limits or (self._max_bytes, self._total_timeout)
         await self._pace(host)
         try:
-            async with asyncio.timeout(self._total_timeout):
-                return await self._read(pinned, headers, extensions)
+            async with asyncio.timeout(timeout):
+                return await self._read(pinned, headers, extensions, max_bytes)
         except TimeoutError as error:
             raise FetchError("The site took too long to answer.", "unreachable") from error
         except httpx.HTTPError as error:
@@ -172,7 +199,7 @@ class Fetcher:
             raise FetchError(msg, "unreachable") from error
 
     async def _read(
-        self, url: str, headers: dict[str, str], extensions: dict[str, str]
+        self, url: str, headers: dict[str, str], extensions: dict[str, str], max_bytes: int
     ) -> tuple[int, httpx.Headers, bytes]:
         request = self._client.build_request("GET", url, headers=headers, extensions=extensions)
         response = await self._client.send(request, stream=True)
@@ -180,8 +207,8 @@ class Fetcher:
             body = bytearray()
             async for piece in response.aiter_bytes():
                 body.extend(piece)
-                if len(body) > self._max_bytes:
-                    limit = self._max_bytes // 1_000_000
+                if len(body) > max_bytes:
+                    limit = max_bytes // 1_000_000
                     msg = f"The page is larger than {limit} MB; skipped."
                     raise FetchError(msg, "too_large")
             return response.status_code, response.headers, bytes(body)
