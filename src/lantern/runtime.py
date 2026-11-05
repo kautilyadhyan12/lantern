@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from dataclasses import replace
 
 from lantern.agent.loop import Agent
 from lantern.archive import Wayback
@@ -76,11 +77,14 @@ def fast_order(found: list[Provider], settings: AppSettings) -> list[Provider]:
     return [fast, *found]
 
 
-def budget_for(investigation: Investigation, *, resume: bool) -> Budget:
-    """The agent's budget: a continuation gets its own; otherwise by the chosen depth."""
+def budget_for(investigation: Investigation, settings: AppSettings, *, resume: bool) -> Budget:
+    """The agent's budget: a continuation gets its own; otherwise by the chosen depth. The
+    token limits come from settings."""
     if resume:
-        return CONTINUE
-    return QUICK if investigation.depth == "quick" else DEEP
+        return replace(CONTINUE, tokens=settings.continue_tokens)
+    if investigation.depth == "quick":
+        return replace(QUICK, tokens=settings.quick_tokens)
+    return replace(DEEP, tokens=settings.deep_tokens)
 
 
 def missing_keys(settings: AppSettings) -> list[str]:
@@ -154,7 +158,7 @@ async def run_investigation(
         max_questions=settings.max_questions,
         max_posts=settings.max_posts,
     )
-    budget = budget_for(investigation, resume=resume)
+    budget = budget_for(investigation, settings, resume=resume)
     used = investigation.usage.tokens_in + investigation.usage.tokens_out
     tokens = TokenBudget(budget.tokens, start=used) if settings.agent else None
     try:

@@ -40,14 +40,17 @@ def brief_view(inv: Investigation, phrases: Sequence[str], hashtags: Sequence[st
     return capped("\n".join(lines), BRIEF_CAP)
 
 
-def question_view(
+def question_view(  # noqa: PLR0913  # each input is one part of the question's state
     question: Question,
     attempts: int,
     tools: Iterable[str],
     finding: Finding | None,
     planned: Sequence[str],
+    *,
+    single: Sequence[str] = (),
 ) -> str:
-    """The key question being researched: its status, attempts and current finding."""
+    """The key question being researched: its status, attempts, current finding, and the
+    items that still need a second, independent source."""
     used = ", ".join(sorted(tools)) or "none"
     lines = [
         f"Now researching {question.ref} ({question.kind}): {question.text}",
@@ -65,6 +68,11 @@ def question_view(
         lines.append("Current finding: not assessed yet.")
     if planned and attempts == 0:
         lines.append(f"Planned starting searches: {_quoted(planned)}.")
+    if single:
+        lines.append(
+            f"Found in only one source so far (search one by name for a second source): "
+            f"{'; '.join(single[:5])}."
+        )
     return capped("\n".join(lines), QUESTION_CAP)
 
 

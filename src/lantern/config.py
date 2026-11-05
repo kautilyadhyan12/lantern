@@ -50,6 +50,9 @@ class AppSettings(BaseSettings):
     max_questions: int = 4
     max_llm_calls: int = 200  # a backstop: the agent's token budget binds first
     agent: bool = True  # the researcher agent; false restores the fixed research rounds
+    quick_tokens: int = 40_000  # AI tokens a quick look may use, across all providers
+    deep_tokens: int = 100_000  # AI tokens a deep investigation may use
+    continue_tokens: int = 50_000  # AI tokens one continuation may use
     social_enabled: bool = True
     archive_enabled: bool = True
     max_posts: int = 8

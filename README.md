@@ -19,7 +19,9 @@ You ask a question. Lantern:
    question's subject, and the budget must allow it. A triage step picks the most
    promising results to read and notes names seen in them. Code decides when a key question
    is closed and when research stops. A deep investigation may use up to 6 rounds, 30 pages,
-   60 tool calls, 15 minutes and 200,000 AI tokens; a quick look one round and 10 pages.
+   60 tool calls, 15 minutes and 100,000 AI tokens; a quick look one round, 10 pages and
+   40,000 tokens (`LANTERN_DEEP_TOKENS`, `LANTERN_QUICK_TOKENS` and
+   `LANTERN_CONTINUE_TOKENS` change these limits).
    Research stops at 85% of any budget, so the assessment and report always run, and the
    report says what stopped it. For questions that ask for every instance, it keeps a list
    of everything found, each item marked corroborated or single source. It reads pages

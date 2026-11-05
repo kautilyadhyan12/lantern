@@ -100,3 +100,51 @@ def test_gemini_is_used_only_after_the_other_providers():
     assert providers(settings)[1].base_url.startswith("https://generativelanguage.googleapis.com")
     only_gemini = AppSettings(gemini_api_key="m", tavily_api_key="t")
     assert missing_keys(only_gemini) == []
+
+
+class Clock:
+    def __init__(self):
+        self.now = 0.0
+
+    def __call__(self):
+        return self.now
+
+    async def sleep(self, seconds):
+        self.now += seconds
+
+
+def patient(responses, providers=("a", "b")):
+    """A gateway whose clock is fake: waits take no real time."""
+    clock, seen = Clock(), []
+
+    def handler(request):
+        seen.append(request.url.host)
+        return responses[request.url.host].pop(0)
+
+    items = [Provider(name, f"https://{name}.test/v1", "key", "m") for name in providers]
+    transport = httpx.MockTransport(handler)
+    model = Gateway(items, Usage(), 50, transport=transport, clock=clock, sleep=clock.sleep)
+    return model, clock, seen
+
+
+async def test_busy_providers_are_retried_until_one_answers():
+    busy = [httpx.Response(429, headers={"retry-after": "40"}) for _ in range(3)]
+    down = [httpx.Response(503) for _ in range(20)]
+    model, clock, seen = patient({"a.test": [*busy, reply('{"allowed": true}')], "b.test": down})
+    assert (await model.structured("s", "u", GateOut)).allowed
+    assert seen.count("a.test") == 4  # more than the old limit of 8 attempts in all
+    assert len(seen) > 8
+    assert clock.now < 180
+
+
+async def test_providers_failing_for_three_minutes_give_a_plain_reason():
+    busy = [httpx.Response(429, headers={"retry-after": "30"}) for _ in range(30)]
+    down = [httpx.Response(503) for _ in range(30)]
+    model, clock, _ = patient({"a.test": busy, "b.test": down})
+    with pytest.raises(ModelError) as caught:
+        await model.structured("s", "u", GateOut)
+    message = str(caught.value)
+    assert message.startswith("The AI providers kept failing for 3 minutes")
+    assert "a:m: HTTP 429, busy or rate-limited" in message
+    assert "b:m: HTTP 503, server error" in message
+    assert 150 <= clock.now <= 180
