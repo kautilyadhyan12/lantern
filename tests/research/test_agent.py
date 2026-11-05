@@ -358,6 +358,7 @@ async def test_continuing_reopens_questions_and_repeats_no_work(tmp_path, monkey
     first = await runner.run()
     read_first = list(fetcher.urls)
     searched = list(first.searched)
+    sweeps = len(searcher.domain_calls)
 
     def again(ref, step, user):
         if step == 1:
@@ -383,6 +384,7 @@ async def test_continuing_reopens_questions_and_repeats_no_work(tmp_path, monkey
     assert new_page in [s.url for s in inv.sources]
     assert not set(read_first) & set(fetcher.urls[len(read_first) :])  # no page read twice
     assert inv.searched.count(searched[0]) == 1
+    assert len(searcher.domain_calls) == sweeps  # the opening sweep is not repeated
     assert "second incident" in inv.searched
     assert "Continuing the investigation" in inv.steps[-30].message or any(
         "Continuing the investigation" in s.message for s in inv.steps
