@@ -8,13 +8,15 @@ function startForm() {
     event.preventDefault();
     const button = form.querySelector("button");
     const brief = document.getElementById("brief").value.trim();
+    const choice = form.querySelector('input[name="depth"]:checked');
+    const depth = choice ? choice.value : "deep";
     error.hidden = true;
     button.disabled = true;
     try {
       const response = await fetch("/api/investigations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brief }),
+        body: JSON.stringify({ brief, depth }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not start the investigation.");

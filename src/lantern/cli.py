@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import sys
 from collections.abc import Sequence
+from typing import Literal
 
 import uvicorn
 from pydantic import ValidationError
@@ -30,7 +31,7 @@ def _database() -> int:
     return 0
 
 
-def _run(brief: str) -> int:
+def _run(brief: str, depth: Literal["quick", "deep"]) -> int:
 
     settings = AppSettings()
     store = Store(settings.data_dir)
@@ -43,7 +44,7 @@ def _run(brief: str) -> int:
         sys.stdout.flush()
         seen = len(investigation.steps)
 
-    investigation = Investigation(id=store.new_id(), brief=brief)
+    investigation = Investigation(id=store.new_id(), brief=brief, depth=depth)
     store.save(investigation)
     result = asyncio.run(run_investigation(investigation, settings, store, show))
     if result.status == "done":
@@ -65,6 +66,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     run = commands.add_parser("run", help="Investigate a question and save a cited report")
     run.add_argument("brief", help="The research question, in quotes")
+    run.add_argument(
+        "--quick", action="store_true", help="One round of about 10 pages instead of a deep run"
+    )
     serve = commands.add_parser("serve", help="Start the web app")
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8000)
@@ -72,7 +76,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     database.add_subparsers(dest="operation", required=True).add_parser("upgrade")
     arguments = parser.parse_args(argv)
     if arguments.command == "run":
-        return _run(arguments.brief)
+        return _run(arguments.brief, "quick" if arguments.quick else "deep")
     if arguments.command == "serve":
         return _serve(arguments.host, arguments.port)
     return _database()

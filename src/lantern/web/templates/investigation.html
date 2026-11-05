@@ -83,6 +83,30 @@
     {% else %}
       <p class="muted">Could not be determined. {{ finding.answer }}</p>
     {% endif %}
+    {% set items = inv.items | selectattr("question_ref", "equalto", finding.question_ref) | list %}
+    {% if items %}
+    {% set corroborated = items | selectattr("status", "equalto", "corroborated") | list | length %}
+    <h4 class="items-title">Everything found: {{ items | length }}
+      <span class="muted">({{ corroborated }} corroborated, {{ items | length - corroborated }} from a single source)</span></h4>
+    <p class="muted">Every item any source reported, however weak the source. “Corroborated” means at
+      least two independent sources report it; single-source items are unconfirmed.</p>
+    <div class="table-wrap">
+    <table class="items">
+      <thead><tr><th>Item</th><th>What is reported</th><th>Status</th><th>Evidence</th></tr></thead>
+      <tbody>
+      {% for item in items %}
+      <tr>
+        <td><b>{{ item.name }}</b></td>
+        <td>{{ item.summary }}</td>
+        <td><span class="chip st-{{ 'ok' if item.status == 'corroborated' else 'single' }}">{{ item.status }}</span>
+          <div class="muted">{{ item.origins | length }} source{{ "" if item.origins | length == 1 else "s" }} · best grade {{ item.best_grade }}</div></td>
+        <td>{{ cite(item.claim_refs) }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% endif %}
   </section>
   {% endfor %}
 
@@ -137,17 +161,30 @@
   </section>
 
   {% if inv.leads %}
+  {% set post_leads = inv.leads | selectattr("kind", "equalto", "post") | list %}
+  {% set page_leads = inv.leads | selectattr("kind", "equalto", "page") | list %}
   <section>
     <h2>Leads to check yourself</h2>
-    <p class="muted">These posts appeared in search results on sites whose rules forbid
-      automated reading, so Lantern did not open them and they are <b>not evidence</b> in this
-      report. Open them yourself if you want to check what they say.</p>
+    <p class="muted">Links Lantern found but did not read. They are <b>not evidence</b> in this
+      report; open them yourself to check what they say.</p>
+    {% if post_leads %}
+    <h4>Posts on sites that forbid automated reading</h4>
     <ul class="leads">
-      {% for lead in inv.leads %}
+      {% for lead in post_leads %}
       <li><a href="{{ lead.url }}" rel="noopener noreferrer nofollow" target="_blank">Open on {{ lead.platform }}</a>
         <span class="muted">post {{ loop.index }} · related to {{ lead.question_refs | join(", ") }}</span></li>
       {% endfor %}
     </ul>
+    {% endif %}
+    {% if page_leads %}
+    <h4>Pages Lantern could not read</h4>
+    <ul class="leads">
+      {% for lead in page_leads %}
+      <li><a href="{{ lead.url }}" rel="noopener noreferrer nofollow" target="_blank">Open page on {{ lead.platform }}</a>
+        <span class="muted">{{ lead.reason }}</span></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
   </section>
   {% endif %}
 
@@ -155,7 +192,10 @@
     <h2>How this was done</h2>
     <ul>
       <li>Safety: {{ inv.safety }}</li>
-      <li>{{ inv.usage.searches }} web searches; {{ inv.usage.pages_fetched }} pages saved,
+      <li>{{ "Deep investigation" if inv.depth == "deep" else "Quick look" }}: {{ inv.usage.rounds }}
+        research round{{ "" if inv.usage.rounds == 1 else "s" }}; later rounds followed up on what
+        earlier rounds found.</li>
+      <li>{{ inv.usage.searches }} web and news searches; {{ inv.usage.pages_fetched }} pages saved,
         {{ inv.usage.pages_skipped }} skipped (robots.txt, errors or no readable text).</li>
       <li>{{ inv.usage.posts_saved }} public social media posts saved as ground reports, from
         Bluesky search and Mastodon hashtags. Only posts about the event are searched, never

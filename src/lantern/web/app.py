@@ -3,7 +3,7 @@
 import asyncio
 from collections.abc import Callable, Coroutine
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
@@ -29,6 +29,7 @@ CSP = (
 
 class NewInvestigation(BaseModel):
     brief: str = Field(min_length=1, max_length=600)
+    depth: Literal["quick", "deep"] = "deep"
 
 
 def segments(text: str, claims: list[Claim]) -> list[tuple[str, str | None]]:
@@ -87,7 +88,7 @@ def create_app(  # noqa: PLR0915  # routes share one store and settings via clos
         if store.started_today() >= config.daily_run_limit:
             message = f"Today's limit of {config.daily_run_limit} investigations is used up."
             return JSONResponse({"error": f"{message} Try again tomorrow."}, 429)
-        investigation = Investigation(id=store.new_id(), brief=body.brief.strip())
+        investigation = Investigation(id=store.new_id(), brief=body.brief.strip(), depth=body.depth)
         store.save(investigation)
         task = asyncio.create_task(runner(investigation, config, store))
         tasks.add(task)

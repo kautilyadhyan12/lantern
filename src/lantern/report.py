@@ -91,6 +91,14 @@ def to_markdown(investigation: Investigation) -> str:
             ]
         else:
             lines.append(f"Could not be determined. {finding.answer}")
+        items = [i for i in investigation.items if i.question_ref == finding.question_ref]
+        if items:
+            lines += ["", f"### Everything found ({len(items)})", ""]
+            lines += [
+                f"- **{item.name}** — {item.summary} *({item.status}; {len(item.origins)} "
+                f"sources; best grade {item.best_grade}; {', '.join(item.claim_refs)})*"
+                for item in items
+            ]
         lines.append("")
     if report.gaps:
         lines += ["## What could not be determined", "", *(f"- {gap}" for gap in report.gaps), ""]
@@ -116,18 +124,19 @@ def to_markdown(investigation: Investigation) -> str:
             f"grade {source.reliability} ({grade}); "
             f"saved {source.fetched_at:%Y-%m-%d %H:%M} UTC; sha256 `{source.sha256}`"
         )
-    if investigation.leads:
-        platforms = ", ".join(sorted({lead.platform for lead in investigation.leads}))
-        lines += [
-            "",
-            "## Leads to check yourself",
-            "",
-            (
-                f"{len(investigation.leads)} posts on {platforms} appeared in search results. "
-                "Lantern does not open these sites and they are not evidence here; open them "
-                "from the web app."
-            ),
-        ]
+    posts = [lead for lead in investigation.leads if lead.kind == "post"]
+    pages = [lead for lead in investigation.leads if lead.kind == "page"]
+    if posts or pages:
+        lines += ["", "## Leads to check yourself", ""]
+    if posts:
+        platforms = ", ".join(sorted({lead.platform for lead in posts}))
+        lines.append(
+            f"{len(posts)} posts on {platforms} appeared in search results. Lantern does not "
+            "open these sites and they are not evidence here; open them from the web app."
+        )
+    if pages:
+        lines += ["", "Pages Lantern could not read (not evidence):", ""]
+        lines += [f"- <{lead.url}> — {lead.reason}" for lead in pages]
     lines += [
         "",
         (

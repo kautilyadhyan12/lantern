@@ -147,6 +147,16 @@ def clamp_likelihood(proposed: str, domains: int) -> str:
     return TERMS[min(max(index, 3 - spread), 3 + spread)]
 
 
+def item_status(origins: int) -> Literal["corroborated", "single source"]:
+    """An item counts as corroborated once two independent origins report it."""
+    return "corroborated" if origins >= 2 else "single source"
+
+
+def best_grade(grades: Iterable[str]) -> str:
+    """The best Admiralty grade (A is best); F when nothing is known."""
+    return min(grades, default="F")
+
+
 def credibility(domains: int, contradicted: bool, supporting: bool) -> int:
     """Admiralty credibility of a claim from how its finding is corroborated."""
     if not supporting:

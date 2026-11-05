@@ -202,3 +202,10 @@ blockquote {
   padding: 0.05rem 0.4rem; border-radius: 4px; margin-left: 0.3rem;
   background: var(--accent-soft); color: var(--accent);
 }
+.depth { border: 0; padding: 0; margin: 0.5rem 0; display: grid; gap: 0.3rem; }
+.depth label { cursor: pointer; }
+.items-title { margin: 1rem 0 0.2rem; }
+.items { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+.items th, .items td { text-align: left; padding: 0.45rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+.st-ok { color: var(--good); }
+.st-single { color: var(--warn); }

@@ -15,6 +15,13 @@
     <label for="brief" class="sr">Research question</label>
     <textarea id="brief" name="brief" rows="3" maxlength="600" required
       placeholder="For example: What is publicly known about the 2026 monsoon floods in Assam?"></textarea>
+    <fieldset class="depth">
+      <legend class="sr">How thorough</legend>
+      <label><input type="radio" name="depth" value="deep" checked> <b>Deep investigation</b>
+        <span class="muted">up to 3 rounds and 30 pages; follows up on what it finds; about 5–10 minutes</span></label>
+      <label><input type="radio" name="depth" value="quick"> <b>Quick look</b>
+        <span class="muted">one round of about 10 pages; 2–3 minutes</span></label>
+    </fieldset>
     <div class="ask-row">
       <span class="hint">{{ left }} investigation{{ "" if left == 1 else "s" }} left today.
         Questions about private people, locations of individuals or minors are refused.</span>

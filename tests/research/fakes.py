@@ -29,19 +29,36 @@ def html(text: str) -> bytes:
     return f"<html><head><title>Report</title></head><body>{body}</body></html>".encode()
 
 
+HIT_TITLE = "Transient hit title 7f3a"
+HIT_SNIPPET = "Transient hit snippet 9c1e"
+
+
 class FakeSearch:
     def __init__(self) -> None:
         self.queries: list[str] = []
         self.domain_calls: list[list[str]] = []
+        self.options: list[tuple[str, bool, str | None]] = []
 
-    async def search(self, query: str, limit: int, domains: list[str] | None = None) -> list[Hit]:
+    async def search(
+        self,
+        query: str,
+        limit: int,
+        domains: list[str] | None = None,
+        *,
+        news: bool = False,
+        time_range: str | None = None,
+    ) -> list[Hit]:
         if domains:
             self.domain_calls.append(domains)
             urls = ["https://x.com/witness/status/999", "https://x.com/witness"]
             return [Hit(url=url, title="hit", rank=i) for i, url in enumerate(urls, start=1)]
         self.queries.append(query)
+        self.options.append((query, news, time_range))
         urls = [*PAGES, "https://www.facebook.com/post/1", "https://blocked.example/page"]
-        return [Hit(url=url, title="hit", rank=i) for i, url in enumerate(urls, start=1)]
+        return [
+            Hit(url=url, title=HIT_TITLE, rank=i, snippet=HIT_SNIPPET)
+            for i, url in enumerate(urls, start=1)
+        ]
 
 
 class FakeFetcher:
@@ -52,22 +69,64 @@ class FakeFetcher:
 
 
 class FakeModel:
-    def __init__(self, allowed: bool = True) -> None:
+    def __init__(
+        self,
+        allowed: bool = True,
+        kinds: tuple[str, str] = ("fact", "fact"),
+        followups: list[list[str]] | None = None,
+    ) -> None:
         self.allowed = allowed
+        self.kinds = kinds
+        self.followups = list(followups or [])
         self.calls: list[str] = []
+        self.prompts: dict[str, list[str]] = {}
 
     async def structured[T: BaseModel](self, system: str, user: str, output: type[T]) -> T:
         self.calls.append(output.__name__)
+        self.prompts.setdefault(output.__name__, []).append(user)
         data: object
         if output is prompts.GateOut:
             data = {"allowed": self.allowed, "reason": "The subject is a private individual."}
         elif output is prompts.PlanOut:
             data = {
                 "questions": [
-                    {"text": "How high did the river rise?", "queries": ["river rise floods"]},
-                    {"text": "How many families were moved?", "queries": ["relief camps families"]},
+                    {
+                        "text": "How high did the river rise?",
+                        "kind": self.kinds[0],
+                        "queries": ["river rise floods", "river gauge news"],
+                    },
+                    {
+                        "text": "How many families were moved?",
+                        "kind": self.kinds[1],
+                        "queries": ["relief camps families"],
+                    },
                 ],
+                "news": True,
+                "time_range": "Week",
                 "hashtags": ["#DistrictFloods"],
+            }
+        elif output is prompts.TriageOut:
+            refs = [line.split(" ")[0] for line in user.splitlines() if line.startswith("H")]
+            data = {"read": list(reversed(refs))}
+        elif output is prompts.FollowupOut:
+            queries = self.followups.pop(0) if self.followups else []
+            data = {
+                "queries": [{"query": q, "question_ref": "Q2", "news": True} for q in queries],
+                "done": not queries,
+            }
+        elif output is prompts.InventoryOut:
+            groups: dict[str, list[str]] = {}
+            for line in user.splitlines():
+                if line.startswith("C") and "]: " in line:
+                    ref = line.split(" ")[0]
+                    statement = line.split("]: ", 1)[1].split(" Quote:")[0]
+                    groups.setdefault(statement, []).append(ref)
+            data = {
+                "items": [
+                    {"name": statement[:40], "summary": statement, "claims": refs}
+                    for statement, refs in groups.items()
+                ]
+                + [{"name": "Ghost", "summary": "Cites nothing real.", "claims": ["C999"]}]
             }
         elif output is prompts.ExtractOut:
             data = {

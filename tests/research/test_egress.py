@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 from lantern.egress import Fetcher, FetchError, is_public
-from lantern.pipeline import blocked_site
+from lantern.sites import blocked_site
 
 HTML = b"<html><body><p>" + b"Public page text. " * 30 + b"</p></body></html>"
 

@@ -60,8 +60,14 @@ async def test_search_results_are_not_stored(tmp_path):
     start, store, _ = run(tmp_path)
     inv = await start()
     saved = (store.root / "investigations" / f"{inv.id}.json").read_text()
-    assert "facebook.com" not in saved
-    assert "blocked.example" not in saved.replace("Skipped blocked.example", "")
+    stored = saved + "".join(path.read_text("utf-8", "replace") for path in store.root.rglob("*.*"))
+    assert fakes.HIT_TITLE not in stored
+    assert fakes.HIT_SNIPPET not in stored
+    # A non-post facebook link is neither read nor listed; an unreadable page is a lead.
+    assert "facebook.com/post/1" not in saved
+    assert [(lead.kind, lead.platform) for lead in inv.leads if lead.kind == "page"] == [
+        ("page", "blocked.example")
+    ]
 
 
 async def test_fixed_rules_refuse_without_any_model_call(tmp_path):
@@ -102,14 +108,14 @@ async def test_page_choice_skips_video_sites_and_caps_pages_per_site(tmp_path, m
     urls = [f"https://en.wikipedia.org/wiki/Page{i}" for i in range(4)]
     urls += ["https://www.youtube.com/watch?v=1", "https://apnews.com/floods"]
 
-    async def search(self, query, limit, domains=None):
+    async def search(self, query, limit, domains=None, **options):
         return [fakes.Hit(url=url, title="hit", rank=i) for i, url in enumerate(urls, start=1)]
 
     monkeypatch.setattr(fakes.FakeSearch, "search", search)
     start, _, _ = run(tmp_path)
     inv = await start()
     reading = next(step.message for step in inv.steps if step.message.startswith("Reading"))
-    assert reading == "Reading 3 pages."  # two Wikipedia pages and AP; no YouTube
+    assert reading == "Reading 4 pages."  # three Wikipedia pages (the cap) and AP; no YouTube
 
 
 async def test_running_out_of_free_ai_stops_the_run_with_a_clear_message(tmp_path):

@@ -1,21 +1,33 @@
 """Web search. Hits are transient: they pick pages to read and are never stored."""
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
 
 import httpx
+
+TimeRange = Literal["day", "week", "month", "year"]
 
 
 @dataclass(frozen=True)
 class Hit:
+    """One search result. Kept in memory only, to choose pages; never stored."""
+
     url: str
     title: str
     rank: int
+    snippet: str = ""
+    published: str | None = None
 
 
 class Searcher(Protocol):
     async def search(
-        self, query: str, limit: int, domains: list[str] | None = None
+        self,
+        query: str,
+        limit: int,
+        domains: list[str] | None = None,
+        *,
+        news: bool = False,
+        time_range: TimeRange | None = None,
     ) -> list[Hit]: ...
 
 
@@ -36,10 +48,22 @@ class TavilySearch:
     async def close(self) -> None:
         await self._client.aclose()
 
-    async def search(self, query: str, limit: int, domains: list[str] | None = None) -> list[Hit]:
+    async def search(
+        self,
+        query: str,
+        limit: int,
+        domains: list[str] | None = None,
+        *,
+        news: bool = False,
+        time_range: TimeRange | None = None,
+    ) -> list[Hit]:
         body: dict[str, object] = {"query": query, "max_results": limit, "search_depth": "basic"}
         if domains:
             body["include_domains"] = domains
+        if news:
+            body["topic"] = "news"
+        if time_range:
+            body["time_range"] = time_range
         try:
             response = await self._client.post(self.endpoint, json=body)
         except httpx.HTTPError as error:
@@ -55,5 +79,14 @@ class TavilySearch:
         for rank, item in enumerate(results, start=1):
             url = item.get("url") if isinstance(item, dict) else None
             if isinstance(url, str) and url.startswith(("http://", "https://")):
-                hits.append(Hit(url=url, title=str(item.get("title") or ""), rank=rank))
+                published = item.get("published_date")
+                hits.append(
+                    Hit(
+                        url=url,
+                        title=str(item.get("title") or ""),
+                        rank=rank,
+                        snippet=str(item.get("content") or "")[:300],
+                        published=str(published) if published else None,
+                    )
+                )
         return hits[:limit]

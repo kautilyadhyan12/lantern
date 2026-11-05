@@ -9,7 +9,13 @@ You ask a question. Lantern:
 1. **Checks it is safe to research.** Fixed rules, then a model check, refuse questions
    that target private people, locate or track anyone, involve minors, or seek private data.
 2. **Splits it into key questions** (`Q1`, `Q2`, …) that together answer it.
-3. **Searches the web and reads pages politely.** It only opens links returned by search,
+3. **Investigates in rounds.** It searches the web and the news (within the period the
+   question covers, and in local languages where useful), lets the model choose the most
+   promising results, then reviews what it found and follows up: single-source items,
+   missing incidents, other names and spellings, and primary sources. A deep investigation
+   runs up to three rounds and 30 pages; a quick look runs one. For questions that ask for
+   every instance, it keeps a list of everything found, each item marked corroborated or
+   single source. It reads pages politely: it only opens links returned by search,
    obeys robots.txt, identifies itself, and never connects to private or internal network
    addresses. Search results themselves are never stored.
 4. **Adds ground reports from public social media.** Bluesky public search and Mastodon

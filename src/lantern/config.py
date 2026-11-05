@@ -47,8 +47,7 @@ class AppSettings(BaseSettings):
     user_agent: str = "LanternResearch/0.1 (+https://github.com/kautilyadhyan12/lantern)"
     daily_run_limit: int = 10
     max_questions: int = 4
-    max_pages: int = 10
-    max_llm_calls: int = 40
+    max_llm_calls: int = 100
     social_enabled: bool = True
     max_posts: int = 8
     mastodon_instance: str = "https://mastodon.social"

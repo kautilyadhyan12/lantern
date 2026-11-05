@@ -21,6 +21,7 @@ class Step(BaseModel):
 class Question(BaseModel):
     ref: str
     text: str
+    kind: Literal["fact", "list"] = "fact"
     status: Literal["open", "answered", "unanswerable"] = "open"
 
 
@@ -42,11 +43,29 @@ class Source(BaseModel):
 
 
 class Lead(BaseModel):
-    """A post on a site Lantern may not read: listed for a person to check, never evidence."""
+    """A link Lantern did not read: listed for a person to check, never evidence.
+
+    `post` is a post on a site whose terms forbid automated reading; `page` is a page
+    Lantern tried to read but could not (blocked, error, no readable text).
+    """
 
     platform: str
     url: str
     question_refs: list[str] = Field(default_factory=list)
+    kind: Literal["post", "page"] = "post"
+    reason: str = ""
+
+
+class Item(BaseModel):
+    """One thing found for a list question (a person, incident or event), with its evidence."""
+
+    question_ref: str
+    name: str
+    summary: str
+    claim_refs: list[str]
+    origins: list[str]
+    best_grade: str
+    status: Literal["corroborated", "single source"]
 
 
 class Claim(BaseModel):
@@ -105,6 +124,7 @@ class Usage(BaseModel):
     tokens_in: int = 0
     tokens_out: int = 0
     claims_dropped: int = 0
+    rounds: int = 0
     providers: list[str] = Field(default_factory=list)
 
 
@@ -114,12 +134,14 @@ class Investigation(BaseModel):
     created_at: AwareDatetime = Field(default_factory=now)
     finished_at: AwareDatetime | None = None
     status: Status = "queued"
+    depth: Literal["quick", "deep"] = "deep"
     safety: str = "Not checked yet."
     error: str | None = None
     steps: list[Step] = Field(default_factory=list)
     questions: list[Question] = Field(default_factory=list)
     sources: list[Source] = Field(default_factory=list)
     leads: list[Lead] = Field(default_factory=list)
+    items: list[Item] = Field(default_factory=list)
     claims: list[Claim] = Field(default_factory=list)
     findings: list[Finding] = Field(default_factory=list)
     report: Report | None = None

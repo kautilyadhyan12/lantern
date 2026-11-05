@@ -5,8 +5,9 @@ from fastapi.testclient import TestClient
 
 from lantern.config import AppSettings
 from lantern.models import Investigation
-from lantern.pipeline import Investigator, Limits, Tools, post_lead
+from lantern.pipeline import Investigator, Limits, Tools
 from lantern.report import to_markdown
+from lantern.sites import post_lead
 from lantern.store import Store
 from lantern.web.app import create_app
 
@@ -53,7 +54,7 @@ async def test_leads_are_listed_not_fetched_and_shown_without_usernames(tmp_path
         *fakes.PAGES,
     ]
 
-    async def search(self, query, limit, domains=None):
+    async def search(self, query, limit, domains=None, **options):
         if domains:
             return []
         return [fakes.Hit(url=url, title="hit", rank=i) for i, url in enumerate(urls, start=1)]
@@ -91,5 +92,6 @@ async def test_social_sites_are_searched_on_purpose_for_leads(tmp_path):
     inv = await Investigator(inv, tools, store, Limits()).run()
     assert searcher.domain_calls
     assert {"x.com", "facebook.com", "reddit.com"} <= set(searcher.domain_calls[0])
-    assert [lead.url for lead in inv.leads] == ["https://x.com/witness/status/999"]
+    posts = [lead.url for lead in inv.leads if lead.kind == "post"]
+    assert posts == ["https://x.com/witness/status/999"]
     assert not any("x.com" in url for url in fetcher.urls)
