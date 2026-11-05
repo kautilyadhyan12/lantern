@@ -110,7 +110,7 @@ class WikiLookup:
         ids = [v["id"] for p in FACTS if p != "P570" for v in _values(claims, p) if "id" in v]
         labels = await self._labels(ids)
         draft = self._draft(qid, entity, labels, summary if isinstance(summary, dict) else {})
-        return ToolResult([], [draft], f"Wikidata: {draft.title} ({draft.url}).")
+        return ToolResult([], [draft], f"{draft.title} ({draft.url}).")
 
     async def _exact_match(self, query: str) -> str | None:
         """A Wikidata entry whose label or alias is exactly the name, never a near match."""

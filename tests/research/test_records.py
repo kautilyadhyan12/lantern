@@ -292,10 +292,7 @@ async def test_wiki_lookup_gives_background_with_code_generated_facts():
         "Wikidata records Lashkar-e-Taiba as founded by: Hafiz Muhammad Saeed.",
     )
     assert "Wikipedia summary (https://en.wikipedia.org/wiki/Lashkar-e-Taiba)" in draft.text
-    assert (
-        result.summary
-        == "Wikidata: Wikidata: Lashkar-e-Taiba (https://www.wikidata.org/wiki/Q736955)."
-    )
+    assert result.summary == "Wikidata: Lashkar-e-Taiba (https://www.wikidata.org/wiki/Q736955)."
 
 
 @pytest.mark.ac("AG2-AC2")
