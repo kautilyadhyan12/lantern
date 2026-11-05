@@ -95,7 +95,8 @@ def to_markdown(investigation: Investigation) -> str:
         if items:
             lines += ["", f"### Everything found ({len(items)})", ""]
             lines += [
-                f"- **{item.name}** — {item.summary} *({item.status}; {len(item.origins)} "
+                f"- **{item.name}** ({item.when or 'date unknown'}) — {item.summary} "
+                f"*({item.status}; {len(item.origins)} "
                 f"sources; best grade {item.best_grade}; {', '.join(item.claim_refs)})*"
                 for item in items
             ]

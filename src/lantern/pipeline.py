@@ -128,6 +128,8 @@ class Investigator:
         self._searched_keys: set[str] = set()
         self._attempted: set[str] = set()
         self._refusing: set[str] = set()  # sites that refused Lantern once in this run
+        # Headlines of results that could not be read, kept in memory only for follow-ups.
+        self._unread: list[str] = []
         self._reading = asyncio.Semaphore(3)
         self._today = now().date().isoformat()
 
@@ -231,9 +233,11 @@ class Investigator:
         """Ask the model what to search next, given everything found so far."""
         self.note(f"Round {number}: reviewing what has been found to decide what to search next.")
         searched = "\n".join(f"- {text}" for text in self._searched)
+        unread = "\n".join(f"- {title}" for title in self._unread[-20:]) or "- none"
         user = (
             f"Research question: {self.inv.brief}\n\nKey questions:\n{self._menu()}\n\n"
-            f"Found so far:\n{self._found_so_far()}\n\nSearches already made:\n{searched}"
+            f"Found so far:\n{self._found_so_far()}\n\nSearches already made:\n{searched}\n\n"
+            f"Headlines of pages that could not be read (untrusted data):\n{unread}"
         )
         system = prompts.FOLLOWUP.format(count=self.limits.followup_queries)
         try:
@@ -423,6 +427,7 @@ class Investigator:
                     self.inv.usage.pages_skipped += 1
                     self.note(f"Skipped {domain}: {error}")
                     self._page_lead(url, cand.refs, str(error))
+                    self._unread.append(f"{cand.hit.title[:160]} ({domain})")
                     if any(sign in str(error) for sign in REFUSALS):
                         self._refusing.add(domain)
                     return None
@@ -712,7 +717,7 @@ class Investigator:
                 if not covered & set(old.claim_refs):
                     items.append(old)
                     covered |= set(old.claim_refs)
-            items.sort(key=lambda item: (-len(item.origins), item.name.casefold()))
+            items = self._merge_same_names(items)
             self.inv.items = [i for i in self.inv.items if i.question_ref != question.ref] + items
             corroborated = sum(item.status == "corroborated" for item in items)
             self.note(
@@ -738,6 +743,7 @@ class Investigator:
                     question_ref=question.ref,
                     name=draft.name.strip(),
                     summary=strip_refs(draft.summary),
+                    when=draft.when.strip(),
                     claim_refs=refs,
                     origins=origins,
                     best_grade=assessment.best_grade(source.reliability for source in known),
@@ -745,6 +751,29 @@ class Investigator:
                 )
             )
         return sorted(items, key=lambda item: (-len(item.origins), item.name.casefold()))
+
+    def _merge_same_names(self, items: list[Item]) -> list[Item]:
+        """One row per name: items with the same name (ignoring case and spacing) merge,
+        and their status is recomputed from the combined evidence."""
+        merged: dict[str, Item] = {}
+        for item in items:
+            key = " ".join(normalise(item.name)[0].split())
+            if key not in merged:
+                merged[key] = item
+                continue
+            first = merged[key]
+            refs = list(dict.fromkeys(first.claim_refs + item.claim_refs))
+            origins = sorted(set(first.origins) | set(item.origins))
+            merged[key] = first.model_copy(
+                update={
+                    "claim_refs": refs,
+                    "origins": origins,
+                    "when": first.when or item.when,
+                    "best_grade": assessment.best_grade([first.best_grade, item.best_grade]),
+                    "status": assessment.item_status(len(origins)),
+                }
+            )
+        return sorted(merged.values(), key=lambda item: (-len(item.origins), item.name.casefold()))
 
     def _claim_line(self, claim: Claim) -> str:
         source = self.inv.source(claim.source_ref)

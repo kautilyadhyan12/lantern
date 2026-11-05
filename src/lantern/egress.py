@@ -69,7 +69,7 @@ class Fetcher:
         self._blocked = blocked
         self._client = httpx.AsyncClient(
             transport=transport,
-            timeout=httpx.Timeout(10.0, connect=5.0),
+            timeout=httpx.Timeout(15.0, connect=10.0),
             follow_redirects=False,
             trust_env=False,
             limits=httpx.Limits(max_keepalive_connections=0),

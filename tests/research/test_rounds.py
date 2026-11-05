@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 from lantern.config import AppSettings
 from lantern.llm import ModelError, Provider
-from lantern.models import Investigation, now
+from lantern.models import Investigation, Item, now
 from lantern.pipeline import Investigator, Limits, Tools
 from lantern.report import to_markdown
 from lantern.runtime import reading_order
@@ -247,3 +247,42 @@ async def test_a_cautious_triage_still_reads_half_the_budget(tmp_path, monkeypat
     inv = await run
     reading = next(step.message for step in inv.steps if step.message.startswith("Reading"))
     assert reading == "Reading 3 pages."
+
+
+def test_items_with_the_same_name_merge_and_are_re_rated():
+    store_less = Investigator.__new__(Investigator)
+    one = Item(
+        question_ref="Q1",
+        name="Muhammad Sarwar",
+        summary="a",
+        claim_refs=["C1"],
+        origins=["thehindu.com"],
+        best_grade="B",
+        status="single source",
+    )
+    two = Item(
+        question_ref="Q1",
+        name="muhammad  sarwar",
+        summary="b",
+        when="18 Oct",
+        claim_refs=["C2"],
+        origins=["news18.com"],
+        best_grade="F",
+        status="single source",
+    )
+    merged = store_less._merge_same_names([one, two])
+    assert len(merged) == 1
+    assert merged[0].claim_refs == ["C1", "C2"]
+    assert merged[0].status == "corroborated"
+    assert merged[0].when == "18 Oct"
+
+
+async def test_blocked_headlines_guide_follow_ups_but_are_never_saved(tmp_path):
+    model = FakeModel(followups=[["second incident found dead"]])
+    run, store = investigate(tmp_path, model, Limits.for_depth("deep"), DeepSearch())
+    inv = await run
+    follow_up = model.prompts["FollowupOut"][0]
+    assert f"{fakes.HIT_TITLE} (blocked.example)" in follow_up
+    saved = "".join(path.read_text("utf-8", "replace") for path in store.root.rglob("*.*"))
+    assert fakes.HIT_TITLE not in saved
+    assert inv.status == "done"

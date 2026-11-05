@@ -92,11 +92,12 @@
       least two independent sources report it; single-source items are unconfirmed.</p>
     <div class="table-wrap">
     <table class="items">
-      <thead><tr><th>Item</th><th>What is reported</th><th>Status</th><th>Evidence</th></tr></thead>
+      <thead><tr><th>Item</th><th>When</th><th>What is reported</th><th>Status</th><th>Evidence</th></tr></thead>
       <tbody>
       {% for item in items %}
       <tr>
         <td><b>{{ item.name }}</b></td>
+        <td>{{ item.when or "unknown" }}</td>
         <td>{{ item.summary }}</td>
         <td><span class="chip st-{{ 'ok' if item.status == 'corroborated' else 'single' }}">{{ item.status }}</span>
           <div class="muted">{{ item.origins | length }} source{{ "" if item.origins | length == 1 else "s" }} · best grade {{ item.best_grade }}</div></td>

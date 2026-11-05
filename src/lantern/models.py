@@ -62,6 +62,7 @@ class Item(BaseModel):
     question_ref: str
     name: str
     summary: str
+    when: str = ""
     claim_refs: list[str]
     origins: list[str]
     best_grade: str

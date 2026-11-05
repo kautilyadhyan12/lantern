@@ -77,7 +77,9 @@ FOLLOWUP = (
     "to corroborate them; search for further items not found yet (other names, aliases and "
     "spellings, other places and dates, and other ways the same kind of event is described, "
     "such as 'found dead' or 'died mysteriously' for 'killed'); local-language searches; and "
-    "primary sources such as police, officials, courts and official statements. Never "
+    "primary sources such as police, officials, courts and official statements. Headlines "
+    "of pages that could not be read are listed: search for those people and incidents on "
+    "other outlets. Never "
     "repeat a search already made. Set news to true for searches about reported events. "
     "Set done to true when nothing important is missing."
 )
@@ -86,9 +88,11 @@ INVENTORY = (
     f"{COMMON}\nList every distinct item that answers this list-type key question, using "
     "only the claims given. An item is one person, incident or event. Merge claims about "
     "the same item, including different spellings of a name. For each item give a short "
-    "name, one sentence on what is reported (say who reports it when it is alleged), and "
-    "the refs of every claim about it. Include items mentioned by only one claim or by weak "
-    "sources: never drop an item because its sourcing is weak."
+    "name, one sentence on what is reported (say who reports it when it is alleged), when "
+    "it happened as reported (a date, month or 'unknown'), and the refs of every claim about "
+    "it. Include items mentioned by only one claim or by weak sources: never drop an item "
+    "because its sourcing is weak. Leave out items clearly outside the period the question "
+    "asks about; keep items whose date is unknown."
 )
 
 ASSESS = (
@@ -169,6 +173,7 @@ class FollowupOut(BaseModel):
 class ItemDraft(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     summary: str = Field(min_length=1, max_length=600)
+    when: str = Field(default="", max_length=80)
     claims: list[str]
 
 
