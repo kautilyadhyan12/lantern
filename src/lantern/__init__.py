@@ -1,0 +1,1 @@
+"""Lantern investigation platform."""

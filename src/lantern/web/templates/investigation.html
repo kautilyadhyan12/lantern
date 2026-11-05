@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+{% block title %}{{ inv.brief[:60] }} · Lantern{% endblock %}
+{% block body_attrs %} data-id="{{ inv.id }}" data-status="{{ inv.status }}"{% endblock %}
+
+{% macro cite(refs) -%}
+{%- for ref in refs %}<button type="button" class="cite" data-ref="{{ ref }}">{{ ref }}</button>{% endfor -%}
+{%- endmacro %}
+
+{% macro item_table(rows) -%}
+<div class="table-wrap">
+<table class="items">
+  <thead><tr><th>Item</th><th>When</th><th>What is reported</th><th>Status</th><th>Evidence</th></tr></thead>
+  <tbody>
+  {% for item in rows %}
+  <tr>
+    <td><b>{{ item.name }}</b></td>
+    <td>{{ item.when or "unknown" }}</td>
+    <td>{{ item.summary }}</td>
+    <td><span class="chip st-{{ 'ok' if item.status == 'corroborated' else 'single' }}">{{ item.status }}</span>
+      <div class="muted">{{ item.origins | length }} source{{ "" if item.origins | length == 1 else "s" }} · best grade {{ item.best_grade }}</div></td>
+    <td>{{ cite(item.claim_refs) }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{%- endmacro %}
+
+{% macro sentence(s) -%}
+<span class="sentence">{{ s.text }} {{ cite(s.cites) }}</span>
+{%- endmacro %}
+
+{% block main %}
+<p class="crumb"><a href="/">← All investigations</a></p>
+<h1 class="brief">{{ inv.brief }}</h1>
+<p class="meta">
+  <span class="status s-{{ inv.status }}">{{ inv.status }}</span>
+  Started {{ inv.created_at.strftime("%d %b %Y, %H:%M") }} UTC
+  {% if inv.status == "done" %}
+  · <a href="/investigations/{{ inv.id }}/report.md">Markdown</a>
+  · <a href="/investigations/{{ inv.id }}/investigation.json">JSON</a>
+  {% endif %}
+</p>
+
+{% if inv.status in ("queued", "running") %}
+<section class="panel live">
+  <h2>Working <span class="spinner" aria-hidden="true"></span></h2>
+  <p class="counts" id="counts">{{ inv.questions | length }} key questions ·
+    {{ inv.sources | length }} pages saved · {{ inv.claims | length }} claims</p>
+  <ol id="steps" class="steps">
+    {% for step in inv.steps %}<li>{{ step.message }}</li>{% endfor %}
+  </ol>
+  <p class="hint">This page updates by itself. Free AI tiers are slow; a run takes a few minutes.</p>
+</section>
+{% elif inv.status == "refused" %}
+<section class="panel refused">
+  <h2>Refused</h2>
+  <p>{{ inv.safety }}</p>
+</section>
+{% elif inv.status == "failed" %}
+<section class="panel failed">
+  <h2>Stopped</h2>
+  <p>{{ inv.error }}</p>
+  {% if inv.steps %}<details><summary>Steps</summary><ol class="steps">
+    {% for step in inv.steps %}<li>{{ step.message }}</li>{% endfor %}</ol></details>{% endif %}
+</section>
+{% endif %}
+
+{% if inv.report %}
+{% set report = inv.report %}
+<article class="report">
+  <section class="bottom-line">
+    <h2>Bottom line</h2>
+    {% if report.bottom_line %}
+    <p>{% for s in report.bottom_line %}{{ sentence(s) }} {% endfor %}</p>
+    {% else %}
+    <p>No verified bottom line: none of the key questions could be answered from the pages read.</p>
+    {% endif %}
+  </section>
+
+  {% for finding in inv.findings %}
+  {% set question = inv.question(finding.question_ref) %}
+  <section class="finding">
+    <h3><span class="ref">{{ finding.question_ref }}</span> {{ question.text if question else "" }}</h3>
+    {% if finding.status == "answered" %}
+      {% set section = sections.get(finding.question_ref) %}
+      {% if section and section.sentences %}
+      <p>{% for s in section.sentences %}{{ sentence(s) }} {% endfor %}</p>
+      {% endif %}
+      <dl class="assessment">
+        <div><dt>Answer</dt><dd>{{ finding.answer }} {{ cite(finding.supporting) }}</dd></div>
+        <div><dt>Likelihood</dt><dd><span class="chip">{{ finding.likelihood }}</span>
+          <span class="muted">{{ ranges.get(finding.likelihood, "") }}</span>
+          {% if finding.likelihood_proposed and finding.likelihood_proposed != finding.likelihood %}
+          <span class="muted">· toned down from “{{ finding.likelihood_proposed }}” because the evidence is thin</span>
+          {% endif %}</dd></div>
+        <div><dt>Analytic confidence</dt><dd><span class="chip c-{{ finding.confidence }}">{{ finding.confidence }}</span>
+          <span class="muted">{{ finding.confidence_reason }}</span></dd></div>
+        {% if finding.contradicting %}
+        <div><dt>Disagreeing evidence</dt><dd>{{ cite(finding.contradicting) }}</dd></div>
+        {% endif %}
+      </dl>
+    {% else %}
+      <p class="muted">Could not be determined. {{ finding.answer }}</p>
+    {% endif %}
+    {% set all_items = inv.items | selectattr("question_ref", "equalto", finding.question_ref) | list %}
+    {% set items = all_items | selectattr("in_period") | list %}
+    {% set older = all_items | rejectattr("in_period") | list %}
+    {% if items %}
+    {% set corroborated = items | selectattr("status", "equalto", "corroborated") | list | length %}
+    <h4 class="items-title">Everything found: {{ items | length }}
+      <span class="muted">({{ corroborated }} corroborated, {{ items | length - corroborated }} from a single source)</span></h4>
+    <p class="muted">Every item any source reported, however weak the source. “Corroborated” means at
+      least two independent sources report it; single-source items are unconfirmed.</p>
+    {{ item_table(items) }}
+    {% endif %}
+    {% if older %}
+    <details class="older"><summary>Also found, but dated before the period asked about: {{ older | length }}</summary>
+      {{ item_table(older) }}
+    </details>
+    {% endif %}
+    {% set mentions = inv.mentions | selectattr("question_ref", "equalto", finding.question_ref) | list %}
+    {% if mentions %}
+    <h4 class="items-title">Also seen in search results, not confirmed: {{ mentions | length }}</h4>
+    <p class="muted">Named in search result headlines, but no page Lantern could read confirms them,
+      often because the site blocks automated reading. They are leads, not evidence: open the
+      results to check.</p>
+    <ul class="leads">
+      {% for mention in mentions %}
+      <li><b>{{ mention.name }}</b>{% if mention.when %} <span class="muted">({{ mention.when }})</span>{% endif %} —
+        {% for url in mention.urls %}<a href="{{ url }}" rel="noopener noreferrer nofollow" target="_blank">result {{ loop.index }}</a>{{ ", " if not loop.last }}{% endfor %}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+  {% endfor %}
+
+  {% if report.gaps %}
+  <section>
+    <h2>What could not be determined</h2>
+    <ul>{% for gap in report.gaps %}<li>{{ gap }}</li>{% endfor %}</ul>
+  </section>
+  {% endif %}
+
+  <section>
+    <h2>Sources</h2>
+    <div class="table-wrap">
+    <table class="sources">
+      <thead><tr><th>Ref</th><th>Page</th><th>Grade</th><th>Saved (UTC)</th><th>sha256</th></tr></thead>
+      <tbody>
+      {% for s in inv.sources %}
+      <tr>
+        <td class="ref">{{ s.ref }}</td>
+        <td><a href="/investigations/{{ inv.id }}/sources/{{ s.ref }}">{{ s.title or s.domain }}</a>
+          {% if s.kind == "post" %}<span class="badge">ground report</span>{% endif %}
+          <div class="muted">{{ s.domain }}{% if s.kind == "post" and s.published %} · posted {{ s.published[:16] | replace("T", " ") }} UTC{% endif %}
+            · <a href="{{ s.url }}" rel="noopener noreferrer nofollow" target="_blank">original</a></div></td>
+        <td><span class="grade g-{{ s.reliability }}" title="{{ reliability[s.reliability] }}: {{ s.reliability_reason }}">{{ s.reliability }}</span></td>
+        <td>{{ s.fetched_at.strftime("%d %b %H:%M") }}</td>
+        <td><code title="{{ s.sha256 }}">{{ s.sha256[:12] }}…</code></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <details class="explain" open>
+      <summary>What the grades and fingerprints mean</summary>
+      <p><b>Grade</b> is how reliable the website usually is, on the Admiralty scale used by
+        intelligence analysts. It comes from a fixed list, not from the AI:</p>
+      <ul>
+        <li><b>A</b> Completely reliable — reserved for authoritative official records.</li>
+        <li><b>B</b> Usually reliable — government and international bodies, established news
+          organisations, universities.</li>
+        <li><b>C</b> Fairly reliable — reference works such as Wikipedia, used as background.</li>
+        <li><b>D</b> Not usually reliable — platforms where anyone can post, including social
+          media ground reports. Valuable first-hand, but unverified until others confirm them.</li>
+        <li><b>F</b> Cannot be judged — not on Lantern's list; unknown, not necessarily bad.</li>
+      </ul>
+      <p><b>sha256</b> is a fingerprint of the exact copy Lantern saved. Changing even one
+        character of the copy would give a completely different fingerprint, so it shows the
+        evidence has not been altered since it was read.</p>
+      <p><b>Credibility</b> (shown on each claim, 1–6) says how well the claim is confirmed:
+        1 confirmed by three or more independent websites, 2 probably true (two websites),
+        3 possibly true (one website), 4 doubtful (contradicted), 6 not assessed.</p>
+    </details>
+  </section>
+
+  {% if inv.leads %}
+  {% set post_leads = inv.leads | selectattr("kind", "equalto", "post") | list %}
+  {% set page_leads = inv.leads | selectattr("kind", "equalto", "page") | list %}
+  <section>
+    <h2>Leads to check yourself</h2>
+    <p class="muted">Links Lantern found but did not read. They are <b>not evidence</b> in this
+      report; open them yourself to check what they say.</p>
+    {% if post_leads %}
+    <h4>Posts on sites that forbid automated reading</h4>
+    <ul class="leads">
+      {% for lead in post_leads %}
+      <li><a href="{{ lead.url }}" rel="noopener noreferrer nofollow" target="_blank">Open on {{ lead.platform }}</a>
+        <span class="muted">post {{ loop.index }} · related to {{ lead.question_refs | join(", ") }}</span></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if page_leads %}
+    <h4>Pages Lantern could not read</h4>
+    <ul class="leads">
+      {% for lead in page_leads %}
+      <li><a href="{{ lead.url }}" rel="noopener noreferrer nofollow" target="_blank">Open page on {{ lead.platform }}</a>
+        <span class="muted">{{ lead.reason }}</span></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <section class="method">
+    <h2>How this was done</h2>
+    <ul>
+      <li>Safety: {{ inv.safety }}</li>
+      <li>{{ "Deep investigation" if inv.depth == "deep" else "Quick look" }}: {{ inv.usage.rounds }}
+        research round{{ "" if inv.usage.rounds == 1 else "s" }}; later rounds followed up on what
+        earlier rounds found.</li>
+      <li>{{ inv.usage.searches }} web and news searches; {{ inv.usage.pages_fetched }} pages saved,
+        {{ inv.usage.pages_skipped }} skipped (robots.txt, errors or no readable text).</li>
+      <li>{{ inv.usage.posts_saved }} public social media posts saved as ground reports, from
+        Bluesky search and Mastodon hashtags. Only posts about the event are searched, never
+        anyone's account; authors' names are not stored, and each account counts once as a source.</li>
+      <li>{{ inv.claims | length }} claims anchored to exact quotes; {{ inv.usage.claims_dropped }}
+        proposed claims dropped because their quote was not found word for word.</li>
+      <li>Source grades use the Admiralty scale (A–F) from fixed rules. Likelihood uses the
+        seven ICD 203 terms. Confidence is set by code from independent websites, source
+        grades and disagreement, never by the AI.</li>
+      <li>{{ inv.usage.llm_calls }} AI calls ({{ inv.usage.tokens_in + inv.usage.tokens_out }} tokens)
+        via {{ inv.usage.providers | join(", ") or "none" }}.</li>
+    </ul>
+    {% if report.removed %}
+    <details><summary>{{ report.removed | length }} draft sentence{{ "" if report.removed | length == 1 else "s" }} removed by the citation check</summary>
+      <ul>{% for r in report.removed %}<li>{{ r.text }} <span class="muted">— {{ r.reason }}</span></li>{% endfor %}</ul>
+    </details>
+    {% endif %}
+    <details><summary>Step log</summary><ol class="steps">
+      {% for step in inv.steps %}<li>{{ step.message }}</li>{% endfor %}</ol></details>
+  </section>
+</article>
+{% endif %}
+
+{% for claim in inv.claims %}
+{% set src = sources.get(claim.source_ref) %}
+<template id="card-{{ claim.ref }}">
+  <p class="card-ref">{{ claim.ref }} · credibility {{ claim.credibility }} ({{ credibility[claim.credibility] }})</p>
+  <p class="card-statement">{{ claim.statement }}</p>
+  <blockquote>“{{ claim.quote }}”</blockquote>
+  {% if src %}
+  {% if src.kind == "post" %}<p class="muted">Ground report from a public social media post{% if src.published %}, posted {{ src.published[:16] | replace("T", " ") }} UTC{% endif %}. Unverified unless other sources confirm it.</p>{% endif %}
+  <p class="muted">{{ src.ref }} · {{ src.title or src.domain }} · {{ src.domain }} ·
+    grade {{ src.reliability }} ({{ reliability[src.reliability] }}) ·
+    saved {{ src.fetched_at.strftime("%d %b %Y %H:%M") }} UTC</p>
+  <p><a href="/investigations/{{ inv.id }}/sources/{{ src.ref }}#{{ claim.ref }}">View in saved copy →</a></p>
+  {% endif %}
+</template>
+{% endfor %}
+<dialog id="card"><div id="card-body"></div><form method="dialog"><button>Close</button></form></dialog>
+{% endblock %}

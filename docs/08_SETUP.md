@@ -26,6 +26,14 @@ unzip -q lantern-pack.zip -d /tmp/pack && cp -r /tmp/pack/lantern/. . && rm lant
 
 5. Press **Ctrl+Shift+P**, type **Rebuild Container**, and choose **Codespaces: Rebuild Container**. This installs Python tools, Docker and Codex. It takes a few minutes, once.
 
+The M0 setup correction pins the Microsoft image and installs Node, uv and
+Codex through `.devcontainer/setup.sh`. It checks each official download's
+checksum before unpacking any tool. This snapshot uses the existing tool
+versions under the user-approved [ADR 0006](adr/ADR-0006-existing-workspace-tool-versions.md)
+exception; the recorded tool warnings have not been declared fixed.
+After creation, run `uv sync --frozen` in the repository to prepare its locked
+Python 3.12 environment. Existing workspaces are not rebuilt automatically.
+
 ## 3. Sign in to Codex
 
 In the terminal:

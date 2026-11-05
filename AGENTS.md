@@ -53,6 +53,7 @@ pick → `$plan` → `$tests-first` → `$implement` → `$prove` → `$review` 
 - At the end of every step: commit on the story branch, then `git push -u origin HEAD`.
 - At the end of a session, tell the user: "Everything is saved and pushed. You can close this tab." The codespace stops by itself after 30 minutes idle.
 - Secrets come only from environment variables (Codespaces secrets). Never print them. Never create or commit `.env` with real values.
+- Never create, add or change an API key without the user's explicit permission.
 - The repository is public: never commit personal data, captured evidence (`var/`), or secrets.
 
 ## Commands
@@ -60,7 +61,10 @@ pick → `$plan` → `$tests-first` → `$implement` → `$prove` → `$review` 
 `uv sync` · `make db` · `make hooks` · `make check` · `make prove STORY=<ID>` · `make review STORY=<ID>` · `make evals` (M1+) · `make live` · `make smoke` (M1+)
 
 - Dependencies: `uv add <pkg>` only.
+- Supply chain: before adding or updating a dependency, say why it is needed and check current security advisories for it and its resolved dependencies. There is no mandatory 7-day wait; checked security fixes may be installed immediately. Use official package sources, lock exact resolved versions and hashes, reject yanked releases, and do not install versions with known applicable vulnerabilities. Keep the Node.js used by Codex on the latest patched LTS release, using official releases from nodejs.org only. Never add litellm. Never run gh auth login or use a personal access token in the codespace.
 - Cassettes: only through `scripts/record_fixture.py`. Use `tool <tool> <case> --args <json>` for one call, or `pytest <test ids>` to record what those tests are missing (HTTP and model). Never hand-write or edit anything under `tests/fixtures/`, `docs/proofs/` or `docs/reviews/`.
+
+The user's M0 instruction to continue with the existing development-tool versions is recorded in [ADR 0006](docs/adr/ADR-0006-existing-workspace-tool-versions.md). Its narrow exception does not waive the Python dependency audit or any quality gate.
 
 ## Quality bar (`make check`; never lowered without a recorded decision)
 
@@ -90,7 +94,7 @@ pick → `$plan` → `$tests-first` → `$implement` → `$prove` → `$review` 
 8. Pydantic at every boundary. Timezone-aware datetimes only. Async I/O with timeouts. No `time.sleep`, `print` or `shell=True` in `src/`; subprocesses only with argument lists.
 9. Every state change writes its event in the same transaction. Logs are structured (`structlog`) and redact secrets and personal data.
 10. Errors and refusals say what happened and what to do instead, in plain words. No slogans.
-11. Stories stay under ~400 non-test lines. Design changes get a decision record.
+11. Stories stay under ~400 non-test lines. S0.2 alone may use up to 800 handwritten non-test lines under accepted [ADR 0003](docs/adr/ADR-0003-proof-kit-size-and-strict-audit.md); all quality gates remain required. Design changes get a decision record.
 
 ## Non-negotiable invariants (each needs a test; any violation is a review blocker)
 

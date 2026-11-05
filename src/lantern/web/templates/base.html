@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Lantern{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body{% block body_attrs %}{% endblock %}>
+  <header class="top">
+    <a class="brand" href="/"><span class="mark" aria-hidden="true"></span>Lantern</a>
+    <span class="tag">Public-evidence investigations</span>
+  </header>
+  <main>{% block main %}{% endblock %}</main>
+  <footer class="foot">
+    Lantern uses public web pages only. Reports are produced with automated assistance;
+    review them before publishing or acting on them.
+  </footer>
+</body>
+</html>

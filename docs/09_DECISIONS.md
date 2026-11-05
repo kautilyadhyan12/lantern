@@ -2,7 +2,13 @@
 
 Pack 3.0 · written 2026-10-22
 
+Accepted additions: [ADR 0001 — Official Node.js security updates bypass the cooldown](adr/ADR-0001-node-security-update-cooldown.md) clarifies the development supply-chain policy. The seven-day wait remains for everything else.
+
+[ADR 0002 — Use checked security fixes without an age delay](adr/ADR-0002-advisory-checked-security-updates.md), accepted 2026-10-23, supersedes that waiting period. Current advisory checks, official sources, locked versions/hashes and the other security rules remain required.
+
 The decisions behind this pack, with what was rejected and why. Future changes go into `docs/adr/` as new records that cite the decision they change; the docs are then updated to match.
+
+[ADR 0004 — Bind bootstrap reviews to code without editing generated artifacts](adr/ADR-0004-bootstrap-review-metadata.md), accepted 2026-10-26 with PLAN-M0, clarifies the pre-S0.4 manual reviewer output procedure without changing the shipped prompt or schema.
 
 ### D1 — Fresh start on a proven stack
 **Decision.** Build from an empty folder. Keep Lantern's purpose (evidence-based OSINT), its non-negotiable ethics, and a mainstream stack: Python 3.12, uv, ruff, mypy strict, pytest/hypothesis, Pydantic, Postgres 16 + pgvector, SQLAlchemy async + Alembic, Docker Compose, the `openai` SDK against OpenAI-compatible providers.
@@ -108,3 +114,7 @@ The decisions behind this pack, with what was rejected and why. Future changes g
 ### D24 — Free search by default
 **Decision.** Tavily's free tier (1,000 searches a month, no card) is the default search provider; Brave is optional.
 **Why.** Zero cost; Brave has no free plan and needs a card. Results stay transient with every provider (D10).
+
+[ADR 0005 — Make the saved workspace setup satisfy the security policy](adr/ADR-0005-fresh-workspace-setup.md), accepted 2026-10-26, permits the narrow bootstrap devcontainer correction and corresponding S0.1-AC6/test amendment. Other shipped pack files and all quality gates remain protected.
+
+[ADR 0006 — Continue with the existing workspace tool versions](adr/ADR-0006-existing-workspace-tool-versions.md), accepted 2026-10-26 by the user's explicit instruction, permits continuing M0 with the existing pinned development tools despite the recorded unresolved advisory matches. The Python dependency audit and all quality gates remain required.

@@ -1,0 +1,101 @@
+{
+  "story": "M0",
+  "reviewer_model": "gpt-6",
+  "head_sha": "ca888737067ebaa179462dedd42ae0b7bb2f9628",
+  "verdict": "REQUEST_CHANGES",
+  "ac_status": [
+    {
+      "ac_id": "S0.1-AC1",
+      "status": "SATISFIED",
+      "evidence": "Makefile:5 implements check/db/db-down; tests/test_skeleton.py:43,53,94 cover pins and command behavior. docs/plans/PLAN-M0.md:462 records fresh sync; docs/proofs/PROOF-M0.md records the passing gate."
+    },
+    {
+      "ac_id": "S0.1-AC2",
+      "status": "SATISFIED",
+      "evidence": "pyproject.toml:1 defines project, entry point and tooling; marked tests/test_tooling.py:63,72,83,92 assert configuration."
+    },
+    {
+      "ac_id": "S0.1-AC3",
+      "status": "SATISFIED",
+      "evidence": "compose.yaml:1, src/lantern/config.py:9 and src/lantern/db/migrations/env.py:18 implement the database boundary. Marked tests/e2e/test_database.py:31,79,94 and tests/test_config.py:17 cover it. Database execution passed in the recorded proof; sandbox limitations prevented independent repetition."
+    },
+    {
+      "ac_id": "S0.1-AC4",
+      "status": "SATISFIED",
+      "evidence": ".pre-commit-config.yaml:1 configures local uv hooks; tests/test_hooks.py:29,40,52,75,95 exercise configuration, installation, file corrections and secret detection."
+    },
+    {
+      "ac_id": "S0.1-AC5",
+      "status": "SATISFIED",
+      "evidence": "scripts/lint_custom.py:112 implements lint_source; tests/test_lint_custom.py:17,41,71,180,187,201,229 cover forbidden patterns and valid Python. The new generated reference comparison also passes."
+    },
+    {
+      "ac_id": "S0.1-AC6",
+      "status": "SATISFIED",
+      "evidence": ".devcontainer/setup.sh:1 and .devcontainer/devcontainer.json:1 implement the approved setup. tests/test_devcontainer_setup.py:121,142,161,176,202 and tests/test_workspace.py:17,55,69,90 cover setup and preservation. docs/plans/PLAN-M0.md:485 records the isolated fresh-container gate passing."
+    },
+    {
+      "ac_id": "S0.1-AC7",
+      "status": "SATISFIED",
+      "evidence": "README.md:1 explains the product, Codespaces and local setup; tests/test_readme.py:7,18,34 assert those requirements."
+    },
+    {
+      "ac_id": "S0.2-AC1",
+      "status": "SATISFIED",
+      "evidence": "scripts/checks.py:35 defines the ordered catalogue and scripts/checks.py:91 implements failure propagation. tests/test_check_pipeline.py:47,66,87,98 and tests/test_audit_dependencies.py:85,118 exercise order, failures and process boundaries."
+    },
+    {
+      "ac_id": "S0.2-AC2",
+      "status": "SATISFIED",
+      "evidence": "scripts/coverage_gate.py:15,44,72 validate counts and apply thresholds. tests/test_coverage_gate.py:34,41,51,70,80,134,140 cover boundaries and missing measurements; the new generated branch-weighting comparison passes."
+    },
+    {
+      "ac_id": "S0.2-AC3",
+      "status": "PARTIAL",
+      "evidence": "scripts/check_acceptance_ids.py:30 counts decorated definitions that subsequent assignment or deletion removes. Existing tests/test_acceptance_ids.py:33,67,127 cover ordinary tracing and duplicate definitions, but both cases in tests/review/test_m0_r3_adversarial.py:163 fail."
+    },
+    {
+      "ac_id": "S0.2-AC4",
+      "status": "SATISFIED",
+      "evidence": "scripts/prove.py:26,34,63,77 and scripts/code_tree.py:28 implement provenance, reporting and guarded execution. tests/test_prove.py:75,119,171,209,228,247,285 cover failure and filesystem boundaries; new generated hash and timezone comparisons pass."
+    },
+    {
+      "ac_id": "S0.2-AC5",
+      "status": "SATISFIED",
+      "evidence": "pyproject.toml:57,70 configure branch coverage, 85/95 thresholds and critical paths. tests/test_check_pipeline.py:166,178 assert the required values."
+    },
+    {
+      "ac_id": "S0.2-AC6",
+      "status": "SATISFIED",
+      "evidence": "scripts/check_dependencies.py:13,33,37 implement the normalized deny-list and lockfile scan. tests/test_dependencies.py:22,29,40,55 cover prohibited, normalized, transitive and malformed inputs; the new generated reference comparison passes."
+    }
+  ],
+  "blockers": [
+    {
+      "id": "B1",
+      "kind": "test",
+      "evidence": "scripts/check_acceptance_ids.py:30 retains an AC mapping after its test is overwritten with None or deleted. Running uv run pytest tests/review/test_m0_r3_adversarial.py -o addopts='' -q produced 2 failed, 7 passed. Both test_removed_test_does_not_satisfy_acceptance cases failed with: \"AssertionError: assert 'S9.1-AC1' not in {'S9.1-AC1': ['tests/test_removed.py::test_case']}\". The inputs end with either `test_case = None` or `del test_case`; neither leaves a callable test for pytest. This permits false acceptance coverage.",
+      "fix_hint": "Track assignment/deletion of test bindings in module and class scopes, or conservatively reject ambiguous rebinding. Preserve unknown-ID detection and the prohibition on importing test modules. Retain both regression cases."
+    }
+  ],
+  "spec_ambiguities": [],
+  "notes": [
+    "Scope: all 64 changed files fit the combined S0.1/S0.2 plans and accepted amendments; no additional behavioral scope violation found.",
+    "Changed setup/configuration files: .devcontainer/devcontainer.json, .devcontainer/setup.sh, .env.example, .gitignore, .pre-commit-config.yaml, .python-version, .secrets.baseline, AGENTS.md, Makefile, README.md, compose.yaml, pyproject.toml, uv.lock.",
+    "Changed documentation: docs/05_ENGINEERING_WORKFLOW.md, docs/06_ROADMAP_BACKLOG.md, docs/08_SETUP.md, docs/09_DECISIONS.md, docs/adr/ADR-0001-node-security-update-cooldown.md, docs/adr/ADR-0002-advisory-checked-security-updates.md, docs/adr/ADR-0003-proof-kit-size-and-strict-audit.md, docs/adr/ADR-0004-bootstrap-review-metadata.md, docs/adr/ADR-0005-fresh-workspace-setup.md, docs/adr/ADR-0006-existing-workspace-tool-versions.md, docs/plans/PLAN-M0.md, docs/plans/PLAN-S0.1.md, docs/plans/PLAN-S0.2.md, docs/proofs/PROOF-M0.md, docs/reviews/REVIEW-M0.json.",
+    "Changed implementation files: scripts/__init__.py, scripts/audit_dependencies.py, scripts/check_acceptance_ids.py, scripts/check_dependencies.py, scripts/checks.py, scripts/code_tree.py, scripts/coverage_gate.py, scripts/lint_custom.py, scripts/prove.py, src/lantern/__init__.py, src/lantern/cli.py, src/lantern/config.py, src/lantern/db/__init__.py, src/lantern/db/migrate.py, src/lantern/db/migrations/env.py, src/lantern/db/migrations/versions/0001_baseline.py.",
+    "Changed tests: tests/conftest.py, tests/e2e/test_database.py, tests/review/test_m0_r1_adversarial.py, tests/review/test_m0_r2_adversarial.py, tests/test_acceptance_ids.py, tests/test_audit_dependencies.py, tests/test_check_pipeline.py, tests/test_code_tree.py, tests/test_config.py, tests/test_coverage_gate.py, tests/test_dependencies.py, tests/test_devcontainer_setup.py, tests/test_hooks.py, tests/test_lint_custom.py, tests/test_proof_boundaries.py, tests/test_prove.py, tests/test_readme.py, tests/test_skeleton.py, tests/test_tooling.py, tests/test_workspace.py.",
+    "Proof integrity passed: recorded commit fc3e30d83abd5cd91de57ddeae0d2d5bb34b918b differs from HEAD only in docs/plans/PLAN-M0.md and docs/proofs/PROOF-M0.md. All eleven recorded exits are 0; final line is RESULT: PASS. Recorded coverage is 95.95959595959596%, with future critical paths explicitly absent. The earlier-round digest regression also passed.",
+    "Earlier review regressions: 35 passed. Existing non-review suite: 325 passed and three database/socket tests failed under sandbox restrictions, including PermissionError: [Errno 1] Operation not permitted. These environmental failures are notes, not blockers.",
+    "Seven independent reference oracles were written before reading the implementation modules and compared using Hypothesis: dependency normalization, tree hashing, coverage weighting, backlog parsing, marker extraction, proof outcome/timezone handling and lint rules. All seven generated comparisons passed.",
+    "Test quality: the explicit bootstrap placeholder is vacuous but supplemented by meaningful command tests. Failure injection, actual subprocess checks and filesystem assertions provide substantive coverage. No additional unsupported test-quality blocker found.",
+    "Security review found no additional demonstrated invariant violation. Research egress, captured content, model spend and demo features are outside this bootstrap. Existing development-tool advisory exceptions remain explicitly accepted under ADR 0006.",
+    "Only the new round-three test file was created. It passes ruff and formatting checks; existing files and generated artifacts were not modified."
+  ],
+  "adversarial_tests_file": "tests/review/test_m0_r3_adversarial.py",
+  "adversarial_results": {
+    "passed": 7,
+    "failed": 2
+  },
+  "code_tree": "92f925fed2bc2c43a2d0db1713a92fbdc5fa34975d44a1111faa5488fa209147"
+}
