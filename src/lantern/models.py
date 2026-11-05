@@ -152,6 +152,10 @@ class Investigation(BaseModel):
     finished_at: AwareDatetime | None = None
     status: Status = "queued"
     depth: Literal["quick", "deep"] = "deep"
+    news: bool = False
+    time_range: str | None = None
+    searched: list[str] = Field(default_factory=list)  # queries made, never their results
+    continued_at: list[AwareDatetime] = Field(default_factory=list)
     safety: str = "Not checked yet."
     error: str | None = None
     steps: list[Step] = Field(default_factory=list)

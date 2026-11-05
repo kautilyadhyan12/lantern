@@ -11,7 +11,7 @@ import asyncio
 import json
 import logging
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Protocol
 from urllib.parse import urlsplit
@@ -146,13 +146,15 @@ class Investigator:
         self.limits = limits
         self.on_change = on_change
         self._planned: dict[str, list[str]] = {}
-        self._news = False
-        self._time_range: TimeRange | None = None
+        # Restored from the investigation, so a continued run picks up where it stopped.
+        self._news = investigation.news
+        self._time_range: TimeRange | None = TIME_RANGES.get(investigation.time_range or "")
         self._hashtags: list[str] = []
         self._phrases: list[str] = []
-        self._searched: list[str] = []
-        self._searched_keys: set[str] = set()
-        self._attempted: set[str] = set()
+        self._searched = investigation.searched
+        self._searched_keys = {text.casefold() for text in self._searched}
+        self._attempted = {canonical(s.url) for s in investigation.sources if s.kind == "page"}
+        self._attempted |= {lead.url for lead in investigation.leads if lead.kind == "page"}
         self._refusing: set[str] = set()  # sites that refused Lantern once in this run
         self._robots_no: set[str] = set()  # sites whose robots.txt said no: never archived
         # Headlines of results that could not be read, kept in memory only for follow-ups.
@@ -179,8 +181,7 @@ class Investigator:
             self.on_change(self.inv)
 
     async def run(self) -> Investigation:
-        self.inv.status = "running"
-        try:
+        async def work() -> None:
             if await self._allowed():
                 await self._plan()
                 await self._find_leads()
@@ -191,11 +192,51 @@ class Investigator:
                     await self._round(number, queries)
                     if self._pages_left() <= 0:
                         break
-                self._settle_mentions()
-                await self._assess()
-                await self._write()
-                self.inv.status = "done"
-                self.note("Finished.")
+                await self._conclude()
+
+        return await self._guarded(work)
+
+    async def resume(self, rounds: int = 2, pages: int = 16) -> Investigation:
+        """Continue a finished investigation: more follow-up rounds on everything found so
+        far, without repeating searches or pages, then a fresh assessment and report."""
+        saved = sum(1 for source in self.inv.sources if source.kind == "page")
+        self.limits.max_pages = saved + pages
+        start = self.inv.usage.rounds + 1
+
+        async def work() -> None:
+            self.note(
+                f"Continuing the investigation: up to {rounds} more rounds and {pages} more "
+                "pages, building on everything found so far."
+            )
+            for number in range(start, start + rounds):
+                queries = await self._follow_up(number)
+                if not queries:
+                    break
+                await self._round(number, queries)
+                if self._pages_left() <= 0:
+                    break
+            await self._conclude()
+
+        self.inv.error = None
+        return await self._guarded(work)
+
+    async def _conclude(self) -> None:
+        """Assess every key question afresh from all claims, and write the report."""
+        self._settle_mentions()
+        self.inv.findings = []
+        for claim in self.inv.claims:
+            claim.credibility = 6
+        for question in self.inv.questions:
+            question.status = "open"
+        await self._assess()
+        await self._write()
+        self.inv.status = "done"
+        self.note("Finished.")
+
+    async def _guarded(self, work: Callable[[], Awaitable[None]]) -> Investigation:
+        self.inv.status = "running"
+        try:
+            await work()
         except (ModelError, SearchError) as error:
             self.inv.status, self.inv.error = "failed", str(error)
             self.note(f"Stopped: {error}")
@@ -237,8 +278,9 @@ class Investigator:
             self.inv.questions.append(question)
             queries = [query.strip() for query in item.queries if query.strip()]
             self._planned[question.ref] = queries[: self.limits.queries_per_question]
-        self._news = plan.news
+        self._news = self.inv.news = plan.news
         self._time_range = TIME_RANGES.get((plan.time_range or "").strip().lower())
+        self.inv.time_range = self._time_range
         self._hashtags = [tag.strip().lstrip("#") for tag in plan.hashtags if tag.strip()][:3]
         self._phrases = [phrase.strip() for phrase in plan.social_phrases if phrase.strip()][:3]
         lists = sum(question.kind == "list" for question in self.inv.questions)

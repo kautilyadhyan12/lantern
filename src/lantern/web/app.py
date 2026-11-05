@@ -14,9 +14,9 @@ from starlette.middleware.base import RequestResponseEndpoint
 
 from lantern.assessment import CREDIBILITY, LIKELIHOOD, RELIABILITY
 from lantern.config import AppSettings
-from lantern.models import Claim, Investigation, Source
+from lantern.models import Claim, Investigation, Source, now
 from lantern.report import to_markdown
-from lantern.runtime import missing_keys, run_investigation
+from lantern.runtime import continue_investigation, missing_keys, run_investigation
 from lantern.store import Store
 
 HERE = Path(__file__).parent
@@ -46,7 +46,9 @@ def segments(text: str, claims: list[Claim]) -> list[tuple[str, str | None]]:
 
 
 def create_app(  # noqa: PLR0915  # routes share one store and settings via closure
-    settings: AppSettings | None = None, runner: Runner = run_investigation
+    settings: AppSettings | None = None,
+    runner: Runner = run_investigation,
+    continuer: Runner = continue_investigation,
 ) -> FastAPI:
     config = settings or AppSettings()
     store = Store(config.data_dir)
@@ -81,19 +83,44 @@ def create_app(  # noqa: PLR0915  # routes share one store and settings via clos
         context = {"items": store.all()[:50], "missing": missing_keys(config), "left": left}
         return templates.TemplateResponse(request, "index.html", context)
 
-    @app.post("/api/investigations")
-    async def start(body: NewInvestigation) -> JSONResponse:
+    def blocked() -> JSONResponse | None:
+        """Why no investigation may start now (missing keys, daily limit), or None."""
         if missing := missing_keys(config):
             return JSONResponse({"error": f"Missing keys: {', '.join(missing)}."}, 503)
         if store.started_today() >= config.daily_run_limit:
             message = f"Today's limit of {config.daily_run_limit} investigations is used up."
             return JSONResponse({"error": f"{message} Try again tomorrow."}, 429)
-        investigation = Investigation(id=store.new_id(), brief=body.brief.strip(), depth=body.depth)
-        store.save(investigation)
-        task = asyncio.create_task(runner(investigation, config, store))
+        return None
+
+    def launch(investigation: Investigation, work: Runner) -> None:
+        task = asyncio.create_task(work(investigation, config, store))
         tasks.add(task)
         task.add_done_callback(tasks.discard)
+
+    @app.post("/api/investigations")
+    async def start(body: NewInvestigation) -> JSONResponse:
+        if refusal := blocked():
+            return refusal
+        investigation = Investigation(id=store.new_id(), brief=body.brief.strip(), depth=body.depth)
+        store.save(investigation)
+        launch(investigation, runner)
         return JSONResponse({"id": investigation.id}, 201)
+
+    @app.post("/api/investigations/{investigation_id}/continue")
+    async def resume(investigation_id: str) -> JSONResponse:
+        investigation = load(investigation_id)
+        if investigation.status in {"queued", "running"}:
+            return JSONResponse({"error": "This investigation is already running."}, 409)
+        if investigation.status == "refused" or not investigation.questions:
+            message = "Only an investigation that has started researching can be continued."
+            return JSONResponse({"error": message}, 409)
+        if refusal := blocked():
+            return refusal
+        investigation.status = "queued"
+        investigation.continued_at.append(now())
+        store.save(investigation)
+        launch(investigation, continuer)
+        return JSONResponse({"id": investigation.id}, 202)
 
     @app.get("/api/investigations/{investigation_id}")
     async def progress(investigation_id: str) -> dict[str, Any]:

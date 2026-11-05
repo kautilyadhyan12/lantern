@@ -37,6 +37,9 @@ You ask a question. Lantern:
 8. **Writes a verified report.** Every sentence must cite existing claims; sentences that
    do not are removed and listed. Each citation opens the exact quote, highlighted inside
    the saved copy of its source.
+9. **Continues when asked.** "Continue investigating" on a finished report runs up to two
+   more rounds on the same investigation, skipping searches and pages already done, keeping
+   everything found, and rewriting the report.
 
 ## Try it
 
@@ -53,6 +56,7 @@ Codespaces → Secrets) and then a codespace restart:
 uv sync --frozen
 uv run lantern serve                      # web app on http://127.0.0.1:8000
 uv run lantern run "What is publicly known about the 2026 Assam floods?"
+uv run lantern continue <id>                # dig further into a finished investigation
 ```
 
 In a codespace, open the **Ports** tab to view the web app in your browser. Each

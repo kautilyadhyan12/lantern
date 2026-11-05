@@ -78,6 +78,29 @@ function startCitations() {
   });
 }
 
+function startContinue() {
+  const button = document.getElementById("continue");
+  if (!button) return;
+  const error = document.getElementById("continue-error");
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    error.hidden = true;
+    try {
+      const response = await fetch(`/api/investigations/${button.dataset.id}/continue`, {
+        method: "POST",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not continue the investigation.");
+      window.location.reload();
+    } catch (problem) {
+      error.textContent = problem.message;
+      error.hidden = false;
+      button.disabled = false;
+    }
+  });
+}
+
 startForm();
+startContinue();
 startPolling();
 startCitations();

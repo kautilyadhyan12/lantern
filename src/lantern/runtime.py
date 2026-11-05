@@ -1,6 +1,7 @@
-"""Build the real tools from settings, and run one investigation."""
+"""Build the real tools from settings, and run or continue one investigation."""
 
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 
 from lantern.archive import Wayback
 from lantern.config import AppSettings
@@ -70,29 +71,13 @@ def missing_keys(settings: AppSettings) -> list[str]:
     return missing
 
 
-async def run_investigation(
-    investigation: Investigation,
-    settings: AppSettings,
-    store: Store,
-    on_change: Callable[[Investigation], None] | None = None,
-) -> Investigation:
-    if missing := missing_keys(settings):
-        investigation.status = "failed"
-        investigation.error = f"Missing keys: {', '.join(missing)}. Add them as Codespaces secrets."
-        store.save(investigation)
-        return investigation
-    assert settings.tavily_api_key is not None  # noqa: S101  # checked by missing_keys above
-    limits = Limits.for_depth(
-        investigation.depth, max_questions=settings.max_questions, max_posts=settings.max_posts
-    )
+@asynccontextmanager
+async def open_tools(settings: AppSettings, investigation: Investigation) -> AsyncIterator[Tools]:
+    """The real model gateways, search, fetcher, social search and archive, closed after."""
+    assert settings.tavily_api_key is not None  # noqa: S101  # checked by missing_keys first
     found = providers(settings)
-    try:
-        model = Gateway(found, investigation.usage, settings.max_llm_calls)
-        reader = Gateway(reading_order(found), investigation.usage, settings.max_llm_calls)
-    except ModelError as error:
-        investigation.status, investigation.error = "failed", str(error)
-        store.save(investigation)
-        return investigation
+    model = Gateway(found, investigation.usage, settings.max_llm_calls)
+    reader = Gateway(reading_order(found), investigation.usage, settings.max_llm_calls)
     searcher = TavilySearch(settings.tavily_api_key.get_secret_value())
     fetcher = Fetcher(settings.user_agent, blocked=blocked_site)
     social = (
@@ -101,20 +86,14 @@ async def run_investigation(
         else None
     )
     try:
-        archive = Wayback(fetcher) if settings.archive_enabled else None
-        tools = Tools(
+        yield Tools(
             model=model,
             searcher=searcher,
             fetcher=fetcher,
             social=social,
             reader=reader,
-            archive=archive,
+            archive=Wayback(fetcher) if settings.archive_enabled else None,
         )
-        return await Investigator(investigation, tools, store, limits, on_change).run()
-    except SearchError as error:
-        investigation.status, investigation.error = "failed", str(error)
-        store.save(investigation)
-        return investigation
     finally:
         await model.close()
         await reader.close()
@@ -122,3 +101,43 @@ async def run_investigation(
         await fetcher.close()
         if social:
             await social.close()
+
+
+async def run_investigation(
+    investigation: Investigation,
+    settings: AppSettings,
+    store: Store,
+    on_change: Callable[[Investigation], None] | None = None,
+    *,
+    resume: bool = False,
+) -> Investigation:
+    """Run a new investigation, or continue a finished one when `resume` is true."""
+    if missing := missing_keys(settings):
+        investigation.status = "failed"
+        investigation.error = f"Missing keys: {', '.join(missing)}. Add them as Codespaces secrets."
+        store.save(investigation)
+        return investigation
+    # A continuation always digs deep, whatever the first pass was.
+    limits = Limits.for_depth(
+        "deep" if resume else investigation.depth,
+        max_questions=settings.max_questions,
+        max_posts=settings.max_posts,
+    )
+    try:
+        async with open_tools(settings, investigation) as tools:
+            investigator = Investigator(investigation, tools, store, limits, on_change)
+            return await (investigator.resume() if resume else investigator.run())
+    except (ModelError, SearchError) as error:
+        investigation.status, investigation.error = "failed", str(error)
+        store.save(investigation)
+        return investigation
+
+
+async def continue_investigation(
+    investigation: Investigation,
+    settings: AppSettings,
+    store: Store,
+    on_change: Callable[[Investigation], None] | None = None,
+) -> Investigation:
+    """More rounds on a finished investigation; see Investigator.resume."""
+    return await run_investigation(investigation, settings, store, on_change, resume=True)

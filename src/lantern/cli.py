@@ -11,9 +11,9 @@ from pydantic import ValidationError
 
 from lantern.config import AppSettings, Settings
 from lantern.db.migrate import MigrationError, upgrade
-from lantern.models import Investigation
+from lantern.models import Investigation, now
 from lantern.report import to_markdown
-from lantern.runtime import run_investigation
+from lantern.runtime import continue_investigation, run_investigation
 from lantern.store import Store
 from lantern.web.app import create_app
 
@@ -31,11 +31,20 @@ def _database() -> int:
     return 0
 
 
-def _run(brief: str, depth: Literal["quick", "deep"]) -> int:
-
+def _run(brief: str | None, depth: Literal["quick", "deep"], resume: str | None = None) -> int:
     settings = AppSettings()
     store = Store(settings.data_dir)
-    seen = 0
+    if resume is not None:
+        found = store.load(resume)
+        if found is None or not found.questions or found.status in {"queued", "running"}:
+            sys.stderr.write("No finished investigation with that id. See var/investigations.\n")
+            return 1
+        investigation = found
+        investigation.continued_at.append(now())
+    else:
+        investigation = Investigation(id=store.new_id(), brief=brief or "", depth=depth)
+    store.save(investigation)
+    seen = len(investigation.steps)
 
     def show(investigation: Investigation) -> None:
         nonlocal seen
@@ -44,9 +53,8 @@ def _run(brief: str, depth: Literal["quick", "deep"]) -> int:
         sys.stdout.flush()
         seen = len(investigation.steps)
 
-    investigation = Investigation(id=store.new_id(), brief=brief, depth=depth)
-    store.save(investigation)
-    result = asyncio.run(run_investigation(investigation, settings, store, show))
+    work = continue_investigation if resume else run_investigation
+    result = asyncio.run(work(investigation, settings, store, show))
     if result.status == "done":
         path = store.root / "investigations" / f"{result.id}.md"
         path.write_text(to_markdown(result), encoding="utf-8")
@@ -69,6 +77,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     run.add_argument(
         "--quick", action="store_true", help="One round of about 10 pages instead of a deep run"
     )
+    again = commands.add_parser("continue", help="Continue a finished investigation")
+    again.add_argument("id", help="The investigation id (from the web app or var/)")
     serve = commands.add_parser("serve", help="Start the web app")
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8000)
@@ -77,6 +87,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     arguments = parser.parse_args(argv)
     if arguments.command == "run":
         return _run(arguments.brief, "quick" if arguments.quick else "deep")
+    if arguments.command == "continue":
+        return _run(None, "deep", resume=arguments.id)
     if arguments.command == "serve":
         return _serve(arguments.host, arguments.port)
     return _database()

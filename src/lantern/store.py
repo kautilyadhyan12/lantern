@@ -43,8 +43,11 @@ class Store:
         return sorted(items, key=lambda item: item.created_at, reverse=True)
 
     def started_today(self) -> int:
+        """Investigations started today, counting each "continue" as one more."""
         today = datetime.now(UTC).date()
-        return sum(1 for item in self.all() if item.created_at.date() == today)
+        starts = [item.created_at for item in self.all()]
+        starts += [at for item in self.all() for at in item.continued_at]
+        return sum(1 for at in starts if at.date() == today)
 
     def put_blob(self, data: bytes) -> str:
         return self._put("blobs", data, ".bin")
