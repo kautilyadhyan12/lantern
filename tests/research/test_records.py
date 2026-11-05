@@ -422,7 +422,12 @@ async def test_the_agent_saves_records_with_code_claims_only_for_names_in_eviden
 
 def test_record_tools_are_built_only_when_enabled(tmp_path):
     on = record_tools(AppSettings(data_dir=str(tmp_path)), fetcher=None)
-    assert [tool.name for tool in on] == ["sanctions_search", "wiki_lookup"]
+    assert [tool.name for tool in on] == [
+        "sanctions_search",
+        "wiki_lookup",
+        "company_lookup",
+        "domain_lookup",
+    ]
     assert record_tools(AppSettings(records_enabled=False), fetcher=None) == ()
     assert "sanctions_search" in prompts.RESEARCH
 

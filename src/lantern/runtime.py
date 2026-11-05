@@ -17,6 +17,8 @@ from lantern.search import SearchError, TavilySearch
 from lantern.sites import blocked_site
 from lantern.social import PublicSocial
 from lantern.store import Store
+from lantern.tools.adapters.companies import CompanyLookup
+from lantern.tools.adapters.domains import DomainLookup
 from lantern.tools.adapters.sanctions import SanctionsSearch
 from lantern.tools.adapters.wiki import WikiLookup
 from lantern.tools.base import Tool
@@ -83,11 +85,16 @@ def fast_order(found: list[Provider], settings: AppSettings) -> list[Provider]:
 
 def record_tools(settings: AppSettings, fetcher: Fetcher) -> tuple[Tool, ...]:
     """The agent's official-record tools: sanctions lists (cached a day under the data
-    folder) and Wikipedia/Wikidata background."""
+    folder), Wikipedia/Wikidata background, the GLEIF company register and domain RDAP."""
     if not settings.records_enabled:
         return ()
     lists = Path(settings.data_dir) / "cache" / "lists"
-    return (SanctionsSearch(fetcher, lists), WikiLookup(fetcher))
+    return (
+        SanctionsSearch(fetcher, lists),
+        WikiLookup(fetcher),
+        CompanyLookup(fetcher),
+        DomainLookup(fetcher),
+    )
 
 
 def budget_for(investigation: Investigation, settings: AppSettings, *, resume: bool) -> Budget:

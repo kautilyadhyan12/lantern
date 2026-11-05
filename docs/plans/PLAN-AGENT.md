@@ -484,3 +484,27 @@ Each stage is one pull request.
     Content-Security-Policy is unchanged. All names are escaped by the templates.
   - Token cost: the extraction and assessment prompts grew by about 90 and 80 tokens. The
     relation fields add a few output tokens only to claims that state a relation.
+- 2026-11-05: AG4, first part, built on the owner's go-ahead: `company_lookup` (GLEIF),
+  `domain_lookup` (RDAP) and a repeatable run comparison. External facts re-checked today:
+  - GLEIF `api.gleif.org/api/v1/lei-records`: no key, CC0, 60 requests a minute. The
+    `filter[entity.legalName]` filter also returns similar names ("TATA STEEL TABB
+    LIMITED" for "TATA STEEL LIMITED"), so only exact names are kept. Parents come from the
+    `direct-parent` and `ultimate-parent` relationships when GLEIF links a `lei-record`
+    (Jaguar Land Rover Limited → Jaguar Land Rover Automotive PLC → Tata Motors Passenger
+    Vehicles Limited); otherwise a reporting exception applies. GLEIF answers `text/plain`
+    to a browser-style Accept header, so `fetch_data` now sends the types it expects.
+  - RDAP: IANA's bootstrap file `data.iana.org/rdap/dns.json` (592 services; RFC 9224)
+    gives each TLD's registry. Verisign (`.com`) and Nominet (`.uk`) answered
+    `application/rdap+json` without a key; Verisign's notice asks for lawful, low-volume use.
+  - Settled: company records keep the legal name, other names, LEI, jurisdiction, status,
+    the city and country of the legal address, and parents. Sole proprietors and full street
+    addresses are never kept. Domain records keep the registry dates, status, name servers,
+    DNSSEC and the registrar. Registrant, administrative and technical contacts are never
+    kept. A new relation, `subsidiary_of`, joins the vocabulary for parent companies.
+  - Not built:
+    - UK Companies House needs an API key, which the owner would register.
+    - SEC EDGAR asks for a contact email in every request's User-Agent, an owner decision.
+    - crt.sh has no published terms and an undocumented JSON output (`04` §6), so it is
+      left out.
+  - `scripts/compare_runs.py` prints the AG1b-AC8 numbers for any saved runs, from the saved
+    files only.

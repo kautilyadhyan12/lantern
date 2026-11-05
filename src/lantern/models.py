@@ -106,6 +106,7 @@ RelationName = Literal[
     "killed_in",
     "located_in",
     "reported_by",
+    "subsidiary_of",
 ]
 # The fixed relation vocabulary. There are no relations for protected traits (religion,
 # ethnicity, caste, health, sexuality, political opinion, union membership), by design.
