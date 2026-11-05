@@ -13,10 +13,15 @@ You ask a question. Lantern:
    time. It reads the case file (what was searched, what was found, what failed) and picks
    up to four tool calls with a one-line reason each: web and news search (within the
    period the question covers, and in local languages where useful), social media ground
-   reports, links to posts, and reading a page. The reasons are shown live. A tool gateway
+   reports, links to posts, reading a page, the official US (OFAC) and UN Security Council
+   sanctions lists, and Wikipedia and Wikidata for background and other names and
+   spellings. The reasons are shown live. A tool gateway
    checks every call before it runs: the tool must exist, the arguments must be valid, a
    page to read must be a link Lantern already knows, social media is searched only for the
-   question's subject, and the budget must allow it. A triage step picks the most
+   question's subject, records are looked up only for names already in the evidence, and
+   the budget must allow it. Sanctions entries (graded A) and Wikidata facts (graded C,
+   background only) become claims written by code, never by the AI; dates of birth,
+   identity numbers, family details and protected traits such as religion are never kept. A triage step picks the most
    promising results to read and notes names seen in them. Code decides when a key question
    is closed and when research stops. A deep investigation may use up to 6 rounds, 30 pages,
    60 tool calls, 15 minutes and 100,000 AI tokens; a quick look one round, 10 pages and

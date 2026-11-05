@@ -421,3 +421,41 @@ Each stage is one pull request.
 - 2026-11-05: owner decision: lower token limits, because this is a demo on free
   allowances. Quick look 40k, deep 100k, continue 50k. They are now settings
   (`LANTERN_QUICK_TOKENS`, `LANTERN_DEEP_TOKENS`, `LANTERN_CONTINUE_TOKENS`).
+- 2026-11-05: AG2 built (records toolbox), on the owner's go-ahead. External facts re-checked
+  today (`04` §12):
+  - OFAC `SDN.CSV` (5,815,063 bytes) and `ALT.CSV` (1,064,485 bytes) from
+    sanctionslistservice.ofac.treas.gov: 200 `text/csv`, ASCII, no header row, `-0-` for
+    empty, 19,499 entries. US government data; no key or stated rate limit. Entry pages
+    `sanctionssearch.ofac.treas.gov/Details.aspx?id=<n>` answer 200.
+  - UN `consolidated.xml` (2,177,566 bytes): 200 `application/xml`, 733 individuals and
+    274 entities; Lashkar-e-Tayyiba is QDe.118. No key or stated rate limit. Kept locally,
+    never redistributed.
+  - Wikipedia REST page summary and Wikidata `wbgetentities`/`wbsearchentities`: 200 JSON.
+    Wikimedia's User-Agent policy asks for an email or a specific URL; Lantern's agent string
+    carries its project URL. Anonymous API use has low rate limits (March 2026); Lantern
+    makes 2 to 4 requests per lookup, one per second. Content CC BY-SA, cited with a link.
+  - en.wikipedia.org's robots.txt disallows `/api/` for crawlers. The safe fetcher gains
+    `fetch_data` for documented APIs and published data files: every egress check except
+    robots.txt, which governs crawling ordinary pages (invariant 7), with its own size cap
+    (20 MB for the lists) and time limit.
+
+  Details settled while building:
+  - Names match with the same words in any order, ignoring case, accents and punctuation.
+    There is no fuzzy matching. For organisations only, one-letter joining words are also
+    ignored, so "Lashkar-e-Taiba" finds "Lashkar-i-Taiba". People keep their initials.
+  - Each sanctions entry keeps only names, aliases, programmes, "Linked To" entries, the
+    listing date and, for UN organisations, the listing note. Dates of birth, places of
+    birth, passport and ID numbers, addresses, and the UN notes on individuals (which often
+    name relatives) are never kept. A person's entry always says that a matching name alone
+    does not show it is the same person.
+  - `wiki_lookup` reads only instance of, founded by, member of, position held, date of
+    death and place of death. Religion, ethnicity and similar properties are never read,
+    even when Wikidata has them (Hafiz Saeed's entry lists a religion). For people, the
+    Wikidata description and the Wikipedia summary are not kept either.
+  - Record tools run only for a name written in the research question or in the evidence
+    (a gateway policy check). Their statements become claims by code, anchored in the
+    saved record text; no model reads them, so they cost no AI tokens.
+  - GDELT (`gdelt_search`, AG2-AC3) is deferred: it throttled this codespace before, and
+    its results would add triage tokens. It can come back later as its own small change.
+  - The contract tests use abridged copies of the real responses fetched today. The people
+    in them are invented, so no real person's details are in the public repository.

@@ -29,7 +29,7 @@ class Source(BaseModel):
     ref: str
     url: str
     domain: str
-    kind: Literal["page", "post"] = "page"
+    kind: Literal["page", "post", "record"] = "page"  # record: an official list or reference entry
     origin: str = ""
     title: str | None = None
     published: str | None = None
