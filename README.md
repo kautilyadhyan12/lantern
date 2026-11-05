@@ -9,15 +9,23 @@ You ask a question. Lantern:
 1. **Checks it is safe to research.** Fixed rules, then a model check, refuse questions
    that target private people, locate or track anyone, involve minors, or seek private data.
 2. **Splits it into key questions** (`Q1`, `Q2`, …) that together answer it.
-3. **Investigates in rounds.** It searches the web and the news (within the period the
-   question covers, and in local languages where useful), lets the model choose the most
-   promising results, then reviews what it found and follows up: single-source items,
-   missing incidents, other names and spellings, and primary sources. A deep investigation
-   runs up to three rounds and 30 pages; a quick look runs one. For questions that ask for
-   every instance, it keeps a list of everything found, each item marked corroborated or
-   single source. It reads pages politely: it only opens links returned by search,
-   obeys robots.txt, identifies itself, and never connects to private or internal network
-   addresses. Search results themselves are never stored.
+3. **Investigates like an analyst.** A researcher agent works on one key question at a
+   time. It reads the case file (what was searched, what was found, what failed) and picks
+   up to four tool calls with a one-line reason each: web and news search (within the
+   period the question covers, and in local languages where useful), social media ground
+   reports, links to posts, and reading a page. The reasons are shown live. A tool gateway
+   checks every call before it runs: the tool must exist, the arguments must be valid, a
+   page to read must be a link Lantern already knows, social media is searched only for the
+   question's subject, and the budget must allow it. A triage step picks the most
+   promising results to read and notes names seen in them. Code decides when a key question
+   is closed and when research stops. A deep investigation may use up to 6 rounds, 30 pages,
+   60 tool calls, 15 minutes and 200,000 AI tokens; a quick look one round and 10 pages.
+   Research stops at 85% of any budget, so the assessment and report always run, and the
+   report says what stopped it. For questions that ask for every instance, it keeps a list
+   of everything found, each item marked corroborated or single source. It reads pages
+   politely: it obeys robots.txt, identifies itself, and never connects to private or
+   internal network addresses. Search results themselves are never stored.
+   (`LANTERN_AGENT=0` switches back to the earlier fixed research rounds.)
 4. **Adds ground reports from public social media.** Bluesky public search and Mastodon
    hashtag timelines supply first-hand posts about the event, graded D (unverified) until
    other sources confirm them. Only event searches are made, never an account's timeline;
@@ -37,8 +45,8 @@ You ask a question. Lantern:
 8. **Writes a verified report.** Every sentence must cite existing claims; sentences that
    do not are removed and listed. Each citation opens the exact quote, highlighted inside
    the saved copy of its source.
-9. **Continues when asked.** "Continue investigating" on a finished report runs up to two
-   more rounds on the same investigation, skipping searches and pages already done, keeping
+9. **Continues when asked.** "Continue investigating" on a finished report gives the agent
+   up to two more rounds and 16 more pages on the same investigation, skipping searches and pages already done, keeping
    everything found, and rewriting the report.
 
 ## Try it

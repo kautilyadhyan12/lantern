@@ -1,16 +1,17 @@
 """The only way to run a tool: every call is vetted, budgeted, paced, run and logged here.
 
 Checks run in a fixed order, and nothing reaches the network until all of them pass:
-the tool exists and is allowed, the arguments are valid, the call is not a repeat, a page
-to read is a link the investigation already knows, and the budget has calls left.
+the tool exists and is allowed, the arguments are valid, the call is not a repeat, the
+tool's own policy check (if any) passes, a page to read is a link the investigation already
+knows, and the budget has calls left.
 """
 
 import asyncio
 import json
 import time
-from collections.abc import Awaitable, Callable, Iterable
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ValidationError
 
@@ -50,6 +51,7 @@ class ToolGateway:
         on_step: Callable[[str], None],
         *,
         allowed: Iterable[str] | None = None,
+        checks: Mapping[str, Callable[[Any], str | None]] | None = None,
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
@@ -57,6 +59,7 @@ class ToolGateway:
         self.budget = budget
         self.known_urls = known_urls  # canonical links the investigation may read
         self.allowed = set(registry.names() if allowed is None else allowed)
+        self.checks = dict(checks or {})  # tool name → policy check: why not, or None
         self._on_step = on_step
         self._clock = clock
         self._sleep = sleep
@@ -66,7 +69,7 @@ class ToolGateway:
 
     async def run(self, call: ToolCall, ctx: ToolContext) -> Outcome:
         outcome = await self._run(call, ctx)
-        self._on_step(self._line(outcome))
+        self._on_step(describe(outcome))
         return outcome
 
     async def _run(self, call: ToolCall, ctx: ToolContext) -> Outcome:
@@ -100,12 +103,21 @@ class ToolGateway:
         key = f"{tool.name} {json.dumps(args.model_dump(mode='json'), sort_keys=True)}"
         if key in self._done:
             return Outcome(call, "duplicate", f"The same call was made before: {self._done[key]}")
-        if tool.kind == "read" and canonical(str(getattr(args, "url", ""))) not in self.known_urls:
-            return Outcome(call, "refused", PROVENANCE)
-        if self.budget.left(tool.kind) <= 0:
-            reason = f"This run has no {tool.kind} calls left in its budget."
-            return Outcome(call, "refused", reason)
+        if refusal := self._refusal(tool, args):
+            return Outcome(call, "refused", refusal)
         return tool, args, key
+
+    def _refusal(self, tool: Tool, args: BaseModel) -> str | None:
+        """Why policy forbids this call: the tool's own check, the link's provenance, or the
+        budget. None when it may run."""
+        check = self.checks.get(tool.name)
+        if check is not None and (reason := check(args)):
+            return reason
+        if tool.kind == "read" and canonical(str(getattr(args, "url", ""))) not in self.known_urls:
+            return PROVENANCE
+        if self.budget.left(tool.kind) <= 0:
+            return f"This run has no {tool.kind} calls left in its budget."
+        return None
 
     async def _pace(self, tool: Tool) -> None:
         """Wait until `min_interval` has passed since the last call with the same rate key."""
@@ -117,12 +129,12 @@ class ToolGateway:
                 await self._sleep(wait)
             self._next[tool.rate_key] = self._clock() + tool.min_interval
 
-    @staticmethod
-    def _line(outcome: Outcome) -> str:
-        """One plain line for the investigation log."""
-        call = outcome.call
-        if outcome.status == "ok":
-            return outcome.reason or f"{call.tool}: done."
-        target = next((value for value in call.args.values() if isinstance(value, str)), "")
-        shown = f" “{target[:100]}”" if target else ""
-        return f"{call.tool}{shown}: {SHOWN[outcome.status]}. {outcome.reason}"
+
+def describe(outcome: Outcome) -> str:
+    """One plain line for the investigation log, and for the researcher's next step."""
+    call = outcome.call
+    if outcome.status == "ok":
+        return outcome.reason or f"{call.tool}: done."
+    target = next((value for value in call.args.values() if isinstance(value, str)), "")
+    shown = f" “{target[:100]}”" if target else ""
+    return f"{call.tool}{shown}: {SHOWN[outcome.status]}. {outcome.reason}"

@@ -25,6 +25,25 @@ class QuotaError(ModelError):
     """Every provider is at its free limit: the whole investigation must stop."""
 
 
+class BudgetError(QuotaError):
+    """This run used the model tokens its budget allows for the current phase."""
+
+
+@dataclass
+class TokenBudget:
+    """Model tokens one run may use, across every provider and role. Research may use only
+    `research_share` of them; the rest is kept so the assessment and report always run."""
+
+    total: int
+    start: int = 0  # tokens the investigation had used before this run
+    research_share: float = 0.85
+    researching: bool = True
+
+    def limit(self) -> int:
+        share = self.research_share if self.researching else 1.0
+        return self.start + int(self.total * share)
+
+
 @dataclass
 class Provider:
     name: str
@@ -51,6 +70,7 @@ class Gateway:
         usage: Usage,
         max_calls: int,
         transport: httpx.AsyncBaseTransport | None = None,
+        tokens: TokenBudget | None = None,
     ) -> None:
         if not providers:
             msg = "No AI model is configured. Set LANTERN_GROQ_API_KEY or LANTERN_CEREBRAS_API_KEY."
@@ -58,6 +78,7 @@ class Gateway:
         self._providers = providers
         self._usage = usage
         self._max_calls = max_calls
+        self._tokens = tokens
         self._client = httpx.AsyncClient(
             transport=transport, timeout=httpx.Timeout(120.0, connect=10.0)
         )
@@ -99,6 +120,11 @@ class Gateway:
         if self._usage.llm_calls >= self._max_calls:
             msg = f"The investigation reached its limit of {self._max_calls} AI calls."
             raise ModelError(msg)
+        used = self._usage.tokens_in + self._usage.tokens_out
+        if self._tokens is not None and used >= self._tokens.limit():
+            phase = "research" if self._tokens.researching else "this investigation"
+            msg = f"The AI token budget for {phase} is used up ({used:,} tokens)."
+            raise BudgetError(msg)
         loop = asyncio.get_running_loop()
         too_large: set[str] = set()
         for _attempt in range(8):

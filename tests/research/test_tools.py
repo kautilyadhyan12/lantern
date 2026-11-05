@@ -236,6 +236,25 @@ async def test_the_checks_run_in_their_fixed_order():
     assert len(find.runs) == 1
 
 
+async def test_a_tools_policy_check_refuses_before_it_runs_or_spends_budget():
+    find = FakeTool("find")
+    budget = RunBudget(tool_calls=5, searches=5, pages=0, records=0)
+    lines = []
+    gate = ToolGateway(
+        Registry([find]),
+        budget,
+        set(),
+        lines.append,
+        checks={"find": lambda args: "Off topic." if "private" in args.query else None},
+    )
+    refused = await gate.run(call("find", query="a private person"), CTX)
+    assert (refused.status, refused.reason) == ("refused", "Off topic.")
+    assert lines == ["find “a private person”: not run. Off topic."]
+    assert (await gate.run(call("find", query="floods"), CTX)).status == "ok"
+    assert len(find.runs) == 1
+    assert budget.searches == 4
+
+
 @pytest.mark.ac("AG1a-AC2")
 async def test_calls_are_paced_per_rate_key():
     clock = FakeClock()

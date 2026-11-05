@@ -39,6 +39,7 @@ class AppSettings(BaseSettings):
     tavily_api_key: SecretStr | None = None
     groq_api_key: SecretStr | None = None
     groq_model: str = "openai/gpt-oss-120b"
+    fast_model: str = "openai/gpt-oss-20b"  # Groq model for triage and item lists
     cerebras_api_key: SecretStr | None = None
     cerebras_model: str = "gpt-oss-120b"
     gemini_api_key: SecretStr | None = None
@@ -47,7 +48,8 @@ class AppSettings(BaseSettings):
     user_agent: str = "LanternResearch/0.1 (+https://github.com/kautilyadhyan12/lantern)"
     daily_run_limit: int = 10
     max_questions: int = 4
-    max_llm_calls: int = 100
+    max_llm_calls: int = 200  # a backstop: the agent's token budget binds first
+    agent: bool = True  # the researcher agent; false restores the fixed research rounds
     social_enabled: bool = True
     archive_enabled: bool = True
     max_posts: int = 8

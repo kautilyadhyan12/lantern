@@ -142,6 +142,8 @@ class Usage(BaseModel):
     tokens_out: int = 0
     claims_dropped: int = 0
     rounds: int = 0
+    research_steps: int = 0  # researcher steps taken by the agent
+    tools: dict[str, int] = Field(default_factory=dict)  # tool name → calls that ran
     providers: list[str] = Field(default_factory=list)
 
 
@@ -158,6 +160,7 @@ class Investigation(BaseModel):
     continued_at: list[AwareDatetime] = Field(default_factory=list)
     safety: str = "Not checked yet."
     error: str | None = None
+    stopped_by: str = ""  # what ended the last pass of research, in plain words
     steps: list[Step] = Field(default_factory=list)
     questions: list[Question] = Field(default_factory=list)
     sources: list[Source] = Field(default_factory=list)
