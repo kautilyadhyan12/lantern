@@ -802,11 +802,18 @@ class Investigator:
                     items.append(old)
                     covered |= set(old.claim_refs)
             items = self._merge_same_names(items)
+            for item in items:
+                item.in_period = not assessment.outside_period(
+                    item.when, now().date(), self._time_range
+                )
             self.inv.items = [i for i in self.inv.items if i.question_ref != question.ref] + items
-            corroborated = sum(item.status == "corroborated" for item in items)
+            current = [item for item in items if item.in_period]
+            corroborated = sum(item.status == "corroborated" for item in current)
+            older = len(items) - len(current)
+            note = f"; {older} more outside the period" if older else ""
             self.note(
-                f"{question.ref}: {len(items)} items found so far ({corroborated} corroborated, "
-                f"{len(items) - corroborated} from a single source)."
+                f"{question.ref}: {len(current)} items found so far ({corroborated} corroborated, "
+                f"{len(current) - corroborated} from a single source{note})."
             )
 
     def _items(

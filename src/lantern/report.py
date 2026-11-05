@@ -142,14 +142,18 @@ def _finding_lines(investigation: Investigation, report: Report, finding: Findin
     else:
         lines.append(f"Could not be determined. {finding.answer}")
     items = [i for i in investigation.items if i.question_ref == finding.question_ref]
-    if items:
-        lines += ["", f"### Everything found ({len(items)})", ""]
-        lines += [
-            f"- **{item.name}** ({item.when or 'date unknown'}) — {item.summary} "
-            f"*({item.status}; {len(item.origins)} "
-            f"sources; best grade {item.best_grade}; {', '.join(item.claim_refs)})*"
-            for item in items
-        ]
+    for heading, rows in (
+        ("Everything found", [item for item in items if item.in_period]),
+        ("Also found, dated before the period asked about", [i for i in items if not i.in_period]),
+    ):
+        if rows:
+            lines += ["", f"### {heading} ({len(rows)})", ""]
+            lines += [
+                f"- **{item.name}** ({item.when or 'date unknown'}) — {item.summary} "
+                f"*({item.status}; {len(item.origins)} "
+                f"sources; best grade {item.best_grade}; {', '.join(item.claim_refs)})*"
+                for item in rows
+            ]
     mentions = [m for m in investigation.mentions if m.question_ref == finding.question_ref]
     if mentions:
         lines += ["", f"### Also seen in search results, not confirmed ({len(mentions)})", ""]

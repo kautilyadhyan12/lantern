@@ -79,6 +79,7 @@ class Item(BaseModel):
     origins: list[str]
     best_grade: str
     status: Literal["corroborated", "single source"]
+    in_period: bool = True
 
 
 class Claim(BaseModel):

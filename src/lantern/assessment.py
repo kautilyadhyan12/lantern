@@ -3,7 +3,10 @@
 The model may propose a likelihood; these rules decide what the evidence allows.
 """
 
+import calendar
+import re
 from collections.abc import Iterable
+from datetime import date, timedelta
 from typing import Literal
 from urllib.parse import urlsplit
 
@@ -145,6 +148,40 @@ def clamp_likelihood(proposed: str, domains: int) -> str:
     index = TERMS.index(proposed) if proposed in TERMS else 3
     spread = {0: 0, 1: 1, 2: 2}.get(domains, 3)
     return TERMS[min(max(index, 3 - spread), 3 + spread)]
+
+
+_MONTHS = {
+    name: number
+    for number, full in enumerate(calendar.month_name)
+    if full
+    for name in (full.lower(), full[:3].lower())
+}
+PERIOD_DAYS = {"day": 1, "week": 7, "month": 31, "year": 366}
+
+
+def period_end(when: str) -> date | None:
+    """The last day a reported date could mean: "May 2025" → 31 May 2025, "2025" → 31 Dec.
+
+    None when no year is given. Generous on purpose: an item is only treated as outside a
+    period when even the latest reading of its date falls before the period starts.
+    """
+    lowered = when.lower()
+    years = re.findall(r"\b(?:19|20)\d{2}\b", lowered)
+    if not years:
+        return None
+    year = int(years[-1])
+    months = [_MONTHS[word] for word in re.findall(r"[a-z]+", lowered) if word in _MONTHS]
+    if not months:
+        return date(year, 12, 31)
+    month = months[-1]
+    return date(year, month, calendar.monthrange(year, month)[1])
+
+
+def outside_period(when: str, today: date, time_range: str | None) -> bool:
+    """Whether a reported date clearly falls before the period the question asks about."""
+    days = PERIOD_DAYS.get(time_range or "")
+    end = period_end(when)
+    return days is not None and end is not None and end < today - timedelta(days=days)
 
 
 def item_status(origins: int) -> Literal["corroborated", "single source"]:

@@ -6,6 +6,26 @@
 {%- for ref in refs %}<button type="button" class="cite" data-ref="{{ ref }}">{{ ref }}</button>{% endfor -%}
 {%- endmacro %}
 
+{% macro item_table(rows) -%}
+<div class="table-wrap">
+<table class="items">
+  <thead><tr><th>Item</th><th>When</th><th>What is reported</th><th>Status</th><th>Evidence</th></tr></thead>
+  <tbody>
+  {% for item in rows %}
+  <tr>
+    <td><b>{{ item.name }}</b></td>
+    <td>{{ item.when or "unknown" }}</td>
+    <td>{{ item.summary }}</td>
+    <td><span class="chip st-{{ 'ok' if item.status == 'corroborated' else 'single' }}">{{ item.status }}</span>
+      <div class="muted">{{ item.origins | length }} source{{ "" if item.origins | length == 1 else "s" }} · best grade {{ item.best_grade }}</div></td>
+    <td>{{ cite(item.claim_refs) }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{%- endmacro %}
+
 {% macro sentence(s) -%}
 <span class="sentence">{{ s.text }} {{ cite(s.cites) }}</span>
 {%- endmacro %}
@@ -83,30 +103,21 @@
     {% else %}
       <p class="muted">Could not be determined. {{ finding.answer }}</p>
     {% endif %}
-    {% set items = inv.items | selectattr("question_ref", "equalto", finding.question_ref) | list %}
+    {% set all_items = inv.items | selectattr("question_ref", "equalto", finding.question_ref) | list %}
+    {% set items = all_items | selectattr("in_period") | list %}
+    {% set older = all_items | rejectattr("in_period") | list %}
     {% if items %}
     {% set corroborated = items | selectattr("status", "equalto", "corroborated") | list | length %}
     <h4 class="items-title">Everything found: {{ items | length }}
       <span class="muted">({{ corroborated }} corroborated, {{ items | length - corroborated }} from a single source)</span></h4>
     <p class="muted">Every item any source reported, however weak the source. “Corroborated” means at
       least two independent sources report it; single-source items are unconfirmed.</p>
-    <div class="table-wrap">
-    <table class="items">
-      <thead><tr><th>Item</th><th>When</th><th>What is reported</th><th>Status</th><th>Evidence</th></tr></thead>
-      <tbody>
-      {% for item in items %}
-      <tr>
-        <td><b>{{ item.name }}</b></td>
-        <td>{{ item.when or "unknown" }}</td>
-        <td>{{ item.summary }}</td>
-        <td><span class="chip st-{{ 'ok' if item.status == 'corroborated' else 'single' }}">{{ item.status }}</span>
-          <div class="muted">{{ item.origins | length }} source{{ "" if item.origins | length == 1 else "s" }} · best grade {{ item.best_grade }}</div></td>
-        <td>{{ cite(item.claim_refs) }}</td>
-      </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    </div>
+    {{ item_table(items) }}
+    {% endif %}
+    {% if older %}
+    <details class="older"><summary>Also found, but dated before the period asked about: {{ older | length }}</summary>
+      {{ item_table(older) }}
+    </details>
     {% endif %}
     {% set mentions = inv.mentions | selectattr("question_ref", "equalto", finding.question_ref) | list %}
     {% if mentions %}

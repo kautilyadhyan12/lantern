@@ -1,5 +1,7 @@
 """Pure rules: quote anchoring, ratings, confidence, likelihood limits and safety refusals."""
 
+from datetime import date
+
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
@@ -140,3 +142,24 @@ def test_ordinary_research_briefs_pass_the_fixed_rules(brief):
 def test_too_short_or_long_briefs_are_refused():
     assert check_brief("floods") is not None
     assert check_brief("x" * 700) is not None
+
+
+@pytest.mark.parametrize(
+    ("when", "outside"),
+    [
+        ("18 May 2025", True),  # before 5 Nov 2025
+        ("December 2024", True),
+        ("September 2023", True),
+        ("2025", False),  # could be December 2025: kept
+        ("May 2026", False),
+        ("October 19, 2026", False),
+        ("unknown", False),
+        ("", False),
+    ],
+)
+def test_items_clearly_before_the_period_are_flagged(when, outside):
+    assert assessment.outside_period(when, date(2026, 11, 5), "year") is outside
+
+
+def test_no_period_means_nothing_is_outside_it():
+    assert assessment.outside_period("May 1999", date(2026, 11, 5), None) is False
