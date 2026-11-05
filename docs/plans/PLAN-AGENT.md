@@ -192,6 +192,16 @@ Budgets replace the fixed depths:
 | Pages | 10 | 30 | +16 |
 | Tool calls | 15 | 60 | +25 |
 | Wall clock | 5 min | 15 min | 8 min |
+| Model tokens (all providers) | 60k | 200k | +100k |
+
+The model gateway enforces the token budget. At 85% of any budget (tokens, tool calls, pages, wall clock), research stops and the run moves to assessment and the report. This share is reserved, so a report is always produced, and the report says what stopped it (`02` §13).
+
+Models are routed by role, spreading work over separate free allowances:
+
+- **Researcher, assessor and writer:** `groq:openai/gpt-oss-120b`.
+- **Triage and inventory:** a second free model with its own daily quota (`groq:openai/gpt-oss-20b` per `04` §1; re-verify at build time).
+- **Bulk reading:** Gemini.
+- **Fallback:** each role falls back to the other entries when a quota runs out.
 
 The live log shows one line per researcher step, for example: *"Q1 · step 3 · news_search 'Abu Hashim Lahore fall': a report calls Muhammad Sarwar 'Abu Hashim'; searching the alias for more reporting."*
 
@@ -245,6 +255,7 @@ The researcher prompt gains short guidance on when each tool helps. For example:
 - AG1b-AC5 The live log shows each step's note and calls. The report's method section lists the tools used and the steps taken.
 - AG1b-AC6 Injection canary: a captured page that says to read `https://evil.example/…` or to call an unlisted tool causes no such call. The provenance refusal is logged.
 - AG1b-AC7 Quick look, deep investigation and continue run as budgets of the same loop. Everything shipped in #1–#3 still holds: quote anchoring, citation check, ratings, archive rules, leads, social posts, items, mentions, period grouping.
+- AG1b-AC9 The token budget per depth is enforced. At 85% the loop stops research and moves to assessment and the report, and the report states that the budget stopped research (fake usage counts).
 - AG1b-AC8 Comparison: the same three questions are run with the fixed rounds and with the agent, and the PLAN log records items, corroborated items, pages, tokens and minutes. The fixed rounds are removed only if the agent is at least as good.
 
 ### AG2
@@ -285,7 +296,7 @@ The researcher prompt gains short guidance on when each tool helps. For example:
 
 | Risk | Mitigation |
 |---|---|
-| **Token use.** A deep agent run may use 1.5–2× today's tokens (about 150–200k), close to Groq's free 200k/day. | Capped views; Gemini does the bulk reading; per-depth budgets; stop on no progress. A paid model (DeepSeek, about $0.15–0.30 per investigation per `03` §5) is the owner's decision. |
+| **Token use.** A deep agent run may use 1.5–2× today's tokens (about 150–200k), close to Groq's free 200k/day. | A token budget per depth (60k / 200k / +100k), with a soft stop at 85%. Routing by role spreads the work over models with separate free quotas. Capped views; assess only when the evidence changed; stop on no progress. The live comparison (6 runs) is spread over 2–3 days. A paid model (DeepSeek, about $0.15–0.30 per investigation per `03` §5) is the owner's decision. |
 | **Clumsy tool choices** by free models. | Clear tool descriptions with "when to use"; refusals fed back; one-line reasons visible for review; the comparison before the switch-over. |
 | **Wandering or loops.** | Duplicate suppression, attempt caps, round and wall-clock limits, the no-progress stop. |
 | **Prompt injection.** | Read-only tools; menu-only calls; URL provenance; refs-only outputs; schema validation; the canary test. |
@@ -310,6 +321,14 @@ Each stage is one pull request.
 - Until AG1b-AC8 passes, `LANTERN_AGENT=0` restores the fixed rounds.
 - New tools can be switched off one by one in settings.
 
+## Decisions (owner, 2026-11-05)
+
+1. The fixed rounds are replaced by the agent once the comparison (AG1b-AC8) shows it is at least as good.
+2. Each researcher step's reason is shown live on the progress page and kept in the step log.
+3. Deep-run limits: 6 rounds, 30 pages, 60 tool calls, 15 minutes and 200k model tokens.
+4. `AGENTS.md` opens with a note on the current way of working: staged pull requests, safety rules unchanged.
+
 ## Log
 
 - Plan written 2026-11-05.
+- 2026-11-05: owner approved decisions 1–4; token budgets and model routing by role added.
