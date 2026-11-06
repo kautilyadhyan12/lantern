@@ -159,6 +159,32 @@
     <p class="muted">Daily true-colour images from NASA (EOSDIS GIBS), with about 250–375 m detail.
       Code chose the clearest day near each date; no AI reads the images. Areas from
       OpenStreetMap (© OpenStreetMap contributors).</p>
+    {% if earth %}
+    <link rel="stylesheet" href="/static/vendor/leaflet-1.9.4/leaflet.css">
+    <div class="eo" id="eo" data-west="{{ earth.west }}" data-south="{{ earth.south }}" data-east="{{ earth.east }}" data-north="{{ earth.north }}">
+      <div class="eo-controls">
+        <label>Before <input type="date" id="eo-before" value="{{ earth.before }}" max="{{ earth.today }}"></label>
+        <label>After <input type="date" id="eo-after" value="{{ earth.after }}" max="{{ earth.today }}"></label>
+        <label>View <select id="eo-view">
+          <option value="viirs">True colour (VIIRS NOAA-20, fewest gaps)</option>
+          <option value="modis">True colour (MODIS Terra, sharper)</option>
+          <option value="bands721">False colour: water dark blue, burn scars brown (MODIS 7-2-1)</option>
+        </select></label>
+        <label><input type="checkbox" id="eo-labels" checked> Place names and borders</label>
+      </div>
+      <div class="eo-frame">
+        <div id="eo-map" class="eo-map"></div>
+        <div id="eo-divider" class="eo-divider" aria-hidden="true"></div>
+        <span class="eo-tag eo-left">Before</span><span class="eo-tag eo-right">After</span>
+      </div>
+      <input type="range" id="eo-swipe" class="eo-swipe" min="0" max="100" value="50" aria-label="Swipe between the before and after images">
+      <p class="muted">Explore live NASA imagery: drag the slider to compare, zoom and pan the map,
+        or pick other dates and views. Your browser loads these tiles straight from NASA. The saved
+        images below are the evidence this report cites.</p>
+    </div>
+    <script src="/static/vendor/leaflet-1.9.4/leaflet.js"></script>
+    <script src="/static/earth.js"></script>
+    {% endif %}
     <div class="views">
       {% for s in images %}
       <figure>

@@ -32,6 +32,7 @@ from lantern.tools.adapters.earth import (
     SatelliteViews,
 )
 from lantern.tools.base import ToolContext, ToolError
+from lantern.web import earthview
 from lantern.web.app import create_app
 
 from .fakes import FakeFetcher, FakeSearch
@@ -439,3 +440,48 @@ async def test_the_agent_saves_views_and_alerts_only_for_places_in_the_evidence(
         m.startswith("satellite_views “Gaza”: not run. Lantern looks up records") for m in messages
     )
     assert "ExtractOut" not in model.calls  # no model reads images or alerts
+
+
+def test_the_interactive_viewer_takes_its_area_and_dates_from_the_saved_images(tmp_path):
+    store = Store(tmp_path)
+    inv = Investigation(id=store.new_id(), brief="Floods in Assam?", status="done")
+    inv.questions = [Question(ref="Q1", text="What happened?")]
+    inv.report = Report()
+    common = {
+        "domain": "nasa.gov",
+        "fetched_at": now(),
+        "size": 1,
+        "reliability": "A",
+        "reliability_reason": "r",
+        "text_sha256": store.put_text("about"),
+        "sha256": store.put_blob(JPEG),
+        "kind": "image",
+    }
+    viewer = "https://worldview.earthdata.nasa.gov/?v=89.699,24.136,96.012,27.971&l=X&t="
+    inv.sources = [
+        Source(ref="S1", url=f"{viewer}2026-05-21", **common),
+        Source(ref="S2", url="https://worldview.earthdata.nasa.gov/?broken", **common),
+        Source(ref="S3", url=f"{viewer}2026-10-25", **common),
+    ]
+    store.save(inv)
+    view = earthview.view(inv)
+    assert (view.west, view.south, view.east, view.north) == (89.699, 24.136, 96.012, 27.971)
+    assert (view.before, view.after) == ("2026-05-21", "2026-10-25")
+    assert earthview.view(Investigation(id="x", brief="y")) is None
+    client = TestClient(
+        create_app(AppSettings(data_dir=str(tmp_path), tavily_api_key="t", groq_api_key="g"))
+    )
+    response = client.get(f"/investigations/{inv.id}")
+    page = response.text
+    assert 'id="eo"' in page
+    assert 'data-west="89.699"' in page
+    assert 'id="eo-before" value="2026-05-21"' in page
+    assert 'id="eo-after" value="2026-10-25"' in page
+    assert '<script src="/static/vendor/leaflet-1.9.4/leaflet.js"></script>' in page
+    assert (
+        "img-src 'self' data: https://gibs.earthdata.nasa.gov;"
+        in response.headers["content-security-policy"]
+    )
+    assert "script-src 'self';" in response.headers["content-security-policy"]  # still local only
+    assert client.get("/static/vendor/leaflet-1.9.4/leaflet.js").status_code == 200
+    assert client.get("/static/earth.js").status_code == 200

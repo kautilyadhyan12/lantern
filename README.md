@@ -19,7 +19,7 @@ You ask a question. Lantern:
    registry records over RDAP (when a site was registered, and by which registrar, never
    who registered it), official disaster alerts from GDACS, and NASA satellite images of an
    area before and after an event (code picks the clearest day near each date and measures
-   the cloud; no AI reads the images). The reasons are shown live. A tool gateway
+   the cloud; no AI reads the images), with an interactive viewer on the report page to swipe between the dates, zoom, and switch to false colour. The reasons are shown live. A tool gateway
    checks every call before it runs: the tool must exist, the arguments must be valid, a
    page to read must be a link Lantern already knows, social media is searched only for the
    question's subject, records are looked up only for names already in the evidence, and

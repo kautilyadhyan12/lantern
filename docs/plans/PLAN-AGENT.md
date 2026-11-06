@@ -534,3 +534,14 @@ Each stage is one pull request.
     - GDACS alerts are graded B and link their event to the place on the links map.
     - The report shows the images side by side, each linking to NASA Worldview. They are
       served only for image sources and only as JPEG.
+- 2026-11-06: interactive satellite viewer, at the owner's request: static images were not
+  enough. NASA Worldview cannot be embedded (its `frame-ancestors` allows only listed
+  sites), so the report page gains its own viewer over NASA GIBS WMTS tiles.
+  - The page has a swipe slider between two dates, zoom and pan, date pickers, true colour
+    (VIIRS NOAA-20 or MODIS Terra) or false colour 7-2-1 (water dark blue, burn scars
+    brown), and NASA place-name and border overlays.
+  - It uses Leaflet 1.9.4 (BSD-2-Clause, the latest stable release), vendored under
+    `web/static/vendor/leaflet-1.9.4/`. It was downloaded from the npm registry and checked
+    against its published sha512 integrity; OSV lists no vulnerabilities for 1.9.4.
+  - The CSP only adds `https://gibs.earthdata.nasa.gov` to `img-src`; scripts stay local.
+  - The viewer is for exploring: the saved images remain the evidence the report cites.

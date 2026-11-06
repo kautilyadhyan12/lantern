@@ -235,3 +235,14 @@ blockquote {
 .views figure { margin: 0; }
 .views img { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line); }
 .views figcaption { font-size: 0.85rem; color: var(--muted); margin-top: 0.3rem; }
+
+/* Interactive satellite viewer */
+.eo { margin: 0.5rem 0 1.25rem; }
+.eo-controls { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; font-size: 0.9rem; margin-bottom: 0.5rem; }
+.eo-frame { position: relative; }
+.eo-map { height: 460px; border-radius: 8px; border: 1px solid var(--line); background: #0b0d10; }
+.eo-divider { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 4px #000; pointer-events: none; z-index: 800; }
+.eo-tag { position: absolute; top: 0.5rem; z-index: 800; padding: 0.1rem 0.5rem; border-radius: 4px; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 0.8rem; pointer-events: none; }
+.eo-left { left: 0.5rem; }
+.eo-right { right: 0.5rem; }
+.eo-swipe { width: 100%; margin: 0.4rem 0 0; }

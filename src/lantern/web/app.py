@@ -18,12 +18,13 @@ from lantern.models import Claim, Investigation, Source, now
 from lantern.report import to_markdown
 from lantern.runtime import continue_investigation, missing_keys, run_investigation
 from lantern.store import Store
-from lantern.web import linkmap
+from lantern.web import earthview, linkmap
 
 HERE = Path(__file__).parent
 Runner = Callable[[Investigation, AppSettings, Store], Coroutine[Any, Any, Investigation]]
 CSP = (
-    "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "
+    f"default-src 'self'; img-src 'self' data: {earthview.GIBS_TILES}; style-src 'self'; "
+    "script-src 'self'; "
     "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
 )
 
@@ -147,6 +148,7 @@ def create_app(  # noqa: PLR0915  # routes share one store and settings via clos
             "nodes": nodes,
             "edges": edges,
             "namesakes": linkmap.namesakes(item.entities),
+            "earth": earthview.view(item),
             "entity": {entity.ref: entity for entity in item.entities},
             "map_size": (linkmap.WIDTH, linkmap.HEIGHT),
             "claims": {claim.ref: claim for claim in item.claims},
