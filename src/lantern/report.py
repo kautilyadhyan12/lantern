@@ -154,6 +154,8 @@ def _verdict_lines(investigation: Investigation) -> list[str]:
     if verdict is None:
         return []
     lines = ["## Verdict", "", f"**{verdict.label.capitalize()}.**", ""]
+    if verdict.likelihood:
+        lines += [f"Likelihood: {verdict.likelihood} ({dict(LIKELIHOOD)[verdict.likelihood]}).", ""]
     if verdict.sentence:
         lines += [_cited(verdict.sentence), ""]
     if verdict.confidence:

@@ -1270,8 +1270,9 @@ class Investigator:
     def _verdict_sentence(
         self, out: prompts.VerdictOut, ruling: verdict.Ruling, cites: list[str], valid: set[str]
     ) -> Sentence | None:
-        """The verdict sentence when it states the decided label with the allowed likelihood
-        and passes the citation check; otherwise None, and it is listed as removed."""
+        """The verdict sentence when it states the decided label, uses no likelihood but the
+        allowed one (shown on its own beside the label anyway), and passes the citation
+        check; otherwise None, and it is listed as removed."""
         text = strip_refs(out.sentence)
         if not text:
             return None
@@ -1279,9 +1280,9 @@ class Investigator:
         reason = ""
         if ruling.label != out.label:
             reason = f"It states “{out.label}”, which the evidence does not carry."
-        elif likelihood_terms(text) != ({ruling.likelihood} if ruling.likelihood else set()):
+        elif (used := likelihood_terms(text)) and used != {ruling.likelihood}:
             reason = (
-                f"It does not use the likelihood the evidence allows ({ruling.likelihood})."
+                f"It uses a likelihood the evidence does not allow ({ruling.likelihood})."
                 if ruling.likelihood
                 else "An unproven verdict has no likelihood, but the sentence uses one."
             )

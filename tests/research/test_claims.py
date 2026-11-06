@@ -297,7 +297,7 @@ async def test_a_likelihood_the_evidence_cannot_carry_is_clamped_and_kept_apart(
     assert (verdict.likelihood, verdict.likelihood_proposed) == ("likely", "almost certain")
     assert verdict.sentence is None  # it used a likelihood the evidence does not allow
     assert any(
-        r.reason == "It does not use the likelihood the evidence allows (likely)."
+        r.reason == "It uses a likelihood the evidence does not allow (likely)."
         for r in inv.report.removed
     )
 
@@ -748,3 +748,22 @@ async def test_a_used_up_token_budget_leaves_the_report_and_an_unproven_verdict(
     assert inv.report is not None
     assert inv.verdict.label == "unproven"
     assert inv.verdict.reason.startswith("No verdict was weighed: The AI token budget")
+
+
+@pytest.mark.ac("CL-AC8")
+async def test_a_verdict_sentence_may_leave_the_likelihood_to_the_stamp(tmp_path):
+    model = ClaimModel(sentence="Fact-checkers found the video shows an earlier flood.")
+    runner, _store, _model, _tools = claim_agent(tmp_path, model)
+    inv = await runner.run()
+    assert inv.verdict.sentence.text == "Fact-checkers found the video shows an earlier flood."
+    markdown = to_markdown(inv)
+    assert "**False.**\n\nLikelihood: very likely (80-95%)." in markdown
+    settings = AppSettings(data_dir=str(tmp_path), _env_file=None)
+    page = TestClient(create_app(settings)).get(f"/investigations/{inv.id}").text
+    assert '<p class="verdict-likelihood">Very likely <span class="muted">80-95%</span></p>' in page
+
+
+def test_fact_checkers_ratings_keep_their_own_words():
+    assert "rating in the article's own word" in prompts.EXTRACT
+    assert "the label is misleading" in prompts.VERDICT
+    assert "Never guess a link" in prompts.CLAIM_STEPS

@@ -76,6 +76,7 @@
   <section class="verdict v-{{ v.label }}" aria-labelledby="verdict-label">
     <p class="verdict-kicker">Verdict</p>
     <p class="verdict-label" id="verdict-label">{{ v.label | capitalize }}</p>
+    {% if v.likelihood %}<p class="verdict-likelihood">{{ v.likelihood | capitalize }} <span class="muted">{{ ranges.get(v.likelihood, "") }}</span></p>{% endif %}
     {% if v.sentence %}<p class="verdict-sentence">{{ sentence(v.sentence) }}</p>{% endif %}
     {% if v.confidence %}<p class="verdict-why">{{ v.confidence | capitalize }} confidence: {{ v.confidence_reason }}.</p>{% endif %}
     <p class="verdict-why">{{ v.reason }}</p>

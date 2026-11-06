@@ -58,7 +58,8 @@ EXTRACT = (
     "300 characters, no ellipses, no changes); and the refs of the key questions it helps "
     "answer. If the page says something is alleged or claimed by someone, the statement "
     "must say who claims it. On a fact-check article, the statement names the fact-checker "
-    "and its rating (for example 'Alt News rated the claim false: the video is from 2022'). "
+    "and gives its rating in the article's own word (false, misleading, missing context, "
+    "altered and so on), never a different one, and what it found. "
     "When the page reports several separate people, incidents or "
     "events, give each its own claim with its name, date and place. Skip opinions, adverts "
     "and navigation text. Return no claims if nothing is relevant. When a claim states that "
@@ -187,7 +188,8 @@ CLAIM_STEPS = (
     "saved. When the claim gives a date, search for the same material before that date with "
     "the before argument of news_search or web_search: an earlier copy shows the material "
     "is older than claimed. Not finding an earlier copy never proves that one is the "
-    "original."
+    "original. Never guess a link: read_page and earliest_copy take only links from the "
+    "claim, search results or saved pages, and pages already saved need no second reading."
 )
 
 VERDICT = (
@@ -199,9 +201,13 @@ VERDICT = (
     "correct from: almost no chance, very unlikely, unlikely, roughly even chance, likely, "
     "very likely, almost certain. In cites give the refs of the claims the verdict rests "
     "on, and in against the refs of claims that point the other way. sentence is one "
-    "sentence stating the verdict with that likelihood term, for example 'It is very likely "
-    "that the video shows an earlier flood.' Attribute fact-checkers' ratings to them. Never "
-    "mention confidence. An archive record shows only that material existed by its date."
+    "sentence that begins 'It is <likelihood> that' and states the verdict, for example 'It "
+    "is very likely that the video shows an earlier flood.' Attribute fact-checkers' ratings "
+    "to them. Never "
+    "mention confidence. An archive record shows only that material existed by its date. "
+    "When the evidence shows genuine material from another time, place or event (which "
+    "fact-checkers often rate misleading or missing context), the label is misleading, "
+    "not false. Report each fact-checker's rating in its own word."
 )
 
 

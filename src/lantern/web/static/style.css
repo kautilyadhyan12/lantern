@@ -491,6 +491,7 @@ blockquote { border-left-color: var(--orange); }
 .verdict { margin-top: 1.4rem; padding: 1rem 1.25rem 1.1rem; border: 3px solid var(--line); background: var(--paper); box-shadow: 6px 6px 0 var(--orange); }
 .verdict-kicker { margin: 0; font: 700 0.8rem/1.4 var(--mono); color: var(--muted); }
 .verdict-label { display: inline-block; margin: 0.2rem 0 0.6rem; padding: 0.1rem 0.7rem; font: 700 2rem/1.2 var(--sans); border: 3px solid currentColor; transform: rotate(-2deg); }
+.verdict-likelihood { margin: 0 0 0.5rem; font: 700 1rem/1.4 var(--mono); }
 .verdict-sentence { margin: 0 0 0.5rem; font-size: 1.15rem; }
 .verdict-why { margin: 0.2rem 0 0; font-size: 0.92rem; color: var(--muted); }
 .v-supported .verdict-label { color: var(--good); }

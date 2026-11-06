@@ -252,3 +252,18 @@ The office rules stay exactly as they are:
   - Tests: `tests/research/test_claims.py` (30 tests, CL-AC1 to CL-AC10, including property
     tests of the verdict rules). The full suite: 699 passed; the five failures already on
     `main` are unrelated. Coverage 95% total.
+- 2026-11-06: one live claim check, kept small at the owner's request: a hard cap of 30,000
+  AI tokens (research share 80%), 4 pages, 10 tool calls, no social posts and no record
+  tools. Claim: "A viral video shows visuals of the 2025 Assam floods." It used 26,114 tokens
+  in 17 model calls and found fact-checks by Factly, AFP, The Quint and NewsMobile. Verdict:
+  false, almost certain, high confidence. Lessons, fixed the same day:
+  - The extraction example "Alt News rated the claim false" led the model to write "Factly
+    rated the claim false" where Factly's quote says MISLEADING. Extraction now asks for the
+    fact-checker's rating in the article's own word, and the verdict prompt says that real
+    material from another time, place or event is "misleading", not "false".
+  - The verdict sentence was dropped because it left out the likelihood term. The likelihood
+    is now shown beside the label, and only a sentence using a different term is removed.
+  - The researcher guessed two fact-check links; the gateway refused them (provenance). The
+    claim instructions now say never to guess a link.
+  - A token budget used up just before the verdict now leaves the report and an "unproven"
+    verdict instead of failing the run.
