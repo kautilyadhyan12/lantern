@@ -350,3 +350,8 @@ blockquote {
 .board .subject .card-paper { stroke: #c9a227; stroke-width: 3.5; }
 .board .card-stamp { font: 800 11px/1 system-ui, sans-serif; letter-spacing: 0.12em; fill: none; stroke: #b3121b; stroke-width: 0.9; opacity: 0.85; }
 .note-connection.loose { color: var(--bad); }
+
+/* Start a new investigation from any page */
+.top { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.new-button { margin-left: auto; padding: 0.4rem 0.9rem; border-radius: 6px; background: var(--accent); color: #fff; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.new-button:hover, .new-button:focus { filter: brightness(1.08); }

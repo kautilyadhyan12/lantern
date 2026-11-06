@@ -3,6 +3,12 @@
 function startForm() {
   const form = document.getElementById("ask");
   if (!form) return;
+  const focusQuestion = () => document.getElementById("brief").focus({ preventScroll: false });
+  // After the page has loaded: the browser's jump to #ask would otherwise reset the focus.
+  if (window.location.hash === "#ask") window.addEventListener("load", focusQuestion);
+  document.querySelectorAll('a[href="/#ask"]').forEach((link) =>
+    link.addEventListener("click", () => window.setTimeout(() => document.getElementById("brief").focus(), 0)),
+  );
   const error = document.getElementById("ask-error");
   form.addEventListener("submit", async (event) => {
     event.preventDefault();

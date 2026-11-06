@@ -506,3 +506,15 @@ def test_static_files_are_versioned_by_content_and_always_rechecked(tmp_path):
     home = client.get("/").text
     assert '<script src="/static/app.js?v=' in home
     assert client.get("/static/app.js").headers["cache-control"] == "no-cache"
+
+
+def test_every_page_offers_a_new_investigation(tmp_path):
+    client = TestClient(
+        create_app(AppSettings(data_dir=str(tmp_path), tavily_api_key="t", groq_api_key="g"))
+    )
+    store = Store(tmp_path)
+    inv = Investigation(id=store.new_id(), brief="Floods?", status="done")
+    store.save(inv)
+    for path in ("/", f"/investigations/{inv.id}"):
+        assert '<a class="new-button" href="/#ask">+ New investigation</a>' in client.get(path).text
+    assert 'id="ask"' in client.get("/").text
