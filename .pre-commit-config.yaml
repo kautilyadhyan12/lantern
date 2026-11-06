@@ -1,8 +1,8 @@
 repos:
   - repo: local
     hooks:
-      - {id: end-of-file-fixer, name: End of file, entry: uv run end-of-file-fixer, language: system, types: [text]}
-      - {id: trailing-whitespace-fixer, name: Trailing whitespace, entry: uv run trailing-whitespace-fixer, language: system, types: [text]}
+      - {id: end-of-file-fixer, name: End of file, entry: uv run end-of-file-fixer, language: system, types: [text], exclude: ^src/lantern/web/static/vendor/}
+      - {id: trailing-whitespace-fixer, name: Trailing whitespace, entry: uv run trailing-whitespace-fixer, language: system, types: [text], exclude: ^src/lantern/web/static/vendor/}
       - {id: ruff, name: Ruff, entry: uv run ruff check --fix, language: system, types: [python]}
       - {id: ruff-format, name: Ruff format, entry: uv run ruff format, language: system, types: [python]}
       - {id: mypy, name: Strict types, entry: uv run mypy --strict, language: system, pass_filenames: false, types: [python]}
