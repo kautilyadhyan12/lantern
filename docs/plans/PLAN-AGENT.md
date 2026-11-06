@@ -629,3 +629,15 @@ Each stage is one pull request.
     status, depth, downloads, five stat tiles and the bottom line; numbered section panels;
     one card per key question.
   - Saved-copy page: a header card and a facts card. All pages fit a phone screen.
+- 2026-11-06: calmer design and less text.
+  - One accent colour (yellow) with black and white; colour only where it means something
+    (status, grades, confidence). Shadows only on things you can press.
+  - Shorter wording on every page; long explanations moved into closed "Help" or
+    "What the grades mean" panels.
+  - Evidence board redesigned as a dark case wall: flat white index cards with a black kind
+    strip (red for events, pale yellow for places), the subject card casts a yellow shadow,
+    red pins and strings. Zoom, Fit, Tidy, Reset, Filter and Help sit in one bar above the
+    wall, with a legend for the string styles below it.
+  - Case notes are shorter: each string shows a short tag ("Official record",
+    "2 independent sources", "One source only", "Lantern's inference") with its sources and
+    quote buttons; the long sentence appears only when it is a warning.

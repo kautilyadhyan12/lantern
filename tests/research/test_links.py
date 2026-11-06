@@ -369,6 +369,7 @@ def test_the_map_renders_every_link_with_its_evidence_and_escapes_text(tmp_path)
     assert 'data-ref="C1"' in page
     assert "Against: " in page
     assert "Lantern's assessment, not a fact stated by a source." in page
+    assert "Lantern's inference" in page  # the short tag on the string's note
     assert "<script>alert(1)</script>" not in page
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
     assert 'data-kind="event"' in page
@@ -552,6 +553,11 @@ def test_card_notes_say_what_the_evidence_means_in_plain_words(tmp_path):
     assert (
         facts["L3"].strength == "Only one source reports this (dawn.com), so treat it with caution."
     )
+    assert [facts[ref].label for ref in ("L1", "L2", "L3")] == [
+        "Official record",
+        "2 independent sources",
+        "One source only",
+    ]
     assert notes["E3"].caution.startswith("Careful: 1 other card on this board shares this name.")
     assert notes["E2"].caution == ""
     assert board.gloss("SDGT and SDGT") == "SDGT (Specially Designated Global Terrorist) and SDGT"
@@ -641,9 +647,7 @@ def test_every_card_says_why_it_is_here_and_how_it_reaches_the_subject(tmp_path)
     assert (notes["E1"].steps, notes["E1"].tag) == (0, "★ subject of this case")
     assert notes["E1"].connection.startswith("This is what the investigation is about")
     assert notes["E3"].tag == "1 step from the subject"
-    assert notes["E3"].why == (
-        "The evidence gathered for Q2, “Who founded it?” mentions it: 1 claim, from Wikidata."
-    )
+    assert notes["E3"].why == "Named in 1 claim gathered for Q2 “Who founded it?”."
     assert notes["E3"].connection == (
         "Hafiz Muhammad Saeed founded LASHKAR-E-TAYYIBA. That is how it connects to "
         "LASHKAR-E-TAYYIBA, the subject of this case (1 string away)."
@@ -704,3 +708,5 @@ def test_sharing_a_sanctions_list_is_not_a_connection_and_wikidata_is_background
     assert board.strength(links[0], ["UN Security Council Consolidated List"]) == (
         "An official record says this (UN Security Council Consolidated List)."
     )
+    assert board.label(links[2], official=False) == "Reference work"
+    assert board.label(links[0]) == "Official record"

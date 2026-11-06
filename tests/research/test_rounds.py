@@ -306,7 +306,8 @@ async def test_names_in_search_results_become_unconfirmed_mentions(tmp_path):
     assert fakes.HIT_SNIPPET not in saved
     settings = AppSettings(data_dir=str(tmp_path), tavily_api_key="t", groq_api_key="g")
     page = TestClient(create_app(settings)).get(f"/investigations/{inv.id}").text
-    assert "Also seen in search results, not confirmed" in page
+    assert "Only in search headlines: 1" in page
+    assert "leads, not evidence" in page
     assert "### Also seen in search results" in to_markdown(inv)
 
 

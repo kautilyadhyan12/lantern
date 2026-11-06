@@ -3,12 +3,11 @@
 {% block main %}
 <header class="case-hero source-hero">
 <p class="crumb"><a href="/investigations/{{ inv.id }}">← Back to the report</a></p>
-<p class="kicker"><span class="pill black">{{ source.ref }}</span>
-  <span class="pill yellow">{{ {"post": "Ground report", "record": "Record", "image": "Satellite image"}.get(source.kind, "Saved web page") }}</span>
-  <span class="grade g-{{ source.reliability }}" title="{{ reliability[source.reliability] }}">{{ source.reliability }}</span></p>
 <h1 class="brief">{{ source.title or source.domain }}</h1>
-<p class="hint">This is the text Lantern extracted from its saved copy. Highlighted passages are
-  the exact quotes behind claims; the page's own HTML is never shown.</p>
+<p class="meta"><span class="ref">{{ source.ref }}</span>
+  <span>{{ {"post": "Ground report", "record": "Record", "image": "Satellite image"}.get(source.kind, "Saved web page") }}</span>
+  <span><span class="grade g-{{ source.reliability }}" title="{{ reliability[source.reliability] }}">{{ source.reliability }}</span> {{ reliability[source.reliability] }}</span></p>
+<p class="hint">Text Lantern saved. Highlights are the exact quotes behind claims.</p>
 </header>
 <div class="facts-card">
 <dl class="facts">
@@ -23,8 +22,7 @@
   {% if source.published %}<div><dt>{{ "Posted" if source.kind == "post" else "Published" }}</dt><dd>{{ source.published }}</dd></div>{% endif %}
   <div><dt>Saved</dt><dd>{{ source.fetched_at.strftime("%d %b %Y, %H:%M:%S") }} UTC</dd></div>
   <div><dt>sha256 of saved bytes</dt><dd><code>{{ source.sha256 }}</code>
-    <div class="muted">A fingerprint of the saved copy: if one character changed, this would be
-      completely different.</div></dd></div>
+    <div class="muted">Fingerprint of the saved copy. Any change would alter it.</div></dd></div>
 </dl>
 </div>
 {% if source.kind == "image" %}<div class="views"><figure><img src="/investigations/{{ inv.id }}/sources/{{ source.ref }}/image" alt="{{ source.title }}"></figure></div>{% endif %}

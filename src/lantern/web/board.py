@@ -61,6 +61,7 @@ class Fact:
     said: list[str]  # what the sources say, in their claims' words with codes explained
     claims: list[str]  # claim refs, for the quote buttons
     against: list[str] = field(default_factory=list)
+    label: str = ""  # how sure the evidence is, in two or three words
 
 
 @dataclass(frozen=True)
@@ -119,20 +120,33 @@ def strength(link: Link, sources: list[str], official: bool = True) -> str:
     return f"Only one source reports this ({named}), so treat it with caution."
 
 
+def label(link: Link, official: bool = True) -> str:
+    """How sure the evidence is, in two or three words, for the tag on a note."""
+    if link.status == "record":
+        return "Official record" if official else "Reference work"
+    if link.status == "corroborated":
+        return f"{len(link.origins)} independent sources"
+    if link.status == "assessment":
+        return "Lantern's inference"
+    return "One source only"
+
+
 def fact(inv: Investigation, link: Link, names: dict[str, str]) -> Fact:
     claims = [claim for ref in link.claim_refs if (claim := inv.claim(ref))]
     sources = [source for claim in claims if (source := inv.source(claim.source_ref))]
     named = list(dict.fromkeys(source_name(source) for source in sources))
     sentence = SENTENCES[link.relation].format(a=names[link.subject], b=names[link.object])
+    official = any(s.reliability in {"A", "B"} for s in sources)
     return Fact(
         ref=link.ref,
         sentence=sentence,
-        strength=strength(link, named, any(s.reliability in {"A", "B"} for s in sources)),
+        strength=strength(link, named, official),
         status=link.status,
         sources=named,
         said=list(dict.fromkeys(gloss(claim.statement) for claim in claims))[:4],
         claims=link.claim_refs,
         against=link.against,
+        label=label(link, official),
     )
 
 
@@ -217,7 +231,7 @@ def _tag(steps: int | None) -> str:
 
 
 def _why(inv: Investigation, entity: Entity) -> str:
-    """Which key questions' evidence names this card, from how many claims and where."""
+    """Which key questions' evidence names this card, and in how many claims."""
     refs = [
         ref
         for link in inv.links
@@ -229,13 +243,9 @@ def _why(inv: Investigation, entity: Entity) -> str:
         return ""
     asked = list(dict.fromkeys(q for claim in claims for q in claim.question_refs))
     questions = [q for ref in asked if (q := inv.question(ref))]
-    named = list(dict.fromkeys(source_name(s) for c in claims if (s := inv.source(c.source_ref))))
-    shown = "; ".join(f"{q.ref}, “{q.text}”" for q in questions) or "this investigation"
+    shown = " and ".join(f"{q.ref} “{q.text}”" for q in questions) or "this investigation"
     count = f"{len(claims)} claim{'s' if len(claims) != 1 else ''}"
-    return (
-        f"The evidence gathered for {shown} mentions it: {count}, from "
-        f"{', '.join(named[:4])}{' and others' if len(named) > 4 else ''}."
-    )
+    return f"Named in {count} gathered for {shown}."
 
 
 def _connection(

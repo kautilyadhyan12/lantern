@@ -1,84 +1,70 @@
 {% extends "base.html" %}
 {% block main %}
 <section class="hero">
-  <p class="kicker"><span class="pill black">Public evidence only</span><span class="pill yellow">Every claim cited</span></p>
-  <h1>Ask a question.<br><span class="hl">Get a report</span> you can check.</h1>
-  <p class="lede">
-    Lantern splits your question into key questions, reads public web pages, saves a
-    fingerprinted copy of each one, and pulls out claims tied to exact quotes. Every
-    sentence in the report cites its evidence, and every rating comes from fixed rules.
-  </p>
+  <h1>Ask a question. Get a report you can check.</h1>
+  <p class="lede">Lantern reads public sources, keeps a fingerprinted copy of each, and backs every
+    sentence with an exact quote.</p>
   {% if missing %}
   <p class="notice">Setup needed: add {{ missing | join(" and ") }} as Codespaces secrets,
     then restart the codespace.</p>
   {% endif %}
   <form id="ask" class="ask" autocomplete="off">
-    <div class="ask-part">
-      <label for="brief" class="ask-label"><span class="num">01</span>Your question</label>
-      <textarea id="brief" name="brief" rows="3" maxlength="600" required
-        placeholder="For example: What is publicly known about the 2026 monsoon floods in Assam?"></textarea>
-    </div>
-    <div class="ask-part">
-      <fieldset class="depth">
-        <legend class="ask-label"><span class="num">02</span>How thorough should it be?</legend>
-        <label class="choice">
-          <input type="radio" name="depth" value="deep" checked>
-          <span class="choice-card">
-            <span class="choice-top"><span class="choice-title">Deep investigation</span><span class="choice-tick" aria-hidden="true">✓</span></span>
-            <span class="choice-text">The agent follows up on what it finds, checks names in official
-              records and keeps digging until each key question is answered.</span>
-            <span class="choice-facts"><span class="pill">Up to 6 rounds</span> <span class="pill">30 pages</span> <span class="pill">~15 min</span></span>
-            <span class="choice-picked">Selected</span>
-          </span>
-        </label>
-        <label class="choice">
-          <input type="radio" name="depth" value="quick">
-          <span class="choice-card">
-            <span class="choice-top"><span class="choice-title">Quick look</span><span class="choice-tick" aria-hidden="true">✓</span></span>
-            <span class="choice-text">One fast round of searching and reading. Good for a first
-              overview; uses fewer AI tokens.</span>
-            <span class="choice-facts"><span class="pill">1 round</span> <span class="pill">10 pages</span> <span class="pill">~5 min</span></span>
-            <span class="choice-picked">Selected</span>
-          </span>
-        </label>
-      </fieldset>
-    </div>
-    <div class="ask-part ask-row">
-      <p class="hint"><b>{{ left }} investigation{{ "" if left == 1 else "s" }} left today.</b>
-        Questions about private people, locations of individuals or minors are refused.</p>
-      <button type="submit" {% if missing or not left %}disabled{% endif %}>Investigate →</button>
+    <label for="brief" class="sr">Research question</label>
+    <textarea id="brief" name="brief" rows="3" maxlength="600" required
+      placeholder="What is publicly known about the 2026 monsoon floods in Assam?"></textarea>
+    <fieldset class="depth">
+      <legend class="sr">How thorough</legend>
+      <label class="choice">
+        <input type="radio" name="depth" value="deep" checked>
+        <span class="choice-card">
+          <span class="choice-dot" aria-hidden="true"></span>
+          <span class="choice-title">Deep investigation</span>
+          <span class="choice-text">Follows leads and checks official records.</span>
+          <span class="choice-meta">Up to 6 rounds · 30 pages · ~15 min</span>
+        </span>
+      </label>
+      <label class="choice">
+        <input type="radio" name="depth" value="quick">
+        <span class="choice-card">
+          <span class="choice-dot" aria-hidden="true"></span>
+          <span class="choice-title">Quick look</span>
+          <span class="choice-text">One round of searching and reading.</span>
+          <span class="choice-meta">1 round · 10 pages · ~5 min</span>
+        </span>
+      </label>
+    </fieldset>
+    <div class="ask-row">
+      <p class="hint">{{ left }} left today. Questions about private people or minors are refused.</p>
+      <button type="submit" {% if missing or not left %}disabled{% endif %}>Investigate</button>
     </div>
     <p id="ask-error" class="error" hidden></p>
   </form>
 </section>
 
 <section class="how">
-  <div class="section-head"><h2>How it works</h2><span class="pill">6 steps, all checked by code</span></div>
+  <div class="section-head"><h2>How it works</h2></div>
   <ol>
-    <li><b>Safety check</b> Fixed rules, then an AI check, before anything runs.</li>
-    <li><b>Key questions</b> The question is split into 2–4 parts.</li>
-    <li><b>Evidence</b> Pages are read politely and saved with a sha256 fingerprint.</li>
-    <li><b>Claims</b> Each claim's quote must appear word for word in the saved page.</li>
-    <li><b>Assessment</b> Grades, likelihood words and confidence follow fixed rules.</li>
-    <li><b>Verified report</b> Sentences without valid citations are removed.</li>
+    <li><b>Safety check</b>Rules first, then an AI check.</li>
+    <li><b>Key questions</b>Split into 2–4 parts.</li>
+    <li><b>Evidence</b>Every page saved and fingerprinted.</li>
+    <li><b>Claims</b>Quotes must match word for word.</li>
+    <li><b>Assessment</b>Ratings follow fixed rules.</li>
+    <li><b>Report</b>Uncited sentences are removed.</li>
   </ol>
 </section>
 
 {% if items %}
 <section>
-  <div class="section-head"><h2>Investigations</h2><span class="pill">{{ items | length }} saved</span></div>
+  <div class="section-head"><h2>Investigations</h2><span class="muted">{{ items | length }}</span></div>
   <ul class="cases">
     {% for item in items %}
     <li>
       <a class="case-tile" href="/investigations/{{ item.id }}">
-        <span class="case-tile-top">
-          <span class="status s-{{ item.status }}">{{ item.status }}</span>
-          <span class="pill">{{ "Deep" if item.depth == "deep" else "Quick" }}</span>
-        </span>
         <span class="case-tile-brief">{{ item.brief }}</span>
         <span class="case-tile-foot">
-          <span>{{ item.sources | length }} sources · {{ item.claims | length }} claims</span>
-          <time>{{ item.created_at.strftime("%d %b %Y, %H:%M") }} UTC</time>
+          {% if item.status != "done" %}<span class="status s-{{ item.status }}">{{ item.status }}</span>{% endif %}
+          <span>{{ "Deep" if item.depth == "deep" else "Quick" }} · {{ item.sources | length }} sources</span>
+          <time>{{ item.created_at.strftime("%d %b, %H:%M") }}</time>
         </span>
       </a>
     </li>
