@@ -299,12 +299,15 @@ async def test_records_add_designation_founder_and_link_relations(tmp_path):
     inv = await Agent(inv, tools, store, Limits()).run()
     assert inv.status == "done", inv.error
     name = {entity.ref: entity.name for entity in inv.entities}
+    let = next(e for e in inv.entities if "ofac:7140" in e.ids)
+    assert {"un:QDe.118", "wikidata:Q736955"} <= set(let.ids)  # one organisation
+    name[let.ref] = "LET"  # whichever spelling the card shows
     found = {(name[k.subject], k.relation, name[k.object], k.status) for k in inv.links}
-    assert ("LASHKAR E-TAYYIBA", "designated_by", "US Treasury OFAC", "record") in found
-    assert ("LASHKAR E-TAYYIBA", "designated_by", "UN Security Council", "record") in found
-    assert ("Hafiz Muhammad Saeed", "founded", "LASHKAR E-TAYYIBA", "record") in found
-    let = next(e for e in inv.entities if e.name == "LASHKAR E-TAYYIBA")
-    assert {"ofac:7140", "un:QDe.118", "wikidata:Q736955"} <= set(let.ids)  # one organisation
+    assert ("LET", "designated_by", "US Treasury OFAC", "record") in found
+    assert ("LET", "designated_by", "UN Security Council", "record") in found
+    assert ("Hafiz Muhammad Saeed", "founded", "LET", "record") in found
+    # the UN note "Associated with Hafiz Muhammad Saeed (QDi.263)" links him by his UN number
+    assert ("Hafiz Muhammad Saeed", "linked_to", "LET", "record") in found
     for link in inv.links:
         for ref in link.claim_refs:  # every link rests on an anchored claim
             claim = inv.claim(ref)
@@ -360,7 +363,7 @@ def test_the_map_renders_every_link_with_its_evidence_and_escapes_text(tmp_path)
     assert "Evidence board" in page
     for link in inv.links:
         # each string opens its evidence: in the case notes, or as a link without scripts
-        assert f'<a href="#{link.ref}" data-ref="{link.ref}" class="edge string' in page
+        assert f'<a href="#{link.ref}" data-ref="{link.ref}" data-linked=' in page
         assert f'<template id="note-{link.ref}">' in page
         assert f'<tr id="{link.ref}"' in page
     assert 'data-ref="C1"' in page
@@ -530,8 +533,8 @@ def test_card_notes_say_what_the_evidence_means_in_plain_words(tmp_path):
     assert let.kind == "Organisation"
     assert let.summary == (
         "LASHKAR E-TAYYIBA is an organisation. It is also known as LeT and Army of the Pure and "
-        "1 other name. Lantern found 3 connections for it: 1 from official records; 1 confirmed "
-        "by two or more independent sources; 1 from a single source."
+        "1 other name. Lantern found 3 connections for LASHKAR E-TAYYIBA: 1 from official "
+        "records; 1 confirmed by two or more independent sources; 1 from a single source."
     )
     assert (
         facts["L1"].sentence == "LASHKAR E-TAYYIBA is on a sanctions list kept by US Treasury OFAC."
@@ -552,3 +555,152 @@ def test_card_notes_say_what_the_evidence_means_in_plain_words(tmp_path):
     assert notes["E3"].caution.startswith("Careful: 1 other card on this board shares this name.")
     assert notes["E2"].caution == ""
     assert board.gloss("SDGT and SDGT") == "SDGT (Specially Designated Global Terrorist) and SDGT"
+
+
+def test_every_card_says_why_it_is_here_and_how_it_reaches_the_subject(tmp_path):
+    store = Store(tmp_path)
+    inv = Investigation(
+        id=store.new_id(), brief="Is Lashkar-e-Taiba under sanctions, and who founded it?"
+    )
+    inv.questions = [
+        Question(ref="Q1", text="Is Lashkar-e-Taiba under sanctions?"),
+        Question(ref="Q2", text="Who founded it?"),
+    ]
+    common = {
+        "fetched_at": now(),
+        "size": 1,
+        "reliability": "A",
+        "reliability_reason": "r",
+        "sha256": "x",
+        "text_sha256": "y",
+    }
+    inv.sources = [
+        Source(
+            ref="S1",
+            url="https://un.org/x",
+            domain="un.org",
+            kind="record",
+            title="UN Security Council Consolidated List: LASHKAR-E-TAYYIBA",
+            **common,
+        ),
+        Source(
+            ref="S2",
+            url="https://www.wikidata.org/wiki/Q1",
+            domain="wikidata.org",
+            kind="record",
+            title="Wikidata: Lashkar-e-Taiba",
+            **common,
+        ),
+        Source(ref="S3", url="https://dawn.com/c", domain="dawn.com", **common),
+    ]
+    claim = {"quote": "q", "start": 0, "end": 1}
+    inv.claims = [
+        Claim(ref="C1", source_ref="S1", question_refs=["Q1"], statement="Listed.", **claim),
+        Claim(ref="C2", source_ref="S2", question_refs=["Q2"], statement="Founded by.", **claim),
+        Claim(ref="C3", source_ref="S3", question_refs=["Q2"], statement="A rally.", **claim),
+    ]
+    inv.entities = [
+        Entity(ref="E1", kind=ORG, name="LASHKAR-E-TAYYIBA", aliases=["Lashkar-e-Taiba"]),
+        Entity(ref="E2", kind=ORG, name="UN Security Council"),
+        Entity(ref="E3", kind=PERSON, name="Hafiz Muhammad Saeed"),
+        Entity(ref="E4", kind="event", name="Lahore rally"),
+        Entity(ref="E5", kind="place", name="Lahore"),
+    ]
+    inv.links = [
+        Link(
+            ref="L1",
+            subject="E1",
+            relation="designated_by",
+            object="E2",
+            claim_refs=["C1"],
+            basis="record",
+            status="record",
+        ),
+        Link(
+            ref="L2",
+            subject="E3",
+            relation="founded",
+            object="E1",
+            claim_refs=["C2"],
+            basis="record",
+            status="record",
+        ),
+        Link(
+            ref="L3",
+            subject="E4",
+            relation="located_in",
+            object="E5",
+            claim_refs=["C3"],
+            basis="stated",
+            status="single source",
+            origins=["dawn.com"],
+        ),
+    ]
+    assert board.subject(inv) == "E1"  # its alias is written in the research question
+    notes, _ = board.stories(inv)
+    assert (notes["E1"].steps, notes["E1"].tag) == (0, "★ subject of this case")
+    assert notes["E1"].connection.startswith("This is what the investigation is about")
+    assert notes["E3"].tag == "1 step from the subject"
+    assert notes["E3"].why == (
+        "The evidence gathered for Q2, “Who founded it?” mentions it: 1 claim, from Wikidata."
+    )
+    assert notes["E3"].connection == (
+        "Hafiz Muhammad Saeed founded LASHKAR-E-TAYYIBA. That is how it connects to "
+        "LASHKAR-E-TAYYIBA, the subject of this case (1 string away)."
+    )
+    assert (notes["E5"].steps, notes["E5"].tag) == (None, "no link to the subject yet")
+    assert "treat its relevance as unconfirmed" in notes["E5"].connection
+    nodes, _ = linkmap.view(inv)
+    centre = next(node for node in nodes if node.entity.ref == "E1")
+    assert abs(centre.x - linkmap.WIDTH / 2) < linkmap.WIDTH / 3  # the subject sits near the middle
+    inv.status = "done"
+    inv.report = Report()
+    store.save(inv)
+    settings = AppSettings(data_dir=str(tmp_path), tavily_api_key="t", groq_api_key="g")
+    page = TestClient(create_app(settings)).get(f"/investigations/{inv.id}").text
+    assert "THE CASE" in page
+    assert "card subject" in page or 'k-organisation subject"' in page
+    assert 'data-linked="no"' in page
+    assert "only what is linked to the subject" in page
+    assert "Why it is on the board" in page
+    assert "How it connects to what you searched" in page
+
+
+def test_sharing_a_sanctions_list_is_not_a_connection_and_wikidata_is_background():
+    links = [
+        Link(
+            ref="L1",
+            subject="E1",
+            relation="designated_by",
+            object="E2",
+            claim_refs=["C1"],
+            basis="record",
+            status="record",
+        ),
+        Link(
+            ref="L2",
+            subject="E3",
+            relation="designated_by",
+            object="E2",
+            claim_refs=["C2"],
+            basis="record",
+            status="record",
+        ),
+        Link(
+            ref="L3",
+            subject="E4",
+            relation="founded",
+            object="E1",
+            claim_refs=["C3"],
+            basis="record",
+            status="record",
+        ),
+    ]
+    reach = board.paths(links, "E1")
+    assert set(reach) == {"E1", "E2", "E4"}  # E3 shares only the list keeper E2 with E1
+    assert board.strength(links[2], ["Wikidata"], official=False).startswith(
+        "A reference work says this (Wikidata): it is edited by volunteers"
+    )
+    assert board.strength(links[0], ["UN Security Council Consolidated List"]) == (
+        "An official record says this (UN Security Council Consolidated List)."
+    )

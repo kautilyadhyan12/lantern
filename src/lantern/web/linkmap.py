@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from lantern.core.graph import name_key
 from lantern.models import Entity, Investigation, Link
+from lantern.web.board import subject
 
 WIDTH, HEIGHT, MARGIN = 1200, 760, 110
 CARD_W, CARD_H = 168, 66
@@ -84,13 +85,18 @@ def shown(entities: list[Entity], links: list[Link]) -> tuple[list[Entity], list
     return keep, [link for link in links if link.subject in refs and link.object in refs]
 
 
-def layout(refs: list[str], links: list[Link]) -> dict[str, tuple[float, float]]:
-    """Fruchterman-Reingold from evenly spaced starting points, scaled to the drawing."""
+def layout(
+    refs: list[str], links: list[Link], centre: str | None = None
+) -> dict[str, tuple[float, float]]:
+    """Fruchterman-Reingold from evenly spaced starting points (the `centre` card, if any,
+    starts in the middle), scaled to the drawing."""
     count = len(refs)
     pos = {
         ref: [math.cos(2 * math.pi * i / count), math.sin(2 * math.pi * i / count)]
         for i, ref in enumerate(refs)
     }
+    if centre in pos:
+        pos[centre] = [0.0, 0.0]
     spread, heat = math.sqrt(4.0 / max(count, 1)), 0.2
     for _ in range(STEPS):
         move = {ref: [0.0, 0.0] for ref in refs}
@@ -165,7 +171,7 @@ def view(inv: Investigation) -> tuple[list[Node], list[Edge]]:
     entities, links = shown(inv.entities, inv.links)
     if not entities:
         return [], []
-    places = layout([entity.ref for entity in entities], links)
+    places = layout([entity.ref for entity in entities], links, subject(inv))
     kind = {entity.ref: entity.kind for entity in entities}
     nodes = [
         Node(

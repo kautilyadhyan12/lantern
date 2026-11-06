@@ -112,13 +112,16 @@ function startMapFilters() {
       );
     const kinds = off("data-kind");
     const statuses = off("data-status");
+    const linkedOnly = filters.querySelector("input[data-linked-only]")?.checked;
+    const loose = (item) => linkedOnly && item.dataset.linked === "no";
     document.querySelectorAll(".linkmap .node").forEach((node) => {
-      node.classList.toggle("off", kinds.has(node.dataset.kind));
+      node.classList.toggle("off", kinds.has(node.dataset.kind) || loose(node));
     });
     document.querySelectorAll(".linkmap [data-kinds]").forEach((item) => {
       const hidden =
         statuses.has(item.dataset.status) ||
-        item.dataset.kinds.split(" ").some((kind) => kinds.has(kind));
+        item.dataset.kinds.split(" ").some((kind) => kinds.has(kind)) ||
+        loose(item);
       item.classList.toggle("off", hidden);
     });
   };

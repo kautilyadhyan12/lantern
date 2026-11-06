@@ -232,6 +232,7 @@
       {% for status in ["corroborated", "single source", "record", "assessment"] %}
       <label><input type="checkbox" data-status="{{ status }}" checked> {{ status }}</label>
       {% endfor %}
+      <label><input type="checkbox" data-linked-only> only what is linked to the subject</label>
     </div>
     <div class="board-tools" role="toolbar" aria-label="Evidence board tools">
       <button type="button" data-board="zoom-in" title="Zoom in">+</button>
@@ -257,9 +258,16 @@
           <stop offset="100%" stop-color="#6d1414"></stop>
         </radialGradient>
       </defs>
+      <g class="case-card" transform="translate({{ map_size[0] / 2 }} 38) rotate(-0.6)">
+        <rect class="case-paper" x="-330" y="-26" width="660" height="52" rx="2" filter="url(#card-shadow)"></rect>
+        <rect class="case-clip" x="-318" y="-34" width="14" height="26" rx="5"></rect>
+        <text class="case-label" x="-296" y="-8">THE CASE</text>
+        {% set brief_lines = inv.brief | wordwrap(78, wrapstring="\n") | truncate(156, True, "…") %}
+        {% for line in brief_lines.split("\n")[:2] %}<text class="case-text" x="-296" y="{{ 7 + loop.index0 * 14 }}">{{ line }}</text>{% endfor %}
+      </g>
       <g class="strings">
       {% for edge in edges %}{% set link = edge.link %}
-      <a href="#{{ link.ref }}" data-ref="{{ link.ref }}" class="edge string st-{{ link.status | replace(' ', '-') }}" data-status="{{ link.status }}" data-kinds="{{ edge.kinds }}" data-from="{{ link.subject }}" data-to="{{ link.object }}">
+      <a href="#{{ link.ref }}" data-ref="{{ link.ref }}" data-linked="{{ 'no' if notes[link.subject].steps is none else 'yes' }}" class="edge string st-{{ link.status | replace(' ', '-') }}" data-status="{{ link.status }}" data-kinds="{{ edge.kinds }}" data-from="{{ link.subject }}" data-to="{{ link.object }}">
         <title>{{ entity[link.subject].name }} — {{ link.relation | replace("_", " ") }} → {{ entity[link.object].name }} ({{ link.status }}): select to see the evidence</title>
         <path class="string-hit" d="{{ edge.path }}"></path>
         <path class="string-line" d="{{ edge.path }}"></path>
@@ -270,7 +278,8 @@
       <g class="mine"></g>
       <g class="cards">
       {% for node in nodes %}{% set e = node.entity %}
-      <g class="node card k-{{ e.kind }}" data-kind="{{ e.kind }}" data-ref="{{ e.ref }}" data-name="{{ e.name }}" data-x="{{ node.x }}" data-y="{{ node.y }}" data-tilt="{{ node.tilt }}" transform="translate({{ node.x }} {{ node.y }}) rotate({{ node.tilt }})">
+      {% set st = notes[e.ref] %}
+      <g class="node card k-{{ e.kind }}{{ ' subject' if st.steps == 0 }}" data-kind="{{ e.kind }}" data-ref="{{ e.ref }}" data-name="{{ e.name }}" data-linked="{{ 'no' if st.steps is none else 'yes' }}" data-x="{{ node.x }}" data-y="{{ node.y }}" data-tilt="{{ node.tilt }}" transform="translate({{ node.x }} {{ node.y }}) rotate({{ node.tilt }})">
         <title>{{ e.ref }} {{ e.name }}{% if e.aliases %} (also: {{ e.aliases[:5] | join("; ") }}){% endif %} — drag to move</title>
         {% if e.kind == "organisation" %}<rect class="card-tab" x="-84" y="-43" width="64" height="14" rx="3"></rect>{% endif %}
         <rect class="card-paper" x="-84" y="-33" width="168" height="66" rx="2" filter="url(#card-shadow)"></rect>
@@ -278,11 +287,13 @@
         {% set left = -38 if e.kind == "person_public_role" else -76 %}
         <text class="card-kind" x="{{ left }}" y="-15">{{ {"organisation": "ORGANISATION", "person_public_role": "PERSON", "place": "PLACE", "event": "EVENT"}[e.kind] }} · {{ e.ref }}</text>
         {% for line in node.lines %}<text class="card-name" x="{{ left }}" y="{{ 3 + loop.index0 * 15 }}">{{ line }}</text>{% endfor %}
+        <text class="card-tag{{ ' loose' if st.steps is none }}" x="{{ left }}" y="28">{{ st.tag }}</text>
+        {% if st.steps == 0 %}<text class="card-stamp" x="40" y="-16" transform="rotate(8 40 -16)">SUBJECT</text>{% endif %}
       </g>
       {% endfor %}
       </g>
       <g class="pins">
-      {% for node in nodes %}<circle class="node pin" data-kind="{{ node.entity.kind }}" data-ref="{{ node.entity.ref }}" cx="{{ node.pin[0] }}" cy="{{ node.pin[1] }}" r="6.5" fill="url(#pin-head)"></circle>{% endfor %}
+      {% for node in nodes %}<circle class="node pin" data-kind="{{ node.entity.kind }}" data-linked="{{ 'no' if notes[node.entity.ref].steps is none else 'yes' }}" data-ref="{{ node.entity.ref }}" cx="{{ node.pin[0] }}" cy="{{ node.pin[1] }}" r="6.5" fill="url(#pin-head)"></circle>{% endfor %}
       </g>
       <g class="handles"></g>
     </svg>
@@ -303,6 +314,9 @@
       <p class="note-kind">{{ st.kind }}</p>
       <h4>{{ st.name }}</h4>
       <p class="note-summary">{{ st.summary }}</p>
+      {% if st.why %}<h5>Why it is on the board</h5><p>{{ st.why }}</p>{% endif %}
+      {% if st.connection %}<h5>How it connects to what you searched</h5>
+      <p class="note-connection{{ ' loose' if st.steps is none }}">{{ st.connection }}</p>{% endif %}
       {% if st.caution %}<p class="note-caution">{{ st.caution }}</p>{% endif %}
       {% if st.facts %}
       <h5>What the evidence says</h5>

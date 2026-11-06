@@ -339,3 +339,14 @@ blockquote {
 .case-notes label { display: block; margin: 0.5rem 0; font-weight: 600; }
 .case-notes input[type="text"], .case-notes textarea { display: block; width: 100%; margin-top: 0.25rem; font: inherit; padding: 0.35rem; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); box-sizing: border-box; }
 .case-notes.left { right: auto; left: 22px; }
+
+/* Evidence board: the case card, the subject, relevance tags */
+.board .case-paper { fill: #f7f1e1; stroke: rgba(0, 0, 0, 0.18); }
+.board .case-clip { fill: none; stroke: #8d8d8d; stroke-width: 3; }
+.board .case-label { font: 700 9px/1 system-ui, sans-serif; letter-spacing: 0.14em; fill: #9a1b1b; }
+.board .case-text { font: 700 12.5px/1 "Courier New", Courier, monospace; fill: #1f1a14; }
+.board .card-tag { font: 600 8px/1 system-ui, sans-serif; fill: #6d5a3f; }
+.board .card-tag.loose { fill: #9a1b1b; }
+.board .subject .card-paper { stroke: #c9a227; stroke-width: 3.5; }
+.board .card-stamp { font: 800 11px/1 system-ui, sans-serif; letter-spacing: 0.12em; fill: none; stroke: #b3121b; stroke-width: 0.9; opacity: 0.85; }
+.note-connection.loose { color: var(--bad); }

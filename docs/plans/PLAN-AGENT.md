@@ -602,3 +602,21 @@ Each stage is one pull request.
     under them, the view moves (zooming out only if needed) to show it in the free part.
     Checked in headless Chromium: both handles of every string stay reachable.
   - The board script moves to `web/static/board.js`, loaded only on pages with a board.
+- 2026-11-06: the board says why each card is there, after owner feedback: a board mixing
+  unrelated subjects means nothing (the earlier preview was a mash-up of test lookups; it
+  was deleted and rebuilt around one question).
+  - The investigation's subject is the card whose name or alias is written in the research
+    question, or else the best connected card. It sits in the middle with a gold border
+    and a SUBJECT stamp.
+  - A case card pinned at the top shows the research question.
+  - Each card's foot says how far it is from the subject (by strings) or that there is no
+    link to it yet. A filter shows only what is linked to the subject.
+  - The case notes add "Why it is on the board" (the key questions whose evidence names it,
+    with claim counts and sources) and "How it connects to what you searched" (the chain of
+    plain sentences to the subject, or a warning that relevance is unconfirmed).
+  - Chains end at, but never pass through, a list keeper (`designated_by`) or an outlet
+    (`reported_by`): sharing a sanctions list is not a connection.
+  - The UN note "Associated with NAME (QDi.263)" now adds a `linked_to` record link from
+    that UN-numbered entry to the listed organisation.
+  - Wikidata-backed links read "a reference work says this … not proof on its own" instead
+    of "an official record".
