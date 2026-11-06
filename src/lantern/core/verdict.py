@@ -101,5 +101,25 @@ def decide(
         len(origins), best_grade(i.grade for i in cited), contested(cited, against)
     )
     kept = clamp_likelihood(likelihood, len(origins))
-    reason = f"The cited evidence carries “{proposed}”: {why}."
-    return Ruling(proposed, reason, kept, level, why)
+    return Ruling(proposed, _met(proposed, cited), kept, level, why)
+
+
+def _met(label: VerdictLabel, cited: Sequence[Cited]) -> str:
+    """Which rule the cited evidence met, in plain words."""
+    if label == "supported":
+        return (
+            "Two or more independent sources rated C or better confirm it, and no equally good "
+            "source disagrees."
+        )
+    if label == "false":
+        if any(item.fact_check for item in cited):
+            return "A published fact-check is among the evidence against the claim."
+        return "Two or more independent sources rated B or better are against the claim."
+    how = (
+        "an archive record"
+        if any(item.archive for item in cited)
+        else "a fact-check"
+        if any(item.fact_check for item in cited)
+        else "two independent sources"
+    )
+    return f"The material's original time, place or event is established by {how}."

@@ -221,6 +221,34 @@ The office rules stay exactly as they are:
 3. **The verdict labels**: Supported, False, Misleading, Unproven, decided by code rules.
    (Recommended.)
 
+## Decisions (owner, 2026-11-06)
+
+1. Fact-checker search without a Google key now; the Google Fact Check API only later, if
+   the owner creates the key.
+2. For posts on sites Lantern does not read, `earliest_copy` reads only the archive index's
+   date, never the copy.
+3. Verdict labels: Supported, False, Misleading, Unproven, decided by code rules.
+
 ## Log
 
 - Plan written 2026-11-06.
+- 2026-11-06: owner approved decisions 1–3.
+- 2026-11-06: built on `feature/claim-check`. Differences from the plan, found while building:
+  - Live checks: the CDX index gave a public figure's 2017 post a first capture in 2017
+    under twitter.com but only in 2024 under x.com, so X posts are looked up under both
+    addresses and the earlier capture wins. Tavily accepted `include_domains` with a
+    subdomain (`factcheck.afp.com`) and `end_date`, and answered HTTP 400 for `end_date`
+    together with `time_range`.
+  - The fact-checker list moved to `assessment.FACT_CHECKERS`. Logically Facts is left out
+    (its site no longer answers); NewsMeter, Digiteye and FactChecker.in were added from the
+    IFCN's public assessments. Every listed site allowed Lantern in its robots.txt that day.
+  - `fact_checks` also takes the `after` and `before` dates.
+  - A readable page's earliest copy is saved as a page only when the live site's robots.txt
+    allows Lantern (`Fetcher.allowed`), and it does not stop the live page being read later.
+  - The verdict runs after the report, so a rejected verdict sentence is listed with the
+    report's removed sentences. Its reason line says which rule the evidence met.
+  - The verdict sentence must use exactly the allowed likelihood term (whole terms, so
+    "unlikely" does not count as "likely").
+  - Tests: `tests/research/test_claims.py` (30 tests, CL-AC1 to CL-AC10, including property
+    tests of the verdict rules). The full suite: 699 passed; the five failures already on
+    `main` are unrelated. Coverage 95% total.

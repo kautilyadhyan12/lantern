@@ -503,3 +503,4 @@ blockquote { border-left-color: var(--orange); }
 .verdict-chip.v-misleading { color: #b04a00; }
 .verdict-chip.v-unproven { color: var(--muted); }
 @media (max-width: 560px) { .mode { flex-direction: column; } .mode-tab + .mode-tab { border-left: 0; border-top: 3px solid var(--line); } }
+.brief, .case-tile-brief { overflow-wrap: anywhere; }

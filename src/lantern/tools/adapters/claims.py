@@ -112,7 +112,7 @@ class EarliestCopy:
             "not show when the material was first published."
         )
         kept = {"archive_url": first.archive_url, "captured": first.archived_at.isoformat()}
-        shown = f"a {platform} post" if platform else registrable_domain(first.url)
+        shown = f"a post on {platform}" if platform else registrable_domain(first.url)
         return SourceDraft(
             url=first.archive_url,
             title=f"Wayback Machine: earliest copy of {shown}",

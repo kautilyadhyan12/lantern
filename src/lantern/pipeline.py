@@ -38,7 +38,7 @@ from lantern.models import (
     Verdict,
     now,
 )
-from lantern.report import check_sentence, strip_refs, verify
+from lantern.report import check_sentence, likelihood_terms, strip_refs, verify
 from lantern.safety import check_brief
 from lantern.search import Hit, Searcher, SearchError, TimeRange
 from lantern.sites import canonical, post_lead, readable
@@ -1275,8 +1275,12 @@ class Investigator:
         reason = ""
         if ruling.label != out.label:
             reason = f"It states “{out.label}”, which the evidence does not carry."
-        elif ruling.likelihood and ruling.likelihood not in text.lower():
-            reason = f"It does not use the likelihood the evidence allows ({ruling.likelihood})."
+        elif likelihood_terms(text) != ({ruling.likelihood} if ruling.likelihood else set()):
+            reason = (
+                f"It does not use the likelihood the evidence allows ({ruling.likelihood})."
+                if ruling.likelihood
+                else "An unproven verdict has no likelihood, but the sentence uses one."
+            )
         if reason:
             report.removed.append(Removed(text=text, reason=reason))
             return None

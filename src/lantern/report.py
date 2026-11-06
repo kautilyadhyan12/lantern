@@ -15,6 +15,16 @@ def strip_refs(text: str) -> str:
     return _INLINE.sub("", text).strip()
 
 
+_TERM = re.compile(
+    r"\b(" + "|".join(re.escape(t) for t in sorted(TERMS, key=len, reverse=True)) + r")\b"
+)
+
+
+def likelihood_terms(text: str) -> set[str]:
+    """The ICD 203 likelihood terms a sentence uses: "very likely" is one term, not two."""
+    return set(_TERM.findall(text.lower()))
+
+
 def _mixes_scales(text: str) -> bool:
     lowered = text.lower()
     has_term = any(re.search(rf"\b{re.escape(term)}\b", lowered) for term in TERMS)
