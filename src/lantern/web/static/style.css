@@ -248,3 +248,6 @@ blockquote {
 .eo-swipe { width: 100%; margin: 0.4rem 0 0; }
 .eo-map .eo-name { background: rgba(0, 0, 0, 0.6); color: #fff; border: none; box-shadow: none; font-weight: 600; }
 .eo-map .eo-name::before { display: none; }
+.eo-compare { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin-bottom: 0.5rem; }
+.eo-compare button { padding: 0.25rem 0.7rem; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); cursor: pointer; }
+.eo-compare button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }

@@ -166,11 +166,24 @@
         <label>Before <input type="date" id="eo-before" value="{{ earth.before }}" max="{{ earth.today }}"></label>
         <label>After <input type="date" id="eo-after" value="{{ earth.after }}" max="{{ earth.today }}"></label>
         <label>View <select id="eo-view">
-          <option value="viirs">True colour (VIIRS NOAA-20, fewest gaps)</option>
-          <option value="modis">True colour (MODIS Terra, sharper)</option>
-          <option value="bands721">False colour: water dark blue, burn scars brown (MODIS 7-2-1)</option>
+          <optgroup label="True colour">
+            <option value="viirs">VIIRS NOAA-20: fewest gaps</option>
+            <option value="viirs21">VIIRS NOAA-21: another pass the same day</option>
+            <option value="modis">MODIS Terra: sharper, may have black gaps</option>
+            <option value="aqua">MODIS Aqua: afternoon pass, may have black gaps</option>
+          </optgroup>
+          <optgroup label="False colour: water dark blue, burn scars brown, vegetation green">
+            <option value="viirsFalse">VIIRS NOAA-20: fewest gaps</option>
+            <option value="bands721">MODIS Terra 7-2-1: sharper, may have black gaps</option>
+          </optgroup>
         </select></label>
         <label><input type="checkbox" id="eo-outline" checked> Outline of {{ earth.name }}</label>
+      </div>
+      <div class="eo-compare" role="group" aria-label="Compare the dates">
+        <button type="button" data-eo-show="before" aria-pressed="false">Show before</button>
+        <button type="button" data-eo-show="swipe" aria-pressed="true">Swipe</button>
+        <button type="button" data-eo-show="after" aria-pressed="false">Show after</button>
+        <span class="muted">Flick between before and after to spot changes in the same place.</span>
       </div>
       <div class="eo-frame">
         <div id="eo-map" class="eo-map"></div>
@@ -178,9 +191,11 @@
         <span class="eo-tag eo-left">Before</span><span class="eo-tag eo-right">After</span>
       </div>
       <input type="range" id="eo-swipe" class="eo-swipe" min="0" max="100" value="50" aria-label="Swipe between the before and after images">
-      <p class="muted">Explore live NASA imagery: drag the slider to compare, zoom and pan the map,
-        or pick other dates and views. Your browser loads these tiles straight from NASA. The saved
-        images below are the evidence this report cites.</p>
+      <p class="muted">Left of the white line is the before date, right of it the after date: drag
+        the slider over a place to compare it, or use the buttons above to switch the whole map.
+        Black strips are gaps between satellite passes on that day, not missing data in Lantern.
+        Your browser loads these tiles straight from NASA; the saved images below are the
+        evidence this report cites.</p>
     </div>
     <script src="/static/vendor/leaflet-1.9.4/leaflet.js"></script>
     <script src="/static/earth.js"></script>
