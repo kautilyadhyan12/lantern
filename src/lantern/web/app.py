@@ -18,12 +18,13 @@ from lantern.models import Claim, Investigation, Source, now
 from lantern.report import to_markdown
 from lantern.runtime import continue_investigation, missing_keys, run_investigation
 from lantern.store import Store
-from lantern.web import linkmap
+from lantern.web import earthview, linkmap
 
 HERE = Path(__file__).parent
 Runner = Callable[[Investigation, AppSettings, Store], Coroutine[Any, Any, Investigation]]
 CSP = (
-    "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "
+    f"default-src 'self'; img-src 'self' data: {earthview.GIBS_TILES}; style-src 'self'; "
+    "script-src 'self'; "
     "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
 )
 
@@ -147,6 +148,7 @@ def create_app(  # noqa: PLR0915  # routes share one store and settings via clos
             "nodes": nodes,
             "edges": edges,
             "namesakes": linkmap.namesakes(item.entities),
+            "earth": earthview.view(item),
             "entity": {entity.ref: entity for entity in item.entities},
             "map_size": (linkmap.WIDTH, linkmap.HEIGHT),
             "claims": {claim.ref: claim for claim in item.claims},
@@ -173,6 +175,15 @@ def create_app(  # noqa: PLR0915  # routes share one store and settings via clos
             "reliability": RELIABILITY,
         }
         return templates.TemplateResponse(request, "source.html", context)
+
+    @app.get("/investigations/{investigation_id}/sources/{ref}/image")
+    async def image(investigation_id: str, ref: str) -> Response:
+        """A saved satellite image, served only for image sources and only as JPEG."""
+        source = load(investigation_id).source(ref)
+        body = store.blob(source.sha256) if source and source.kind == "image" else None
+        if body is None or not body.startswith(b"\xff\xd8"):
+            raise HTTPException(404, "This saved image does not exist.")
+        return Response(body, media_type="image/jpeg")
 
     @app.get("/investigations/{investigation_id}/report.md")
     async def markdown(investigation_id: str) -> PlainTextResponse:

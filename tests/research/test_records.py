@@ -427,6 +427,8 @@ def test_record_tools_are_built_only_when_enabled(tmp_path):
         "wiki_lookup",
         "company_lookup",
         "domain_lookup",
+        "disaster_events",
+        "satellite_views",
     ]
     assert record_tools(AppSettings(records_enabled=False), fetcher=None) == ()
     assert "sanctions_search" in prompts.RESEARCH

@@ -508,3 +508,44 @@ Each stage is one pull request.
       left out.
   - `scripts/compare_runs.py` prints the AG1b-AC8 numbers for any saved runs, from the saved
     files only.
+- 2026-11-06: Earth observation, part 1 (no accounts), on the owner's go-ahead:
+  `disaster_events` (GDACS) and `satellite_views` (NASA GIBS), with places from
+  OpenStreetMap Nominatim. External facts checked today, no keys needed:
+  - Nominatim `search?format=jsonv2&addressdetails=1`: bounding box and country (ODbL,
+    attribution "© OpenStreetMap contributors"; at most one request a second, which the safe
+    fetcher's per-host pacing already ensures; one lookup per place per run).
+  - GDACS `geteventlist/SEARCH`: `eventlist` types joined with ";", country filter, 204 when
+    nothing matches. Events carry a point, alert level, dates and a GLIDE number. A country
+    search returns events anywhere in it ("Flood in India" was centred in Tamil Nadu), so a
+    sub-national place keeps only events centred within it (0.5° margin).
+  - NASA GIBS WMS `wms/epsg4326/best/wms.cgi`: JPEG and RGBA PNG; a day with no pass is
+    transparent. Monsoon imagery is mostly cloud (Assam, 10 July 2026: 84% measured), which
+    is why radar (part 2, needs a free Copernicus account) is the real flood measure. MODIS
+    swaths leave gaps at these latitudes; VIIRS NOAA-20 usually does not.
+  - Settled:
+    - For each date, code compares 80-pixel previews of the five nearest days from MODIS
+      Terra and VIIRS NOAA-20 (MODIS Aqua only when both are missing).
+    - It keeps the day with the most clear ground, counting both cloud and gaps between
+      passes, and stops as soon as one is 85% clear.
+    - It then saves one 800-pixel JPEG per date as an "image" source with its sha256.
+    - A small pure PNG reader (`core/imagery.py`) avoids a new image dependency.
+    - The only claims are code-generated: date, sensor, measured cloud share and uncovered
+      share. No model reads the images.
+    - GDACS alerts are graded B and link their event to the place on the links map.
+    - The report shows the images side by side, each linking to NASA Worldview. They are
+      served only for image sources and only as JPEG.
+- 2026-11-06: interactive satellite viewer, at the owner's request: static images were not
+  enough. NASA Worldview cannot be embedded (its `frame-ancestors` allows only listed
+  sites), so the report page gains its own viewer over NASA GIBS WMTS tiles.
+  - The page has a swipe slider between two dates, zoom and pan, date pickers, true colour
+    (VIIRS NOAA-20 or MODIS Terra) or false colour 7-2-1 (water dark blue, burn scars
+    brown), and a dashed outline of the investigated area with its name. NASA's
+    `Reference_Labels_15m` and `Reference_Features_15m` tiles in EPSG:3857 come back as
+    opaque palette PNGs (or errors), which covered the imagery in a headless Chromium test,
+    so they are not used. CARTO's label tiles now need an API key, so they are not used
+    either.
+  - It uses Leaflet 1.9.4 (BSD-2-Clause, the latest stable release), vendored under
+    `web/static/vendor/leaflet-1.9.4/`. It was downloaded from the npm registry and checked
+    against its published sha512 integrity; OSV lists no vulnerabilities for 1.9.4.
+  - The CSP only adds `https://gibs.earthdata.nasa.gov` to `img-src`; scripts stay local.
+  - The viewer is for exploring: the saved images remain the evidence the report cites.

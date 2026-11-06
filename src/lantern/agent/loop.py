@@ -346,7 +346,9 @@ class Agent(Investigator):
         if posts:
             self.note(f"Saved {len(saved)} new posts as ground reports.")
         saved += [
-            self._save_record(draft, ref) for draft in result.sources if draft.kind == "record"
+            self._save_record(draft, ref)
+            for draft in result.sources
+            if draft.kind in {"record", "image"}
         ]
         for draft in result.sources:
             if draft.kind != "page":
@@ -369,7 +371,7 @@ class Agent(Investigator):
             ref=f"S{len(self.inv.sources) + 1}",
             url=draft.url,
             domain=registrable_domain(draft.url),
-            kind="record",
+            kind="image" if draft.kind == "image" else "record",
             origin=draft.origin,
             title=draft.title,
             published=draft.published,

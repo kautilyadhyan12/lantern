@@ -152,6 +152,65 @@
   </section>
   {% endif %}
 
+  {% set images = inv.sources | selectattr("kind", "equalto", "image") | list %}
+  {% if images %}
+  <section class="satellite">
+    <h2>Satellite views</h2>
+    <p class="muted">Daily true-colour images from NASA (EOSDIS GIBS), with about 250–375 m detail.
+      Code chose the clearest day near each date; no AI reads the images. Areas from
+      OpenStreetMap (© OpenStreetMap contributors).</p>
+    {% if earth %}
+    <link rel="stylesheet" href="/static/vendor/leaflet-1.9.4/leaflet.css">
+    <div class="eo" id="eo" data-west="{{ earth.west }}" data-south="{{ earth.south }}" data-east="{{ earth.east }}" data-north="{{ earth.north }}" data-name="{{ earth.name }}">
+      <div class="eo-controls">
+        <label>Before <input type="date" id="eo-before" value="{{ earth.before }}" max="{{ earth.today }}"></label>
+        <label>After <input type="date" id="eo-after" value="{{ earth.after }}" max="{{ earth.today }}"></label>
+        <label>View <select id="eo-view">
+          <optgroup label="True colour">
+            <option value="viirs">VIIRS NOAA-20: fewest gaps</option>
+            <option value="viirs21">VIIRS NOAA-21: another pass the same day</option>
+            <option value="modis">MODIS Terra: sharper, may have black gaps</option>
+            <option value="aqua">MODIS Aqua: afternoon pass, may have black gaps</option>
+          </optgroup>
+          <optgroup label="False colour: water dark blue, burn scars brown, vegetation green">
+            <option value="viirsFalse">VIIRS NOAA-20: fewest gaps</option>
+            <option value="bands721">MODIS Terra 7-2-1: sharper, may have black gaps</option>
+          </optgroup>
+        </select></label>
+        <label><input type="checkbox" id="eo-outline" checked> Outline of {{ earth.name }}</label>
+      </div>
+      <div class="eo-compare" role="group" aria-label="Compare the dates">
+        <button type="button" data-eo-show="before" aria-pressed="false">Show before</button>
+        <button type="button" data-eo-show="swipe" aria-pressed="true">Swipe</button>
+        <button type="button" data-eo-show="after" aria-pressed="false">Show after</button>
+        <span class="muted">Flick between before and after to spot changes in the same place.</span>
+      </div>
+      <div class="eo-frame">
+        <div id="eo-map" class="eo-map"></div>
+        <div id="eo-divider" class="eo-divider" aria-hidden="true"></div>
+        <span class="eo-tag eo-left">Before</span><span class="eo-tag eo-right">After</span>
+      </div>
+      <input type="range" id="eo-swipe" class="eo-swipe" min="0" max="100" value="50" aria-label="Swipe between the before and after images">
+      <p class="muted">Left of the white line is the before date, right of it the after date: drag
+        the slider over a place to compare it, or use the buttons above to switch the whole map.
+        Black strips are gaps between satellite passes on that day, not missing data in Lantern.
+        Your browser loads these tiles straight from NASA; the saved images below are the
+        evidence this report cites.</p>
+    </div>
+    <script src="/static/vendor/leaflet-1.9.4/leaflet.js"></script>
+    <script src="/static/earth.js"></script>
+    {% endif %}
+    <div class="views">
+      {% for s in images %}
+      <figure>
+        <img src="/investigations/{{ inv.id }}/sources/{{ s.ref }}/image" alt="{{ s.title }}" loading="lazy">
+        <figcaption>{{ s.title }} · <a href="{{ s.url }}" rel="noopener noreferrer nofollow" target="_blank">open in NASA Worldview</a> · {{ s.ref }}</figcaption>
+      </figure>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
   {% if nodes %}
   <section class="linkmap">
     <h2>Links map</h2>

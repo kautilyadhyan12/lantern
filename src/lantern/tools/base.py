@@ -40,7 +40,7 @@ class SourceDraft:
     published: str | None
     body: bytes
     text: str
-    kind: Literal["page", "post", "record"]
+    kind: Literal["page", "post", "record", "image"]
     origin: str
     archive_url: str | None = None
     archived_at: datetime | None = None

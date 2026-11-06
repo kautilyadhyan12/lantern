@@ -217,7 +217,7 @@ class Investigator:
         """Records are looked up only for a name written in the research question or in the
         evidence found so far, never for a name the model brings itself."""
         fields = args.model_dump()
-        asked = fields.get("name") or fields.get("query") or fields.get("domain") or ""
+        asked = next((fields[k] for k in ("name", "query", "domain", "place") if fields.get(k)), "")
         wanted = " ".join(name_words(str(asked)))
         texts = [self.inv.brief, *(q.text for q in self.inv.questions)]
         texts += [text for c in self.inv.claims for text in (c.statement, c.quote)]

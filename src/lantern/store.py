@@ -61,6 +61,12 @@ class Store:
         path = self.root / "texts" / f"{sha256}.txt"
         return path.read_text(encoding="utf-8") if path.exists() else None
 
+    def blob(self, sha256: str) -> bytes | None:
+        if not _SHA.match(sha256):
+            return None
+        path = self.root / "blobs" / f"{sha256}.bin"
+        return path.read_bytes() if path.exists() else None
+
     def _put(self, kind: str, data: bytes, suffix: str) -> str:
         digest = hashlib.sha256(data).hexdigest()
         path = self.root / kind / f"{digest}{suffix}"
