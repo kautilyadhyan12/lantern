@@ -23,6 +23,7 @@ from lantern.assessment import FACT_CHECKERS, TERMS, clamp_likelihood, rate_sour
 from lantern.config import AppSettings
 from lantern.core.verdict import Cited, decide, independent
 from lantern.egress import Fetcher, FetchError, Page
+from lantern.llm import BudgetError
 from lantern.models import Finding, Investigation, Sentence, Verdict
 from lantern.pipeline import Limits, Tools
 from lantern.report import to_markdown
@@ -729,3 +730,21 @@ async def test_a_robots_file_that_cannot_be_read_counts_as_no():
     )
     assert await fetcher.allowed("https://www.altnews.in/fact") is False
     await fetcher.close()
+
+
+async def test_a_used_up_token_budget_leaves_the_report_and_an_unproven_verdict(tmp_path):
+    model = ClaimModel()
+    original = model.structured
+
+    async def out_of_tokens(system, user, output):
+        if output is prompts.VerdictOut:
+            raise BudgetError("The AI token budget for this investigation is used up (30,000).")
+        return await original(system, user, output)
+
+    model.structured = out_of_tokens
+    runner, _store, _model, _tools = claim_agent(tmp_path, model)
+    inv = await runner.run()
+    assert inv.status == "done"
+    assert inv.report is not None
+    assert inv.verdict.label == "unproven"
+    assert inv.verdict.reason.startswith("No verdict was weighed: The AI token budget")

@@ -21,7 +21,7 @@ from pydantic import BaseModel
 from lantern import assessment, prompts
 from lantern.archive import Archive
 from lantern.core import graph, verdict
-from lantern.llm import Model, ModelError, QuotaError, TokenBudget
+from lantern.llm import BudgetError, Model, ModelError, QuotaError, TokenBudget
 from lantern.models import (
     Claim,
     Finding,
@@ -1232,6 +1232,10 @@ class Investigator:
         )
         try:
             out = await self._ask(prompts.VERDICT, user, prompts.VerdictOut)
+        except BudgetError as error:  # this run's own limit: the findings and report stand
+            reason = f"No verdict was weighed: {error}"
+            self.inv.verdict = Verdict(label="unproven", label_proposed="unproven", reason=reason)
+            return
         except QuotaError:
             raise
         except ModelError as error:
