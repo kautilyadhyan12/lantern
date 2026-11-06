@@ -246,3 +246,5 @@ blockquote {
 .eo-left { left: 0.5rem; }
 .eo-right { right: 0.5rem; }
 .eo-swipe { width: 100%; margin: 0.4rem 0 0; }
+.eo-map .eo-name { background: rgba(0, 0, 0, 0.6); color: #fff; border: none; box-shadow: none; font-weight: 600; }
+.eo-map .eo-name::before { display: none; }

@@ -19,6 +19,7 @@ class EarthView:
     before: str  # YYYY-MM-DD
     after: str
     today: str
+    name: str  # the place, as the images name it
 
 
 def view(inv: Investigation) -> EarthView | None:
@@ -33,9 +34,11 @@ def view(inv: Investigation) -> EarthView | None:
             day = date.fromisoformat(query["t"][0]).isoformat()
         except (KeyError, IndexError, ValueError):
             continue
-        found.append((west, south, east, north, day))
+        name = (source.title or "").split(" image of ", 1)[-1].rsplit(", ", 1)[0]
+        found.append((west, south, east, north, day, name))
     if not found:
         return None
-    west, south, east, north, before = found[0]
+    west, south, east, north, before, name = found[0]
     after = found[-1][4]
-    return EarthView(west, south, east, north, before, after, now().date().isoformat())
+    today = now().date().isoformat()
+    return EarthView(west, south, east, north, before, after, today, name or "the area")

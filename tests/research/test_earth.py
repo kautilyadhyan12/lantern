@@ -458,15 +458,16 @@ def test_the_interactive_viewer_takes_its_area_and_dates_from_the_saved_images(t
         "kind": "image",
     }
     viewer = "https://worldview.earthdata.nasa.gov/?v=89.699,24.136,96.012,27.971&l=X&t="
+    titled = {"title": "NASA VIIRS NOAA-20 image of Assam, 2026-05-21 (before)"}
     inv.sources = [
-        Source(ref="S1", url=f"{viewer}2026-05-21", **common),
+        Source(ref="S1", url=f"{viewer}2026-05-21", **titled, **common),
         Source(ref="S2", url="https://worldview.earthdata.nasa.gov/?broken", **common),
         Source(ref="S3", url=f"{viewer}2026-10-25", **common),
     ]
     store.save(inv)
     view = earthview.view(inv)
     assert (view.west, view.south, view.east, view.north) == (89.699, 24.136, 96.012, 27.971)
-    assert (view.before, view.after) == ("2026-05-21", "2026-10-25")
+    assert (view.before, view.after, view.name) == ("2026-05-21", "2026-10-25", "Assam")
     assert earthview.view(Investigation(id="x", brief="y")) is None
     client = TestClient(
         create_app(AppSettings(data_dir=str(tmp_path), tavily_api_key="t", groq_api_key="g"))
@@ -477,6 +478,8 @@ def test_the_interactive_viewer_takes_its_area_and_dates_from_the_saved_images(t
     assert 'data-west="89.699"' in page
     assert 'id="eo-before" value="2026-05-21"' in page
     assert 'id="eo-after" value="2026-10-25"' in page
+    assert 'data-name="Assam"' in page
+    assert "Outline of Assam" in page
     assert '<script src="/static/vendor/leaflet-1.9.4/leaflet.js"></script>' in page
     assert (
         "img-src 'self' data: https://gibs.earthdata.nasa.gov;"

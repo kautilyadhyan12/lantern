@@ -16,31 +16,36 @@
   const beforeInput = document.getElementById("eo-before");
   const afterInput = document.getElementById("eo-after");
   const choice = document.getElementById("eo-view");
-  const labelsBox = document.getElementById("eo-labels");
+  const outlineBox = document.getElementById("eo-outline");
   const swipe = document.getElementById("eo-swipe");
   const divider = document.getElementById("eo-divider");
 
   const map = L.map("eo-map", { minZoom: 2, maxZoom: 12, worldCopyJump: true });
+  map.zoomControl.setPosition("bottomleft"); // keeps the Before tag readable
   map.fitBounds([
     [Number(data.south), Number(data.west)],
     [Number(data.north), Number(data.east)],
   ]);
-  ["before", "after", "labels"].forEach((name) => map.createPane(name));
-  map.getPane("labels").style.zIndex = 650;
-  map.getPane("labels").style.pointerEvents = "none";
+  // Imagery panes sit under Leaflet's overlay pane, so the area outline stays on top.
+  ["before", "after"].forEach((name) => {
+    map.createPane(name);
+    map.getPane(name).style.zIndex = 250;
+  });
 
   const imagery = (key, day, pane) => {
     const [name, level] = views[key];
     const url = `${base}${name}/default/${day}/GoogleMapsCompatible_Level${level}/{z}/{y}/{x}.jpg`;
     return L.tileLayer(url, { pane, maxNativeZoom: level, maxZoom: 12, attribution: credit });
   };
-  const reference = (name) =>
-    L.tileLayer(`${base}${name}/default/GoogleMapsCompatible_Level13/{z}/{y}/{x}.png`, {
-      pane: "labels",
-      maxNativeZoom: 13,
-      maxZoom: 12,
-    });
-  const labels = L.layerGroup([reference("Reference_Features_15m"), reference("Reference_Labels_15m")]);
+  // NASA's own label and border tiles have opaque backgrounds in this projection, so
+  // Lantern draws the investigated area and its name itself instead.
+  const outline = L.rectangle(
+    [
+      [Number(data.south), Number(data.west)],
+      [Number(data.north), Number(data.east)],
+    ],
+    { color: "#ffd24d", weight: 2, fill: false, dashArray: "6 4", interactive: false },
+  ).bindTooltip(data.name, { permanent: true, direction: "center", className: "eo-name" });
 
   let before = null;
   let after = null;
@@ -61,15 +66,15 @@
     after = imagery(choice.value, afterInput.value, "after").addTo(map);
     clip();
   };
-  const toggleLabels = () => {
-    if (labelsBox.checked) labels.addTo(map);
-    else map.removeLayer(labels);
+  const toggleOutline = () => {
+    if (outlineBox.checked) outline.addTo(map);
+    else map.removeLayer(outline);
   };
 
   [beforeInput, afterInput, choice].forEach((input) => input.addEventListener("change", redraw));
-  labelsBox.addEventListener("change", toggleLabels);
+  outlineBox.addEventListener("change", toggleOutline);
   swipe.addEventListener("input", clip);
   map.on("move zoom resize", clip);
   redraw();
-  toggleLabels();
+  toggleOutline();
 })();

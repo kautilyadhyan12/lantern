@@ -161,7 +161,7 @@
       OpenStreetMap (© OpenStreetMap contributors).</p>
     {% if earth %}
     <link rel="stylesheet" href="/static/vendor/leaflet-1.9.4/leaflet.css">
-    <div class="eo" id="eo" data-west="{{ earth.west }}" data-south="{{ earth.south }}" data-east="{{ earth.east }}" data-north="{{ earth.north }}">
+    <div class="eo" id="eo" data-west="{{ earth.west }}" data-south="{{ earth.south }}" data-east="{{ earth.east }}" data-north="{{ earth.north }}" data-name="{{ earth.name }}">
       <div class="eo-controls">
         <label>Before <input type="date" id="eo-before" value="{{ earth.before }}" max="{{ earth.today }}"></label>
         <label>After <input type="date" id="eo-after" value="{{ earth.after }}" max="{{ earth.today }}"></label>
@@ -170,7 +170,7 @@
           <option value="modis">True colour (MODIS Terra, sharper)</option>
           <option value="bands721">False colour: water dark blue, burn scars brown (MODIS 7-2-1)</option>
         </select></label>
-        <label><input type="checkbox" id="eo-labels" checked> Place names and borders</label>
+        <label><input type="checkbox" id="eo-outline" checked> Outline of {{ earth.name }}</label>
       </div>
       <div class="eo-frame">
         <div id="eo-map" class="eo-map"></div>

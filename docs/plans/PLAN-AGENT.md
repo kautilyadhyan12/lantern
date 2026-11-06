@@ -539,7 +539,11 @@ Each stage is one pull request.
   sites), so the report page gains its own viewer over NASA GIBS WMTS tiles.
   - The page has a swipe slider between two dates, zoom and pan, date pickers, true colour
     (VIIRS NOAA-20 or MODIS Terra) or false colour 7-2-1 (water dark blue, burn scars
-    brown), and NASA place-name and border overlays.
+    brown), and a dashed outline of the investigated area with its name. NASA's
+    `Reference_Labels_15m` and `Reference_Features_15m` tiles in EPSG:3857 come back as
+    opaque palette PNGs (or errors), which covered the imagery in a headless Chromium test,
+    so they are not used. CARTO's label tiles now need an API key, so they are not used
+    either.
   - It uses Leaflet 1.9.4 (BSD-2-Clause, the latest stable release), vendored under
     `web/static/vendor/leaflet-1.9.4/`. It was downloaded from the npm registry and checked
     against its published sha512 integrity; OSV lists no vulnerabilities for 1.9.4.
