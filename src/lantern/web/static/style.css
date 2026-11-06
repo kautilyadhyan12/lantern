@@ -284,7 +284,7 @@ blockquote {
 .board a.string:hover .string-line, .board a.string:focus .string-line { stroke-width: 5; }
 .board .string-label { font: 600 10px/1 system-ui, sans-serif; fill: #2b1a0e; text-anchor: middle;
   paint-order: stroke; stroke: #f3e2c0; stroke-width: 3px; stroke-linejoin: round; }
-.board .pin { stroke: #4a0d0d; stroke-width: 0.8; pointer-events: none; }
+.board .pin { stroke: #4a0d0d; stroke-width: 0.8; cursor: crosshair; }
 
 /* Evidence board: tools, case notes, selection */
 .board-tools { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin: 0.4rem 0 0.6rem; }
@@ -314,3 +314,28 @@ blockquote {
 .board .string.lit .string-line { stroke-width: 4.5; }
 .board.focus .card:not(.lit), .board.focus .pin:not(.lit), .board.focus .string:not(.lit) { opacity: 0.22; }
 .board .card, .board .pin, .board .string { transition: opacity 0.15s ease; }
+
+/* Evidence board: the reader's own strings, handles, notes */
+.board .own .string-line { stroke: #1d5bd6; stroke-width: 2.8; }
+.board .own .string-label { fill: #0d2e73; }
+.board .string.down { display: none; }
+.board .handle { fill: #fff; stroke: #1d5bd6; stroke-width: 3; cursor: grab; }
+.board .draft { fill: none; stroke: #1d5bd6; stroke-width: 2.8; stroke-dasharray: 6 4; pointer-events: none; }
+.board.tying, .board.tying * { cursor: crosshair; }
+.board.tying .handle { pointer-events: none; }
+.board-hint { margin: 0 0 0.6rem; font-size: 0.85rem; }
+.case-notes h5 { margin: 0.9rem 0 0.4rem; font-size: 0.95rem; }
+.note-summary { font-size: 1rem; }
+.note-caution { background: var(--accent-soft); border-radius: 6px; padding: 0.5rem 0.65rem; }
+.note-facts { padding-left: 1.2rem; margin: 0; }
+.note-facts li { margin-bottom: 0.8rem; }
+.note-strength { margin: 0.25rem 0; }
+.note-strength.st-single-source { color: var(--warn); }
+.note-strength.st-assessment { color: var(--bad); }
+.note-said { margin: 0.25rem 0; font-style: italic; }
+.note-quotes { margin: 0.25rem 0; font-size: 0.9rem; }
+.note-expert summary { color: var(--muted); font-size: 0.85rem; cursor: pointer; }
+.note-button { padding: 0.25rem 0.7rem; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); cursor: pointer; }
+.case-notes label { display: block; margin: 0.5rem 0; font-weight: 600; }
+.case-notes input[type="text"], .case-notes textarea { display: block; width: 100%; margin-top: 0.25rem; font: inherit; padding: 0.35rem; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); box-sizing: border-box; }
+.case-notes.left { right: auto; left: 22px; }

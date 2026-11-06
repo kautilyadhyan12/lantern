@@ -19,7 +19,7 @@ from lantern.models import Claim, Investigation, Source, now
 from lantern.report import to_markdown
 from lantern.runtime import continue_investigation, missing_keys, run_investigation
 from lantern.store import Store
-from lantern.web import earthview, linkmap
+from lantern.web import board, earthview, linkmap
 
 HERE = Path(__file__).parent
 Runner = Callable[[Investigation, AppSettings, Store], Coroutine[Any, Any, Investigation]]
@@ -162,7 +162,10 @@ def create_app(  # noqa: PLR0915  # routes share one store and settings via clos
         item = load(investigation_id)
         report = item.report
         nodes, edges = linkmap.view(item)
+        notes, facts = board.stories(item)
         context = {
+            "notes": notes,
+            "facts": facts,
             "inv": item,
             "nodes": nodes,
             "edges": edges,

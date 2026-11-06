@@ -218,7 +218,8 @@
       records. People are joined only through an anchor (an official ID, an explicit
       "also known as", the same source, or the same role in the same organisation), never on a
       name alone. Red string: solid when confirmed by two or more independent sources or an official
-      record, dashed when from one source only; grey dotted string is Lantern's own assessment.
+      record, dashed when from one source only; grey dotted string is Lantern's own assessment; blue
+      string is one you tied yourself.
       </p>
     {% if namesakes %}<p class="muted">Shown as separate people because no official ID, "also
       known as" claim, shared source or shared role connects them, so they may or may not be the
@@ -237,11 +238,15 @@
       <button type="button" data-board="zoom-out" title="Zoom out">−</button>
       <button type="button" data-board="fit" title="Show the whole board">Fit</button>
       <button type="button" data-board="tidy" title="Put every card back where it started">Tidy up</button>
-      <span class="muted">Click a card or a string to read its evidence · drag cards to move them · drag the cork to move around</span>
+      <button type="button" data-board="put-back" title="Put back the strings you took down" hidden>Put back strings</button>
+      <button type="button" data-board="reset" title="Undo all your changes to this board">Reset board</button>
     </div>
+    <p class="board-hint muted">Mouse wheel: zoom · drag the cork: move around · click a card or string:
+      read what it means · drag a card: move it · drag from a pin to another card: tie your own blue string ·
+      select a string, then drag its end handles: move or take it down. Your changes are kept in this browser.</p>
     <div class="board-layout">
     <div class="board-frame">
-    <svg class="board" viewBox="0 0 {{ map_size[0] }} {{ map_size[1] }}" role="img" aria-label="Evidence board: the people, organisations, places and events found, joined by string where the evidence links them">
+    <svg class="board" data-investigation="{{ inv.id }}" viewBox="0 0 {{ map_size[0] }} {{ map_size[1] }}" role="img" aria-label="Evidence board: the people, organisations, places and events found, joined by string where the evidence links them">
       <defs>
         <filter id="card-shadow" x="-20%" y="-30%" width="140%" height="170%">
           <feDropShadow dx="2" dy="5" stdDeviation="3" flood-color="#2b1a0e" flood-opacity="0.45"></feDropShadow>
@@ -262,9 +267,10 @@
       </a>
       {% endfor %}
       </g>
+      <g class="mine"></g>
       <g class="cards">
       {% for node in nodes %}{% set e = node.entity %}
-      <g class="node card k-{{ e.kind }}" data-kind="{{ e.kind }}" data-ref="{{ e.ref }}" data-x="{{ node.x }}" data-y="{{ node.y }}" data-tilt="{{ node.tilt }}" transform="translate({{ node.x }} {{ node.y }}) rotate({{ node.tilt }})">
+      <g class="node card k-{{ e.kind }}" data-kind="{{ e.kind }}" data-ref="{{ e.ref }}" data-name="{{ e.name }}" data-x="{{ node.x }}" data-y="{{ node.y }}" data-tilt="{{ node.tilt }}" transform="translate({{ node.x }} {{ node.y }}) rotate({{ node.tilt }})">
         <title>{{ e.ref }} {{ e.name }}{% if e.aliases %} (also: {{ e.aliases[:5] | join("; ") }}){% endif %} — drag to move</title>
         {% if e.kind == "organisation" %}<rect class="card-tab" x="-84" y="-43" width="64" height="14" rx="3"></rect>{% endif %}
         <rect class="card-paper" x="-84" y="-33" width="168" height="66" rx="2" filter="url(#card-shadow)"></rect>
@@ -278,6 +284,7 @@
       <g class="pins">
       {% for node in nodes %}<circle class="node pin" data-kind="{{ node.entity.kind }}" data-ref="{{ node.entity.ref }}" cx="{{ node.pin[0] }}" cy="{{ node.pin[1] }}" r="6.5" fill="url(#pin-head)"></circle>{% endfor %}
       </g>
+      <g class="handles"></g>
     </svg>
     </div>
     <aside class="case-notes" id="case-notes" aria-live="polite" hidden>
@@ -286,38 +293,45 @@
       <div id="case-notes-body"></div>
     </aside>
     </div>
-    {% set kind_name = {"organisation": "Organisation", "person_public_role": "Person (public role)", "place": "Place", "event": "Event"} %}
-    {% for node in nodes %}{% set e = node.entity %}
-    <template id="note-{{ e.ref }}">
-      <p class="note-kind">{{ kind_name[e.kind] }} · {{ e.ref }}</p>
-      <h4>{{ e.name }}</h4>
-      {% if e.aliases %}<p><b>Also known as:</b> {{ e.aliases[:8] | join("; ") }}{% if e.aliases | length > 8 %}</p>
-      <details><summary>Show all {{ e.aliases | length }} other names</summary><p>{{ e.aliases[8:] | join("; ") }}</p></details>{% else %}</p>{% endif %}{% endif %}
-      {% if e.ids %}<p><b>Identifiers:</b> {{ e.ids | join(", ") }}</p>{% endif %}
-      {% set mine = (inv.links | selectattr("subject", "equalto", e.ref) | list) + (inv.links | selectattr("object", "equalto", e.ref) | list) %}
-      <p><b>{{ mine | length }} string{{ "" if mine | length == 1 else "s" }}:</b></p>
-      <ul class="note-links">
-        {% for link in mine %}
-        <li><button type="button" class="note-link" data-link="{{ link.ref }}">{{ entity[link.subject].name }} — {{ link.relation | replace("_", " ") }} → {{ entity[link.object].name }}</button>
-          <span class="chip st-{{ 'ok' if link.status in ('corroborated', 'record') else 'single' }}">{{ link.status }}</span>
-          <div>{% if link.status == "assessment" %}For: {% endif %}{{ cite(link.claim_refs) }}{% if link.against %} Against: {{ cite(link.against) }}{% endif %}</div></li>
+    {% macro fact_body(f) -%}
+      <p class="note-strength st-{{ f.status | replace(' ', '-') }}">{{ f.strength }}</p>
+      {% if f.said %}<p class="note-said">{{ "What the sources say" if f.said | length > 1 else "What the source says" }}: {% for said in f.said %}“{{ said }}”{{ " " if not loop.last }}{% endfor %}</p>{% endif %}
+      <p class="note-quotes">Read the exact {{ "quote" if f.claims | length == 1 else "quotes" }} in the saved {{ "source" if f.claims | length == 1 else "sources" }}: {{ cite(f.claims) }}{% if f.against %}<br>Evidence against it: {{ cite(f.against) }}{% endif %}</p>
+    {%- endmacro %}
+    {% for node in nodes %}{% set st = notes[node.entity.ref] %}
+    <template id="note-{{ st.ref }}">
+      <p class="note-kind">{{ st.kind }}</p>
+      <h4>{{ st.name }}</h4>
+      <p class="note-summary">{{ st.summary }}</p>
+      {% if st.caution %}<p class="note-caution">{{ st.caution }}</p>{% endif %}
+      {% if st.facts %}
+      <h5>What the evidence says</h5>
+      <ol class="note-facts">
+        {% for f in st.facts %}
+        <li><button type="button" class="note-link" data-link="{{ f.ref }}">{{ f.sentence }}</button>
+          {{ fact_body(f) }}</li>
         {% endfor %}
-      </ul>
+      </ol>
+      {% endif %}
+      <div class="note-mine" data-for="{{ st.ref }}"></div>
+      {% if st.aliases | length > 2 %}<details><summary>All {{ st.aliases | length }} other names</summary><p>{{ st.aliases | join("; ") }}</p></details>{% endif %}
+      <details class="note-expert"><summary>Reference numbers (for experts)</summary>
+        <p>Card {{ st.ref }}{% if st.ids %} · {{ st.ids | join(", ") }}{% endif %}</p></details>
     </template>
     {% endfor %}
-    {% for link in inv.links %}
+    {% for link in inv.links %}{% set f = facts[link.ref] %}
     <template id="note-{{ link.ref }}">
-      <p class="note-kind">String · {{ link.ref }}</p>
-      <h4>{{ entity[link.subject].name }} — {{ link.relation | replace("_", " ") }} → {{ entity[link.object].name }}</h4>
-      <p><span class="chip st-{{ 'ok' if link.status in ('corroborated', 'record') else 'single' }}">{{ link.status }}</span>
-        {% if link.status == "assessment" %}Lantern's assessment from several claims, not a fact stated by a source.
-        {% elif link.status == "record" %}From an official record.
-        {% elif link.origins %}{{ link.origins | length }} independent source{{ "" if link.origins | length == 1 else "s" }}: {{ link.origins | join(", ") }}.{% endif %}</p>
-      <p><b>{{ "Evidence for" if link.status == "assessment" else "Evidence" }}:</b> {{ cite(link.claim_refs) }}</p>
-      {% if link.against %}<p><b>Evidence against:</b> {{ cite(link.against) }}</p>{% endif %}
-      <p class="muted">Each button opens the exact quote, highlighted in the saved source.</p>
+      <p class="note-kind">Evidence string</p>
+      <h4>{{ f.sentence }}</h4>
+      {{ fact_body(f) }}
+      <p class="note-actions"><button type="button" class="note-button" data-string-down="{{ link.ref }}">Take this string down</button></p>
+      <p class="muted">To move it, drag one of the round handles at its ends onto another card. The
+        evidence stays as it is: Lantern ties a blue string marked as your guess instead.</p>
+      <details class="note-expert"><summary>Reference numbers (for experts)</summary>
+        <p>String {{ link.ref }} · {{ link.relation }} · {{ link.status }}{% if link.origins %} · {{ link.origins | join(", ") }}{% endif %}</p></details>
     </template>
     {% endfor %}
+    <script src="{{ asset('board.js') }}" defer></script>
     <details class="links-table"><summary>All {{ inv.links | length }} strings as a table</summary>
     <div class="table-wrap">
     <table class="links">

@@ -580,3 +580,25 @@ Each stage is one pull request.
   for the new one), so the new board code did not run there. Static URLs now carry a short
   hash of each file's contents (`asset()` in the templates), and `/static/` responses send
   `Cache-Control: no-cache`, so a changed script or stylesheet always reaches the browser.
+- 2026-11-06: evidence board, second round of owner feedback:
+  - The mouse wheel zooms towards the pointer, and dragging the cork pans.
+  - Strings can be moved and taken down. A selected string shows round end handles: drop
+    one on another card to move the string, or on bare cork to take it down. Dragging from
+    a pin to another card ties the reader's own string.
+  - Evidence is never edited. Moving an evidence string hides it and ties a blue string
+    labelled "(your guess)". The reader's strings are blue, can be relabelled, carry notes
+    and can be removed. "Put back" restores taken-down strings and "Reset board" undoes
+    everything.
+  - Positions, the reader's strings and taken-down strings are kept in the browser's
+    localStorage per investigation. They are a reader's workspace, not part of the evidence
+    or the report.
+  - Case notes are written in plain language by code (`web/board.py`): what the card is,
+    one sentence per connection, how sure the evidence is in words (official record /
+    N independent sources / only one source, treat with caution / Lantern's own inference),
+    where it comes from by name, and what the sources say. Record codes (OFAC, SDN, FTO,
+    SDGT, LEI, GLIDE, GDACS…) are explained in brackets the first time they appear.
+    Identifiers move to a "Reference numbers (for experts)" fold.
+  - The notes open on the side away from the selection. If the selection would still sit
+    under them, the view moves (zooming out only if needed) to show it in the free part.
+    Checked in headless Chromium: both handles of every string stay reachable.
+  - The board script moves to `web/static/board.js`, loaded only on pages with a board.

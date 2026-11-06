@@ -8,13 +8,24 @@ from lantern import prompts
 from lantern.agent.loop import Agent
 from lantern.config import AppSettings
 from lantern.core import graph
-from lantern.models import RELATIONS, Entity, Investigation, Link, Question, Report, Triple
+from lantern.models import (
+    RELATIONS,
+    Claim,
+    Entity,
+    Investigation,
+    Link,
+    Question,
+    Report,
+    Source,
+    Triple,
+    now,
+)
 from lantern.pipeline import Investigator, Limits, Tools
 from lantern.report import to_markdown
 from lantern.store import Store
 from lantern.tools.adapters.sanctions import SanctionsSearch
 from lantern.tools.adapters.wiki import SUMMARY, WIKIDATA, WikiLookup
-from lantern.web import linkmap
+from lantern.web import board, linkmap
 from lantern.web.app import create_app
 
 from . import fakes
@@ -434,3 +445,110 @@ def test_overlapping_namesake_groups_are_listed_once():
         Entity(ref="E6", kind=PERSON, name="Muhammad Saeed"),
     ]
     assert linkmap.namesakes(entities) == [("SAEED, Muhammad", 3)]
+
+
+def test_card_notes_say_what_the_evidence_means_in_plain_words(tmp_path):
+    store = Store(tmp_path)
+    inv = Investigation(id=store.new_id(), brief="Who leads the group?")
+    common = {
+        "fetched_at": now(),
+        "size": 1,
+        "reliability": "A",
+        "reliability_reason": "r",
+        "sha256": "x",
+        "text_sha256": "y",
+    }
+    inv.sources = [
+        Source(
+            ref="S1",
+            url="https://sanctionssearch.ofac.treas.gov/x",
+            domain="treas.gov",
+            kind="record",
+            title="US Treasury OFAC SDN list: LASHKAR E-TAYYIBA",
+            **common,
+        ),
+        Source(ref="S2", url="https://dawn.com/a", domain="dawn.com", **common),
+        Source(ref="S3", url="https://thehindu.com/b", domain="thehindu.com", **common),
+    ]
+    claim = {"question_refs": ["Q1"], "quote": "q", "start": 0, "end": 1}
+    inv.claims = [
+        Claim(
+            ref="C1",
+            source_ref="S1",
+            statement="LASHKAR E-TAYYIBA is on the OFAC SDN list as an entity under FTO, SDGT.",
+            **claim,
+        ),
+        Claim(
+            ref="C2", source_ref="S2", statement="Abu Qatal was a commander of the group.", **claim
+        ),
+        Claim(
+            ref="C3", source_ref="S3", statement="Abu Qatal led fighters for the group.", **claim
+        ),
+    ]
+    inv.entities = [
+        Entity(
+            ref="E1", kind=ORG, name="LASHKAR E-TAYYIBA", aliases=["LeT", "Army of the Pure", "JuD"]
+        ),
+        Entity(ref="E2", kind=ORG, name="US Treasury OFAC"),
+        Entity(ref="E3", kind=PERSON, name="Abu Qatal"),
+        Entity(ref="E4", kind=PERSON, name="Qatal, Abu"),
+    ]
+    inv.links = [
+        Link(
+            ref="L1",
+            subject="E1",
+            relation="designated_by",
+            object="E2",
+            claim_refs=["C1"],
+            basis="record",
+            status="record",
+            origins=["ofac.treas.gov"],
+        ),
+        Link(
+            ref="L2",
+            subject="E3",
+            relation="leader_of",
+            object="E1",
+            claim_refs=["C2", "C3"],
+            basis="stated",
+            status="corroborated",
+            origins=["dawn.com", "thehindu.com"],
+        ),
+        Link(
+            ref="L3",
+            subject="E4",
+            relation="member_of",
+            object="E1",
+            claim_refs=["C2"],
+            basis="stated",
+            status="single source",
+            origins=["dawn.com"],
+        ),
+    ]
+    notes, facts = board.stories(inv)
+    let = notes["E1"]
+    assert let.kind == "Organisation"
+    assert let.summary == (
+        "LASHKAR E-TAYYIBA is an organisation. It is also known as LeT and Army of the Pure and "
+        "1 other name. Lantern found 3 connections for it: 1 from official records; 1 confirmed "
+        "by two or more independent sources; 1 from a single source."
+    )
+    assert (
+        facts["L1"].sentence == "LASHKAR E-TAYYIBA is on a sanctions list kept by US Treasury OFAC."
+    )
+    assert facts["L1"].strength == "An official record says this (US Treasury OFAC SDN list)."
+    assert facts["L1"].said == [
+        (
+            "LASHKAR E-TAYYIBA is on the OFAC (the US Treasury's sanctions office) SDN (Specially "
+            "Designated Nationals, the US Treasury's main sanctions list) list as an entity under "
+            "FTO (Foreign Terrorist Organization), SDGT (Specially Designated Global Terrorist)."
+        )
+    ]
+    assert facts["L2"].sentence == "Abu Qatal leads LASHKAR E-TAYYIBA."
+    assert facts["L2"].strength == "2 independent sources report this: dawn.com, thehindu.com."
+    assert (
+        facts["L3"].strength == "Only one source reports this (dawn.com), so treat it with caution."
+    )
+    assert notes["E3"].caution.startswith("Careful: 1 other card on this board shares this name.")
+    assert notes["E2"].caution == ""
+    assert board.gloss("SDGT and SDGT") == "SDGT (Specially Designated Global Terrorist) and SDGT"
