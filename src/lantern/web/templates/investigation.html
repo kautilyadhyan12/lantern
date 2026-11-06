@@ -160,7 +160,7 @@
       Code chose the clearest day near each date; no AI reads the images. Areas from
       OpenStreetMap (© OpenStreetMap contributors).</p>
     {% if earth %}
-    <link rel="stylesheet" href="/static/vendor/leaflet-1.9.4/leaflet.css">
+    <link rel="stylesheet" href="{{ asset('vendor/leaflet-1.9.4/leaflet.css') }}">
     <div class="eo" id="eo" data-west="{{ earth.west }}" data-south="{{ earth.south }}" data-east="{{ earth.east }}" data-north="{{ earth.north }}" data-name="{{ earth.name }}">
       <div class="eo-controls">
         <label>Before <input type="date" id="eo-before" value="{{ earth.before }}" max="{{ earth.today }}"></label>
@@ -197,8 +197,8 @@
         Your browser loads these tiles straight from NASA; the saved images below are the
         evidence this report cites.</p>
     </div>
-    <script src="/static/vendor/leaflet-1.9.4/leaflet.js"></script>
-    <script src="/static/earth.js"></script>
+    <script src="{{ asset('vendor/leaflet-1.9.4/leaflet.js') }}"></script>
+    <script src="{{ asset('earth.js') }}"></script>
     {% endif %}
     <div class="views">
       {% for s in images %}

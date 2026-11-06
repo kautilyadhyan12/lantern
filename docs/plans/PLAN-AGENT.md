@@ -576,3 +576,7 @@ Each stage is one pull request.
   - Checked in headless Chromium: clicks select without moving cards, the panel opens and
     closes, the quote dialog opens from the notes, the page does not jump, zoom changes the
     view box, drag then Tidy up restores positions, and there are no page errors.
+- 2026-11-06: the owner's browser kept an old `app.js` (the server log showed it never asked
+  for the new one), so the new board code did not run there. Static URLs now carry a short
+  hash of each file's contents (`asset()` in the templates), and `/static/` responses send
+  `Cache-Control: no-cache`, so a changed script or stylesheet always reaches the browser.
