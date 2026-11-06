@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block main %}
 <section class="hero">
-  <h1>Ask a question. Get a report you can check.</h1>
+  <p class="kicker"><span class="pill black">Public evidence only</span><span class="pill yellow">Every claim cited</span></p>
+  <h1>Ask a question.<br><span class="hl">Get a report</span> you can check.</h1>
   <p class="lede">
     Lantern splits your question into key questions, reads public web pages, saves a
     fingerprinted copy of each one, and pulls out claims tied to exact quotes. Every
@@ -12,26 +13,47 @@
     then restart the codespace.</p>
   {% endif %}
   <form id="ask" class="ask" autocomplete="off">
-    <label for="brief" class="sr">Research question</label>
-    <textarea id="brief" name="brief" rows="3" maxlength="600" required
-      placeholder="For example: What is publicly known about the 2026 monsoon floods in Assam?"></textarea>
-    <fieldset class="depth">
-      <legend class="sr">How thorough</legend>
-      <label><input type="radio" name="depth" value="deep" checked> <b>Deep investigation</b>
-        <span class="muted">up to 6 rounds and 30 pages; the agent follows up on what it finds; up to 15 minutes</span></label>
-      <label><input type="radio" name="depth" value="quick"> <b>Quick look</b>
-        <span class="muted">one round of up to 10 pages; up to 5 minutes</span></label>
-    </fieldset>
-    <div class="ask-row">
-      <span class="hint">{{ left }} investigation{{ "" if left == 1 else "s" }} left today.
-        Questions about private people, locations of individuals or minors are refused.</span>
-      <button type="submit" {% if missing or not left %}disabled{% endif %}>Investigate</button>
+    <div class="ask-part">
+      <label for="brief" class="ask-label"><span class="num">01</span>Your question</label>
+      <textarea id="brief" name="brief" rows="3" maxlength="600" required
+        placeholder="For example: What is publicly known about the 2026 monsoon floods in Assam?"></textarea>
+    </div>
+    <div class="ask-part">
+      <fieldset class="depth">
+        <legend class="ask-label"><span class="num">02</span>How thorough should it be?</legend>
+        <label class="choice">
+          <input type="radio" name="depth" value="deep" checked>
+          <span class="choice-card">
+            <span class="choice-top"><span class="choice-title">Deep investigation</span><span class="choice-tick" aria-hidden="true">✓</span></span>
+            <span class="choice-text">The agent follows up on what it finds, checks names in official
+              records and keeps digging until each key question is answered.</span>
+            <span class="choice-facts"><span class="pill">Up to 6 rounds</span> <span class="pill">30 pages</span> <span class="pill">~15 min</span></span>
+            <span class="choice-picked">Selected</span>
+          </span>
+        </label>
+        <label class="choice">
+          <input type="radio" name="depth" value="quick">
+          <span class="choice-card">
+            <span class="choice-top"><span class="choice-title">Quick look</span><span class="choice-tick" aria-hidden="true">✓</span></span>
+            <span class="choice-text">One fast round of searching and reading. Good for a first
+              overview; uses fewer AI tokens.</span>
+            <span class="choice-facts"><span class="pill">1 round</span> <span class="pill">10 pages</span> <span class="pill">~5 min</span></span>
+            <span class="choice-picked">Selected</span>
+          </span>
+        </label>
+      </fieldset>
+    </div>
+    <div class="ask-part ask-row">
+      <p class="hint"><b>{{ left }} investigation{{ "" if left == 1 else "s" }} left today.</b>
+        Questions about private people, locations of individuals or minors are refused.</p>
+      <button type="submit" {% if missing or not left %}disabled{% endif %}>Investigate →</button>
     </div>
     <p id="ask-error" class="error" hidden></p>
   </form>
 </section>
 
 <section class="how">
+  <div class="section-head"><h2>How it works</h2><span class="pill">6 steps, all checked by code</span></div>
   <ol>
     <li><b>Safety check</b> Fixed rules, then an AI check, before anything runs.</li>
     <li><b>Key questions</b> The question is split into 2–4 parts.</li>
@@ -44,13 +66,21 @@
 
 {% if items %}
 <section>
-  <h2>Investigations</h2>
-  <ul class="list">
+  <div class="section-head"><h2>Investigations</h2><span class="pill">{{ items | length }} saved</span></div>
+  <ul class="cases">
     {% for item in items %}
     <li>
-      <a href="/investigations/{{ item.id }}">{{ item.brief }}</a>
-      <span class="status s-{{ item.status }}">{{ item.status }}</span>
-      <time>{{ item.created_at.strftime("%d %b %Y, %H:%M") }} UTC</time>
+      <a class="case-tile" href="/investigations/{{ item.id }}">
+        <span class="case-tile-top">
+          <span class="status s-{{ item.status }}">{{ item.status }}</span>
+          <span class="pill">{{ "Deep" if item.depth == "deep" else "Quick" }}</span>
+        </span>
+        <span class="case-tile-brief">{{ item.brief }}</span>
+        <span class="case-tile-foot">
+          <span>{{ item.sources | length }} sources · {{ item.claims | length }} claims</span>
+          <time>{{ item.created_at.strftime("%d %b %Y, %H:%M") }} UTC</time>
+        </span>
+      </a>
     </li>
     {% endfor %}
   </ul>

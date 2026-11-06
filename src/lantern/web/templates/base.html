@@ -13,10 +13,10 @@
     <span class="tag">Public-evidence investigations</span>
     <a class="new-button" href="/#ask">+ New investigation</a>
   </header>
-  <main>{% block main %}{% endblock %}</main>
+  <main{% block main_attrs %}{% endblock %}>{% block main %}{% endblock %}</main>
   <footer class="foot">
-    Lantern uses public web pages only. Reports are produced with automated assistance;
-    review them before publishing or acting on them.
+    <p>Lantern uses public web pages only. Reports are produced with automated assistance;
+      review them before publishing or acting on them.</p>
   </footer>
 </body>
 </html>

@@ -30,27 +30,68 @@
 <span class="sentence">{{ s.text }} {{ cite(s.cites) }}</span>
 {%- endmacro %}
 
+{% block main_attrs %} class="wide"{% endblock %}
 {% block main %}
-<p class="crumb"><a href="/">← All investigations</a></p>
-<h1 class="brief">{{ inv.brief }}</h1>
-<p class="meta">
-  <span class="status s-{{ inv.status }}">{{ inv.status }}</span>
-  Started {{ inv.created_at.strftime("%d %b %Y, %H:%M") }} UTC
+{% set images = inv.sources | selectattr("kind", "equalto", "image") | list %}
+<div class="case-layout">
+<nav class="side-nav" aria-label="Sections of this report">
+  <p class="nav-title">NAVIGATE</p>
+  <ol>
+    <li><a href="#overview">Overview</a></li>
+    {% if inv.report %}
+    <li><a href="#findings">Key findings <span class="count">{{ inv.findings | length }}</span></a></li>
+    {% if images %}<li><a href="#satellite">Satellite <span class="count">{{ images | length }}</span></a></li>{% endif %}
+    {% if nodes %}<li><a href="#board">Evidence board <span class="count">{{ nodes | length }}</span></a></li>{% endif %}
+    <li><a href="#sources">Sources <span class="count">{{ inv.sources | length }}</span></a></li>
+    {% if inv.leads %}<li><a href="#leads">Leads <span class="count">{{ inv.leads | length }}</span></a></li>{% endif %}
+    <li><a href="#method">How it was done</a></li>
+    {% endif %}
+  </ol>
+</nav>
+<div class="case-main">
+<header class="case-hero" id="overview">
+  <p class="crumb"><a href="/">← All investigations</a></p>
+  <p class="kicker">
+    <span class="status s-{{ inv.status }}">{{ inv.status }}</span>
+    <span class="pill yellow">{{ "Deep investigation" if inv.depth == "deep" else "Quick look" }}</span>
+    <span class="muted">Started {{ inv.created_at.strftime("%d %b %Y, %H:%M") }} UTC</span>
+  </p>
+  <h1 class="brief">{{ inv.brief }}</h1>
   {% if inv.status == "done" %}
-  · <a href="/investigations/{{ inv.id }}/report.md">Markdown</a>
-  · <a href="/investigations/{{ inv.id }}/investigation.json">JSON</a>
+  <p class="hero-actions">
+    <a class="btn small" href="/investigations/{{ inv.id }}/report.md">↓ Markdown</a>
+    <a class="btn small" href="/investigations/{{ inv.id }}/investigation.json">↓ JSON</a>
+  </p>
   {% endif %}
-</p>
-
-{% if inv.status in ("done", "failed") and inv.questions %}
-<section class="continue">
-  <button type="button" id="continue" data-id="{{ inv.id }}">Continue investigating</button>
-  <span class="muted">Up to 2 more research rounds and 16 more pages on this investigation. It keeps
-    everything found, skips searches and pages already done, then rewrites the report. Counts as one
-    of today's investigations.</span>
-  <p id="continue-error" class="error" hidden></p>
-</section>
-{% endif %}
+  {% if inv.status not in ("queued", "running") %}
+  <ul class="stats">
+    <li class="stat"><b>{{ inv.questions | length }}</b><span>Key questions</span></li>
+    <li class="stat"><b>{{ inv.sources | length }}</b><span>Sources saved</span></li>
+    <li class="stat"><b>{{ inv.claims | length }}</b><span>Claims quoted</span></li>
+    <li class="stat"><b>{{ inv.links | length }}</b><span>Strings on the board</span></li>
+    <li class="stat"><b>{{ "{:,}".format(inv.usage.tokens_in + inv.usage.tokens_out) }}</b><span>AI tokens used</span></li>
+  </ul>
+  {% endif %}
+  {% if inv.report %}
+  <div class="bottom-line">
+    <h2>Bottom line</h2>
+    {% if inv.report.bottom_line %}
+    <p>{% for s in inv.report.bottom_line %}{{ sentence(s) }} {% endfor %}</p>
+    {% else %}
+    <p>No verified bottom line: none of the key questions could be answered from the pages read.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if inv.status in ("done", "failed") and inv.questions %}
+  <div class="continue">
+    <button type="button" id="continue" data-id="{{ inv.id }}">Continue investigating</button>
+    <p class="muted">Up to 2 more research rounds and 16 more pages on this investigation. It keeps
+      everything found, skips searches and pages already done, then rewrites the report. Counts as one
+      of today's investigations.</p>
+    <p id="continue-error" class="error" hidden></p>
+  </div>
+  {% endif %}
+</header>
 
 {% if inv.status in ("queued", "running") %}
 <section class="panel live">
@@ -78,20 +119,18 @@
 
 {% if inv.report %}
 {% set report = inv.report %}
-<article class="report">
-  <section class="bottom-line">
-    <h2>Bottom line</h2>
-    {% if report.bottom_line %}
-    <p>{% for s in report.bottom_line %}{{ sentence(s) }} {% endfor %}</p>
-    {% else %}
-    <p>No verified bottom line: none of the key questions could be answered from the pages read.</p>
-    {% endif %}
-  </section>
-
+<section class="block" id="findings">
+  <h2 class="block-title">Key findings</h2>
+  <p class="block-lede">One card per key question: the answer, how likely it is, how sure Lantern
+    is, and everything the sources reported. Yellow tags open the exact quote behind each claim.</p>
+  <div class="findings">
   {% for finding in inv.findings %}
   {% set question = inv.question(finding.question_ref) %}
-  <section class="finding">
-    <h3><span class="ref">{{ finding.question_ref }}</span> {{ question.text if question else "" }}</h3>
+  <article class="finding{{ '' if finding.status == 'answered' else ' unanswered' }}">
+    <div class="finding-head"><span class="ref">{{ finding.question_ref }}</span>
+      <h3>{{ question.text if question else "" }}</h3>
+      <span class="chip{{ ' st-ok' if finding.status == 'answered' }}">{{ "answered" if finding.status == "answered" else "open" }}</span></div>
+    <div class="finding-body">
     {% if finding.status == "answered" %}
       {% set section = sections.get(finding.question_ref) %}
       {% if section and section.sentences %}
@@ -142,21 +181,23 @@
       {% endfor %}
     </ul>
     {% endif %}
-  </section>
+    </div>
+  </article>
   {% endfor %}
 
   {% if report.gaps %}
-  <section>
-    <h2>What could not be determined</h2>
+  <div class="gaps">
+    <h3>What could not be determined</h3>
     <ul>{% for gap in report.gaps %}<li>{{ gap }}</li>{% endfor %}</ul>
-  </section>
+  </div>
   {% endif %}
+  </div>
+</section>
 
-  {% set images = inv.sources | selectattr("kind", "equalto", "image") | list %}
   {% if images %}
-  <section class="satellite">
-    <h2>Satellite views</h2>
-    <p class="muted">Daily true-colour images from NASA (EOSDIS GIBS), with about 250–375 m detail.
+  <section class="block satellite" id="satellite">
+    <h2 class="block-title">Satellite views</h2>
+    <p class="block-lede">Daily true-colour images from NASA (EOSDIS GIBS), with about 250–375 m detail.
       Code chose the clearest day near each date; no AI reads the images. Areas from
       OpenStreetMap (© OpenStreetMap contributors).</p>
     {% if earth %}
@@ -191,7 +232,7 @@
         <span class="eo-tag eo-left">Before</span><span class="eo-tag eo-right">After</span>
       </div>
       <input type="range" id="eo-swipe" class="eo-swipe" min="0" max="100" value="50" aria-label="Swipe between the before and after images">
-      <p class="muted">Left of the white line is the before date, right of it the after date: drag
+      <p class="muted">Left of the yellow line is the before date, right of it the after date: drag
         the slider over a place to compare it, or use the buttons above to switch the whole map.
         Black strips are gaps between satellite passes on that day, not missing data in Lantern.
         Your browser loads these tiles straight from NASA; the saved images below are the
@@ -212,9 +253,9 @@
   {% endif %}
 
   {% if nodes %}
-  <section class="linkmap">
-    <h2>Evidence board</h2>
-    <p class="muted">Drawn by code from claims anchored in saved sources and from official
+  <section class="block linkmap" id="board">
+    <h2 class="block-title">Evidence board</h2>
+    <p class="block-lede">Drawn by code from claims anchored in saved sources and from official
       records. People are joined only through an anchor (an official ID, an explicit
       "also known as", the same source, or the same role in the same organisation), never on a
       name alone. Red string: solid when confirmed by two or more independent sources or an official
@@ -371,8 +412,10 @@
   </section>
   {% endif %}
 
-  <section>
-    <h2>Sources</h2>
+  <section class="block" id="sources">
+    <h2 class="block-title">Sources</h2>
+    <p class="block-lede">Every page, post, record and image Lantern saved and used, with its
+      reliability grade and fingerprint. Open a source to read the saved copy with the quotes highlighted.</p>
     <div class="table-wrap">
     <table class="sources">
       <thead><tr><th>Ref</th><th>Page</th><th>Grade</th><th>Saved (UTC)</th><th>sha256</th></tr></thead>
@@ -420,9 +463,9 @@
   {% if inv.leads %}
   {% set post_leads = inv.leads | selectattr("kind", "equalto", "post") | list %}
   {% set page_leads = inv.leads | selectattr("kind", "equalto", "page") | list %}
-  <section>
-    <h2>Leads to check yourself</h2>
-    <p class="muted">Links Lantern found but did not read. They are <b>not evidence</b> in this
+  <section class="block" id="leads">
+    <h2 class="block-title">Leads to check yourself</h2>
+    <p class="block-lede">Links Lantern found but did not read. They are <b>not evidence</b> in this
       report; open them yourself to check what they say.</p>
     {% if post_leads %}
     <h4>Posts on sites that forbid automated reading</h4>
@@ -445,8 +488,8 @@
   </section>
   {% endif %}
 
-  <section class="method">
-    <h2>How this was done</h2>
+  <section class="block method" id="method">
+    <h2 class="block-title">How this was done</h2>
     <ul>
       <li>Safety: {{ inv.safety }}</li>
       {% if inv.continued_at %}<li>Continued {{ inv.continued_at | length }} time{{ "" if inv.continued_at | length == 1 else "s" }} after the first pass.</li>{% endif %}
@@ -486,8 +529,9 @@
     <details><summary>Step log</summary><ol class="steps">
       {% for step in inv.steps %}<li>{{ step.message }}</li>{% endfor %}</ol></details>
   </section>
-</article>
 {% endif %}
+</div>
+</div>
 
 {% for claim in inv.claims %}
 {% set src = sources.get(claim.source_ref) %}

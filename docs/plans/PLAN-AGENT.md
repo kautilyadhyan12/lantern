@@ -620,3 +620,12 @@ Each stage is one pull request.
     that UN-numbered entry to the listed organisation.
   - Wikidata-backed links read "a reference work says this … not proof on its own" instead
     of "an official record".
+- 2026-11-06: new look for the web app (bold yellow and black style with thick borders and
+  hard shadows; Space Grotesk and Space Mono fonts served by Lantern, OFL-1.1).
+  - Home page: the question box, then the two depths as large choice cards (Deep
+    investigation, Quick look), a six-step "How it works" strip and investigations as cards.
+  - Report page: a sticky side menu (Overview, Key findings, Satellite, Evidence board,
+    Sources, Leads, How it was done) that marks the section being read; an opening block with
+    status, depth, downloads, five stat tiles and the bottom line; numbered section panels;
+    one card per key question.
+  - Saved-copy page: a header card and a facts card. All pages fit a phone screen.

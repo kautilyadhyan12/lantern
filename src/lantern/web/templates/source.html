@@ -1,8 +1,16 @@
 {% extends "base.html" %}
 {% block title %}{{ source.ref }} saved copy · Lantern{% endblock %}
 {% block main %}
+<header class="case-hero source-hero">
 <p class="crumb"><a href="/investigations/{{ inv.id }}">← Back to the report</a></p>
+<p class="kicker"><span class="pill black">{{ source.ref }}</span>
+  <span class="pill yellow">{{ {"post": "Ground report", "record": "Record", "image": "Satellite image"}.get(source.kind, "Saved web page") }}</span>
+  <span class="grade g-{{ source.reliability }}" title="{{ reliability[source.reliability] }}">{{ source.reliability }}</span></p>
 <h1 class="brief">{{ source.title or source.domain }}</h1>
+<p class="hint">This is the text Lantern extracted from its saved copy. Highlighted passages are
+  the exact quotes behind claims; the page's own HTML is never shown.</p>
+</header>
+<div class="facts-card">
 <dl class="facts">
   <div><dt>Ref</dt><dd>{{ source.ref }}</dd></div>
   <div><dt>Original</dt><dd><a href="{{ source.url }}" rel="noopener noreferrer nofollow" target="_blank">{% if source.kind == "post" %}Open the original post{% else %}{{ source.url }}{% endif %}</a></dd></div>
@@ -18,8 +26,7 @@
     <div class="muted">A fingerprint of the saved copy: if one character changed, this would be
       completely different.</div></dd></div>
 </dl>
-<p class="hint">This is the text Lantern extracted from its saved copy. Highlighted passages are
-  the exact quotes behind claims; the page's own HTML is never shown.</p>
+</div>
 {% if source.kind == "image" %}<div class="views"><figure><img src="/investigations/{{ inv.id }}/sources/{{ source.ref }}/image" alt="{{ source.title }}"></figure></div>{% endif %}
 <article class="saved">{% for text, ref in parts %}{% if ref %}<mark id="{{ ref }}" title="{{ ref }}">{{ text }}<sup>{{ ref }}</sup></mark>{% else %}{{ text }}{% endif %}{% endfor %}</article>
 {% endblock %}

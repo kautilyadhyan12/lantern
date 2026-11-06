@@ -134,7 +134,30 @@ function startMapFilters() {
   filters.addEventListener("change", apply);
 }
 
+// Marks the section being read in the report's side menu.
+function startSectionMenu() {
+  const links = [...document.querySelectorAll('.side-nav a[href^="#"]')];
+  if (!links.length || !("IntersectionObserver" in window)) return;
+  const byId = new Map(links.map((link) => [link.getAttribute("href").slice(1), link]));
+  const sections = [...byId.keys()].map((id) => document.getElementById(id)).filter(Boolean);
+  const visible = new Set();
+  const mark = () => {
+    const current = sections.find((section) => visible.has(section)) || sections[0];
+    links.forEach((link) => link.setAttribute("aria-current", String(byId.get(current.id) === link)));
+  };
+  const watcher = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => (entry.isIntersecting ? visible.add(entry.target) : visible.delete(entry.target)));
+      mark();
+    },
+    { rootMargin: "-15% 0px -70% 0px" },
+  );
+  sections.forEach((section) => watcher.observe(section));
+  mark();
+}
+
 startForm();
+startSectionMenu();
 startContinue();
 startMapFilters();
 startPolling();
