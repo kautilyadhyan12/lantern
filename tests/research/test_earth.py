@@ -33,7 +33,7 @@ from lantern.tools.adapters.earth import (
 )
 from lantern.tools.base import ToolContext, ToolError
 from lantern.web import earthview
-from lantern.web.app import create_app
+from lantern.web.app import asset_urls, create_app
 
 from .fakes import FakeFetcher, FakeSearch
 from .test_agent import DONE, Researcher
@@ -480,7 +480,7 @@ def test_the_interactive_viewer_takes_its_area_and_dates_from_the_saved_images(t
     assert 'id="eo-after" value="2026-10-25"' in page
     assert 'data-name="Assam"' in page
     assert "Outline of Assam" in page
-    assert '<script src="/static/vendor/leaflet-1.9.4/leaflet.js"></script>' in page
+    assert '<script src="/static/vendor/leaflet-1.9.4/leaflet.js?v=' in page
     assert (
         "img-src 'self' data: https://gibs.earthdata.nasa.gov;"
         in response.headers["content-security-policy"]
@@ -488,3 +488,33 @@ def test_the_interactive_viewer_takes_its_area_and_dates_from_the_saved_images(t
     assert "script-src 'self';" in response.headers["content-security-policy"]  # still local only
     assert client.get("/static/vendor/leaflet-1.9.4/leaflet.js").status_code == 200
     assert client.get("/static/earth.js").status_code == 200
+
+
+def test_static_files_are_versioned_by_content_and_always_rechecked(tmp_path):
+    folder = tmp_path / "static"
+    (folder / "vendor").mkdir(parents=True)
+    (folder / "app.js").write_text("one")
+    (folder / "vendor" / "lib.js").write_text("lib")
+    first = asset_urls(folder)
+    assert first("app.js").startswith("/static/app.js?v=")
+    assert first("vendor/lib.js").startswith("/static/vendor/lib.js?v=")
+    (folder / "app.js").write_text("two")
+    assert asset_urls(folder)("app.js") != first("app.js")  # a changed file gets a new URL
+    client = TestClient(
+        create_app(AppSettings(data_dir=str(tmp_path), tavily_api_key="t", groq_api_key="g"))
+    )
+    home = client.get("/").text
+    assert '<script src="/static/app.js?v=' in home
+    assert client.get("/static/app.js").headers["cache-control"] == "no-cache"
+
+
+def test_every_page_offers_a_new_investigation(tmp_path):
+    client = TestClient(
+        create_app(AppSettings(data_dir=str(tmp_path), tavily_api_key="t", groq_api_key="g"))
+    )
+    store = Store(tmp_path)
+    inv = Investigation(id=store.new_id(), brief="Floods?", status="done")
+    store.save(inv)
+    for path in ("/", f"/investigations/{inv.id}"):
+        assert '<a class="new-button" href="/#ask">+ New investigation</a>' in client.get(path).text
+    assert 'id="ask"' in client.get("/").text

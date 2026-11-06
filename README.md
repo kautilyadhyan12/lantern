@@ -58,8 +58,9 @@ You ask a question. Lantern:
    the saved copy of its source.
 9. **Maps who is linked to whom.** Relations stated in anchored claims (member of, leader
    of, founded, designated by, linked to, killed in, located in, reported by) and listed in
-   official records become a links map of organisations, public figures in their public
-   role, places and events, drawn by Lantern's own code. People are joined only through an
+   official records become an evidence board of organisations, public figures in their
+   public role, places and events: cards pinned to cork, joined by red string, drawn by
+   Lantern's own code; cards can be dragged to rearrange it. People are joined only through an
    anchor (an official ID, an explicit "also known as", the same source, or the same role in
    the same organisation), never on a name alone. Each line opens its evidence and is marked
    corroborated, single source, record, or assessment (a connection Lantern infers from

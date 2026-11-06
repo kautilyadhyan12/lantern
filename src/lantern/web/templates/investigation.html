@@ -14,10 +14,10 @@
   {% for item in rows %}
   <tr>
     <td><b>{{ item.name }}</b></td>
-    <td>{{ item.when or "unknown" }}</td>
+    <td class="nowrap">{{ item.when or "unknown" }}</td>
     <td>{{ item.summary }}</td>
     <td><span class="chip st-{{ 'ok' if item.status == 'corroborated' else 'single' }}">{{ item.status }}</span>
-      <div class="muted">{{ item.origins | length }} source{{ "" if item.origins | length == 1 else "s" }} · best grade {{ item.best_grade }}</div></td>
+      <div class="muted">{{ item.origins | length }} source{{ "" if item.origins | length == 1 else "s" }} · grade {{ item.best_grade }}</div></td>
     <td>{{ cite(item.claim_refs) }}</td>
   </tr>
   {% endfor %}
@@ -30,27 +30,64 @@
 <span class="sentence">{{ s.text }} {{ cite(s.cites) }}</span>
 {%- endmacro %}
 
+{% block main_attrs %} class="wide"{% endblock %}
 {% block main %}
-<p class="crumb"><a href="/">← All investigations</a></p>
-<h1 class="brief">{{ inv.brief }}</h1>
-<p class="meta">
-  <span class="status s-{{ inv.status }}">{{ inv.status }}</span>
-  Started {{ inv.created_at.strftime("%d %b %Y, %H:%M") }} UTC
-  {% if inv.status == "done" %}
-  · <a href="/investigations/{{ inv.id }}/report.md">Markdown</a>
-  · <a href="/investigations/{{ inv.id }}/investigation.json">JSON</a>
+{% set images = inv.sources | selectattr("kind", "equalto", "image") | list %}
+<div class="case-layout">
+<nav class="side-nav" aria-label="Sections of this report">
+  <p class="nav-title">On this page</p>
+  <ol>
+    <li><a href="#overview">Overview</a></li>
+    {% if inv.report %}
+    <li><a href="#findings">Key findings <span class="count">{{ inv.findings | length }}</span></a></li>
+    {% if images %}<li><a href="#satellite">Satellite <span class="count">{{ images | length }}</span></a></li>{% endif %}
+    {% if nodes %}<li><a href="#board">Evidence board <span class="count">{{ nodes | length }}</span></a></li>{% endif %}
+    <li><a href="#sources">Sources <span class="count">{{ inv.sources | length }}</span></a></li>
+    {% if inv.leads %}<li><a href="#leads">Leads <span class="count">{{ inv.leads | length }}</span></a></li>{% endif %}
+    <li><a href="#method">Method</a></li>
+    {% endif %}
+  </ol>
+</nav>
+<div class="case-main">
+<header class="case-hero" id="overview">
+  <p class="crumb"><a href="/">← All investigations</a></p>
+  <h1 class="brief">{{ inv.brief }}</h1>
+  <p class="meta">
+    <span class="status s-{{ inv.status }}">{{ inv.status }}</span>
+    <span>{{ "Deep investigation" if inv.depth == "deep" else "Quick look" }}</span>
+    <span>{{ inv.created_at.strftime("%d %b %Y, %H:%M") }} UTC</span>
+    {% if inv.status == "done" %}
+    <a href="/investigations/{{ inv.id }}/report.md">Markdown</a>
+    <a href="/investigations/{{ inv.id }}/investigation.json">JSON</a>
+    {% endif %}
+  </p>
+  {% if inv.status not in ("queued", "running") %}
+  <ul class="stats">
+    <li><b>{{ inv.questions | length }}</b> key questions</li>
+    <li><b>{{ inv.sources | length }}</b> sources</li>
+    <li><b>{{ inv.claims | length }}</b> claims</li>
+    <li><b>{{ inv.links | length }}</b> strings</li>
+    <li><b>{{ "{:,}".format(inv.usage.tokens_in + inv.usage.tokens_out) }}</b> AI tokens</li>
+  </ul>
   {% endif %}
-</p>
-
-{% if inv.status in ("done", "failed") and inv.questions %}
-<section class="continue">
-  <button type="button" id="continue" data-id="{{ inv.id }}">Continue investigating</button>
-  <span class="muted">Up to 2 more research rounds and 16 more pages on this investigation. It keeps
-    everything found, skips searches and pages already done, then rewrites the report. Counts as one
-    of today's investigations.</span>
-  <p id="continue-error" class="error" hidden></p>
-</section>
-{% endif %}
+  {% if inv.report %}
+  <div class="bottom-line">
+    <h2>Bottom line</h2>
+    {% if inv.report.bottom_line %}
+    <p>{% for s in inv.report.bottom_line %}{{ sentence(s) }} {% endfor %}</p>
+    {% else %}
+    <p>No verified answer: none of the key questions could be answered from the pages read.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if inv.status in ("done", "failed") and inv.questions %}
+  <div class="continue">
+    <button type="button" id="continue" data-id="{{ inv.id }}">Continue investigating</button>
+    <p class="muted">2 more rounds, up to 16 new pages. Uses one of today's runs.</p>
+    <p id="continue-error" class="error" hidden></p>
+  </div>
+  {% endif %}
+</header>
 
 {% if inv.status in ("queued", "running") %}
 <section class="panel live">
@@ -60,7 +97,7 @@
   <ol id="steps" class="steps">
     {% for step in inv.steps %}<li>{{ step.message }}</li>{% endfor %}
   </ol>
-  <p class="hint">This page updates by itself. Free AI tiers are slow; a run takes a few minutes.</p>
+  <p class="hint">Updates by itself. A run takes a few minutes.</p>
 </section>
 {% elif inv.status == "refused" %}
 <section class="panel refused">
@@ -78,20 +115,15 @@
 
 {% if inv.report %}
 {% set report = inv.report %}
-<article class="report">
-  <section class="bottom-line">
-    <h2>Bottom line</h2>
-    {% if report.bottom_line %}
-    <p>{% for s in report.bottom_line %}{{ sentence(s) }} {% endfor %}</p>
-    {% else %}
-    <p>No verified bottom line: none of the key questions could be answered from the pages read.</p>
-    {% endif %}
-  </section>
-
+<section class="block" id="findings">
+  <h2 class="block-title">Key findings</h2>
+  <div class="findings">
   {% for finding in inv.findings %}
   {% set question = inv.question(finding.question_ref) %}
-  <section class="finding">
-    <h3><span class="ref">{{ finding.question_ref }}</span> {{ question.text if question else "" }}</h3>
+  <article class="finding{{ '' if finding.status == 'answered' else ' unanswered' }}">
+    <div class="finding-head"><span class="ref">{{ finding.question_ref }}</span>
+      <h3>{{ question.text if question else "" }}</h3></div>
+    <div class="finding-body">
     {% if finding.status == "answered" %}
       {% set section = sections.get(finding.question_ref) %}
       {% if section and section.sentences %}
@@ -102,9 +134,9 @@
         <div><dt>Likelihood</dt><dd><span class="chip">{{ finding.likelihood }}</span>
           <span class="muted">{{ ranges.get(finding.likelihood, "") }}</span>
           {% if finding.likelihood_proposed and finding.likelihood_proposed != finding.likelihood %}
-          <span class="muted">· toned down from “{{ finding.likelihood_proposed }}” because the evidence is thin</span>
+          <span class="muted">· lowered from “{{ finding.likelihood_proposed }}”: thin evidence</span>
           {% endif %}</dd></div>
-        <div><dt>Analytic confidence</dt><dd><span class="chip c-{{ finding.confidence }}">{{ finding.confidence }}</span>
+        <div><dt>Confidence</dt><dd><span class="chip c-{{ finding.confidence }}">{{ finding.confidence }}</span>
           <span class="muted">{{ finding.confidence_reason }}</span></dd></div>
         {% if finding.contradicting %}
         <div><dt>Disagreeing evidence</dt><dd>{{ cite(finding.contradicting) }}</dd></div>
@@ -119,22 +151,18 @@
     {% if items %}
     {% set corroborated = items | selectattr("status", "equalto", "corroborated") | list | length %}
     <h4 class="items-title">Everything found: {{ items | length }}
-      <span class="muted">({{ corroborated }} corroborated, {{ items | length - corroborated }} from a single source)</span></h4>
-    <p class="muted">Every item any source reported, however weak the source. “Corroborated” means at
-      least two independent sources report it; single-source items are unconfirmed.</p>
+      <span class="muted">· {{ corroborated }} corroborated by two or more independent sources</span></h4>
     {{ item_table(items) }}
     {% endif %}
     {% if older %}
-    <details class="older"><summary>Also found, but dated before the period asked about: {{ older | length }}</summary>
+    <details class="older"><summary>{{ older | length }} more from before the period asked about</summary>
       {{ item_table(older) }}
     </details>
     {% endif %}
     {% set mentions = inv.mentions | selectattr("question_ref", "equalto", finding.question_ref) | list %}
     {% if mentions %}
-    <h4 class="items-title">Also seen in search results, not confirmed: {{ mentions | length }}</h4>
-    <p class="muted">Named in search result headlines, but no page Lantern could read confirms them,
-      often because the site blocks automated reading. They are leads, not evidence: open the
-      results to check.</p>
+    <h4 class="items-title">Only in search headlines: {{ mentions | length }}
+      <span class="muted">· no readable page confirms these, so they are leads, not evidence</span></h4>
     <ul class="leads">
       {% for mention in mentions %}
       <li><b>{{ mention.name }}</b>{% if mention.when %} <span class="muted">({{ mention.when }})</span>{% endif %} —
@@ -142,25 +170,25 @@
       {% endfor %}
     </ul>
     {% endif %}
-  </section>
+    </div>
+  </article>
   {% endfor %}
 
   {% if report.gaps %}
-  <section>
-    <h2>What could not be determined</h2>
+  <div class="gaps">
+    <h3>Could not be determined</h3>
     <ul>{% for gap in report.gaps %}<li>{{ gap }}</li>{% endfor %}</ul>
-  </section>
+  </div>
   {% endif %}
+  </div>
+</section>
 
-  {% set images = inv.sources | selectattr("kind", "equalto", "image") | list %}
   {% if images %}
-  <section class="satellite">
-    <h2>Satellite views</h2>
-    <p class="muted">Daily true-colour images from NASA (EOSDIS GIBS), with about 250–375 m detail.
-      Code chose the clearest day near each date; no AI reads the images. Areas from
-      OpenStreetMap (© OpenStreetMap contributors).</p>
+  <section class="block satellite" id="satellite">
+    <h2 class="block-title">Satellite views</h2>
+    <p class="block-lede">NASA daily images, 250–375 m detail. Code picked the clearest days; no AI reads them.</p>
     {% if earth %}
-    <link rel="stylesheet" href="/static/vendor/leaflet-1.9.4/leaflet.css">
+    <link rel="stylesheet" href="{{ asset('vendor/leaflet-1.9.4/leaflet.css') }}">
     <div class="eo" id="eo" data-west="{{ earth.west }}" data-south="{{ earth.south }}" data-east="{{ earth.east }}" data-north="{{ earth.north }}" data-name="{{ earth.name }}">
       <div class="eo-controls">
         <label>Before <input type="date" id="eo-before" value="{{ earth.before }}" max="{{ earth.today }}"></label>
@@ -180,10 +208,9 @@
         <label><input type="checkbox" id="eo-outline" checked> Outline of {{ earth.name }}</label>
       </div>
       <div class="eo-compare" role="group" aria-label="Compare the dates">
-        <button type="button" data-eo-show="before" aria-pressed="false">Show before</button>
+        <button type="button" data-eo-show="before" aria-pressed="false">Before</button>
         <button type="button" data-eo-show="swipe" aria-pressed="true">Swipe</button>
-        <button type="button" data-eo-show="after" aria-pressed="false">Show after</button>
-        <span class="muted">Flick between before and after to spot changes in the same place.</span>
+        <button type="button" data-eo-show="after" aria-pressed="false">After</button>
       </div>
       <div class="eo-frame">
         <div id="eo-map" class="eo-map"></div>
@@ -191,20 +218,17 @@
         <span class="eo-tag eo-left">Before</span><span class="eo-tag eo-right">After</span>
       </div>
       <input type="range" id="eo-swipe" class="eo-swipe" min="0" max="100" value="50" aria-label="Swipe between the before and after images">
-      <p class="muted">Left of the white line is the before date, right of it the after date: drag
-        the slider over a place to compare it, or use the buttons above to switch the whole map.
-        Black strips are gaps between satellite passes on that day, not missing data in Lantern.
-        Your browser loads these tiles straight from NASA; the saved images below are the
-        evidence this report cites.</p>
+      <p class="muted">Drag the slider to compare. Black strips are gaps between satellite passes.
+        Tiles load live from NASA; the saved images below are the cited evidence.</p>
     </div>
-    <script src="/static/vendor/leaflet-1.9.4/leaflet.js"></script>
-    <script src="/static/earth.js"></script>
+    <script src="{{ asset('vendor/leaflet-1.9.4/leaflet.js') }}"></script>
+    <script src="{{ asset('earth.js') }}"></script>
     {% endif %}
     <div class="views">
       {% for s in images %}
       <figure>
         <img src="/investigations/{{ inv.id }}/sources/{{ s.ref }}/image" alt="{{ s.title }}" loading="lazy">
-        <figcaption>{{ s.title }} · <a href="{{ s.url }}" rel="noopener noreferrer nofollow" target="_blank">open in NASA Worldview</a> · {{ s.ref }}</figcaption>
+        <figcaption><span class="ref-plain">{{ s.ref }}</span> {{ s.title }} · <a href="{{ s.url }}" rel="noopener noreferrer nofollow" target="_blank">Worldview</a></figcaption>
       </figure>
       {% endfor %}
     </div>
@@ -212,39 +236,155 @@
   {% endif %}
 
   {% if nodes %}
-  <section class="linkmap">
-    <h2>Links map</h2>
-    <p class="muted">Drawn by code from claims anchored in saved sources and from official
-      records. People are joined only through an anchor (an official ID, an explicit
-      "also known as", the same source, or the same role in the same organisation), never on a
-      name alone. Select a line to see its evidence.</p>
-    {% if namesakes %}<p class="muted">Shown as separate people because no official ID, "also
-      known as" claim, shared source or shared role connects them, so they may or may not be the
-      same person: {% for name, count in namesakes %}{{ name }} ({{ count }} people){{ "; " if not loop.last }}{% endfor %}.</p>{% endif %}
-    <div class="map-filters" id="map-filters">
-      <span>Show:</span>
-      {% for kind in ["organisation", "person_public_role", "place", "event"] %}
-      <label><input type="checkbox" data-kind="{{ kind }}" checked> {{ kind | replace("_", " ") | replace("person public role", "person (public role)") }}</label>
-      {% endfor %}
-      {% for status in ["corroborated", "single source", "record", "assessment"] %}
-      <label><input type="checkbox" data-status="{{ status }}" checked> {{ status }}</label>
-      {% endfor %}
+  <section class="block linkmap" id="board">
+    <h2 class="block-title">Evidence board</h2>
+    <p class="block-lede">Who and what the evidence connects. Click a card or a string to see why.</p>
+    <div class="board-shell">
+    <div class="board-bar">
+      <div class="board-tools" role="toolbar" aria-label="Evidence board tools">
+        <button type="button" data-board="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
+        <button type="button" data-board="zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
+        <button type="button" data-board="fit" title="Show the whole board">Fit</button>
+        <button type="button" data-board="tidy" title="Put every card back where it started">Tidy</button>
+        <button type="button" data-board="put-back" title="Put back the strings you took down" hidden>Put strings back</button>
+        <button type="button" data-board="reset" title="Undo all your changes to this board">Reset</button>
+      </div>
+      <details class="board-menu">
+        <summary>Filter</summary>
+        <div class="map-filters" id="map-filters">
+          {% for kind in ["organisation", "person_public_role", "place", "event"] %}
+          <label><input type="checkbox" data-kind="{{ kind }}" checked> {{ kind | replace("_", " ") | replace("person public role", "person (public role)") }}</label>
+          {% endfor %}
+          {% for status in ["corroborated", "single source", "record", "assessment"] %}
+          <label><input type="checkbox" data-status="{{ status }}" checked> {{ status }}</label>
+          {% endfor %}
+          <label><input type="checkbox" data-linked-only> only what is linked to the subject</label>
+        </div>
+      </details>
+      <details class="board-menu">
+        <summary>Help</summary>
+        <div class="board-help">
+          <p class="board-hint">Scroll to zoom. Drag the board to move around. Drag a card to move it.
+            Drag from a pin to another card to tie your own string. Select a string and drag its
+            end handles to move it or take it down. Changes stay in this browser.</p>
+          <p>Lantern joins people only through an official ID, an explicit "also known as", the same
+            source or the same role, never on a name alone.</p>
+        </div>
+      </details>
     </div>
-    <svg class="map" viewBox="0 0 {{ map_size[0] }} {{ map_size[1] }}" role="img" aria-label="Links between the people, organisations, places and events found">
+    <div class="board-layout">
+    <div class="board-frame">
+    <svg class="board" data-investigation="{{ inv.id }}" viewBox="0 0 {{ map_size[0] }} {{ map_size[1] }}" role="img" aria-label="Evidence board: the people, organisations, places and events found, joined by string where the evidence links them">
+      <defs>
+        <pattern id="board-grid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M40 0 L0 0 0 40" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"></path>
+        </pattern>
+      </defs>
+      <rect class="board-paper" x="-2000" y="-2000" width="{{ map_size[0] + 4000 }}" height="{{ map_size[1] + 4000 }}" fill="url(#board-grid)"></rect>
+      <g class="case-card" transform="translate({{ map_size[0] / 2 }} 38) rotate(-0.6)">
+        <rect class="case-shade" x="-325" y="-21" width="660" height="52"></rect>
+        <rect class="case-paper" x="-330" y="-26" width="660" height="52"></rect>
+        <rect class="case-tab" x="-330" y="-26" width="86" height="52"></rect>
+        <text class="case-label" x="-287" y="4">THE CASE</text>
+        {% set brief_lines = inv.brief | wordwrap(74, wrapstring="\n") | truncate(148, True, "…") %}
+        {% for line in brief_lines.split("\n")[:2] %}<text class="case-text" x="-230" y="{{ (2 if brief_lines.split('\n') | length > 1 else 9) + loop.index0 * 15 - 5 }}">{{ line }}</text>{% endfor %}
+      </g>
+      <g class="strings">
       {% for edge in edges %}{% set link = edge.link %}
-      <a href="#{{ link.ref }}" class="edge" data-status="{{ link.status }}" data-kinds="{{ edge.kinds }}">
-        <title>{{ entity[link.subject].name }} — {{ link.relation | replace("_", " ") }} → {{ entity[link.object].name }} ({{ link.status }})</title>
-        <line class="st-{{ link.status | replace(' ', '-') }}" x1="{{ edge.x1 }}" y1="{{ edge.y1 }}" x2="{{ edge.x2 }}" y2="{{ edge.y2 }}"></line>
+      <a href="#{{ link.ref }}" data-ref="{{ link.ref }}" data-linked="{{ 'no' if notes[link.subject].steps is none else 'yes' }}" class="edge string st-{{ link.status | replace(' ', '-') }}" data-status="{{ link.status }}" data-kinds="{{ edge.kinds }}" data-from="{{ link.subject }}" data-to="{{ link.object }}">
+        <title>{{ entity[link.subject].name }} — {{ link.relation | replace("_", " ") }} → {{ entity[link.object].name }} ({{ link.status }}): select to see the evidence</title>
+        <path class="string-hit" d="{{ edge.path }}"></path>
+        <path class="string-line" d="{{ edge.path }}"></path>
+        <text class="string-label" x="{{ edge.label[0] }}" y="{{ edge.label[1] }}">{{ link.relation | replace("_", " ") }}</text>
       </a>
       {% endfor %}
-      {% for node in nodes %}
-      <g class="node k-{{ node.entity.kind }}" data-kind="{{ node.entity.kind }}">
-        <title>{{ node.entity.ref }} {{ node.entity.name }}{% if node.entity.aliases %} (also: {{ node.entity.aliases[:5] | join("; ") }}){% endif %}</title>
-        <circle cx="{{ node.x }}" cy="{{ node.y }}" r="8"></circle>
-        <text x="{{ node.x + 11 }}" y="{{ node.y + 4 }}">{{ node.entity.name | truncate(28, True, "…") }}</text>
+      </g>
+      <g class="mine"></g>
+      <g class="cards">
+      {% for node in nodes %}{% set e = node.entity %}
+      {% set st = notes[e.ref] %}
+      {% set person = e.kind == "person_public_role" %}
+      <g class="node card k-{{ e.kind }}{{ ' subject' if st.steps == 0 }}" data-kind="{{ e.kind }}" data-ref="{{ e.ref }}" data-name="{{ e.name }}" data-linked="{{ 'no' if st.steps is none else 'yes' }}" data-x="{{ node.x }}" data-y="{{ node.y }}" data-tilt="{{ node.tilt }}" transform="translate({{ node.x }} {{ node.y }}) rotate({{ node.tilt }})">
+        <title>{{ e.ref }} {{ e.name }}{% if e.aliases %} (also: {{ e.aliases[:5] | join("; ") }}){% endif %} — drag to move</title>
+        <rect class="card-shade" x="-79" y="-28" width="168" height="66"></rect>
+        <rect class="card-paper" x="-84" y="-33" width="168" height="66"></rect>
+        <rect class="card-strip" x="-84" y="-33" width="168" height="15"></rect>
+        <text class="card-kind" x="-78" y="-22.5">{{ {"organisation": "ORGANISATION", "person_public_role": "PERSON", "place": "PLACE", "event": "EVENT"}[e.kind] }}</text>
+        <text class="card-ref" x="78" y="-22.5">{{ e.ref }}</text>
+        {% if person %}<rect class="card-photo" x="-78" y="-13" width="27" height="31"></rect><circle class="card-head" cx="-64.5" cy="-3" r="5.5"></circle><path class="card-body" d="M-74,18 Q-64.5,4 -55,18 Z"></path>{% endif %}
+        {% set left = -45 if person else -77 %}
+        {% set room = 126 if person else 158 %}
+        {% for line in node.lines %}{% set caps = line | list | select("upper") | list | length %}
+        <text class="card-name" x="{{ left }}" y="{{ (0 if node.lines | length > 1 else 6) + loop.index0 * 15 }}"{% if caps * 9.6 + (line | length - caps) * 7.6 > room %} textLength="{{ room }}" lengthAdjust="spacingAndGlyphs"{% endif %}>{{ line }}</text>{% endfor %}
+        <text class="card-tag{{ ' loose' if st.steps is none }}" x="-77" y="28">{{ st.tag }}</text>
       </g>
       {% endfor %}
+      </g>
+      <g class="pins">
+      {% for node in nodes %}<circle class="node pin" data-kind="{{ node.entity.kind }}" data-linked="{{ 'no' if notes[node.entity.ref].steps is none else 'yes' }}" data-ref="{{ node.entity.ref }}" cx="{{ node.pin[0] }}" cy="{{ node.pin[1] }}" r="6"></circle>{% endfor %}
+      </g>
+      <g class="handles"></g>
     </svg>
+    </div>
+    <aside class="case-notes" id="case-notes" aria-live="polite" hidden>
+      <div class="case-head"><h3>Case notes</h3>
+        <button type="button" class="case-close" id="case-clear" aria-label="Close the case notes and clear the selection">×</button></div>
+      <div id="case-notes-body"></div>
+    </aside>
+    </div>
+    <ul class="legend" aria-label="What the strings mean">
+      <li><svg viewBox="0 0 30 8" aria-hidden="true"><line x1="1" y1="4" x2="29" y2="4" class="lg lg-solid"></line></svg>Confirmed or official</li>
+      <li><svg viewBox="0 0 30 8" aria-hidden="true"><line x1="1" y1="4" x2="29" y2="4" class="lg lg-dashed"></line></svg>One source</li>
+      <li><svg viewBox="0 0 30 8" aria-hidden="true"><line x1="1" y1="4" x2="29" y2="4" class="lg lg-dotted"></line></svg>Lantern's inference</li>
+      <li><svg viewBox="0 0 30 8" aria-hidden="true"><line x1="1" y1="4" x2="29" y2="4" class="lg lg-own"></line></svg>Yours</li>
+    </ul>
+    </div>
+    {% if namesakes %}<p class="muted namesakes">Kept apart because nothing links them beyond the name:
+      {% for name, count in namesakes %}{{ name }} ({{ count }} people){{ "; " if not loop.last }}{% endfor %}.</p>{% endif %}
+    {% macro fact_body(f, full=False) -%}
+      <p class="note-meta"><span class="note-badge st-{{ f.status | replace(' ', '-') }}" title="{{ f.strength }}">{{ f.label }}</span>
+        {% if f.sources %}<span class="muted">{{ f.sources | join(", ") }}</span>{% endif %}</p>
+      {% if f.status in ("assessment", "single source") or f.label == "Reference work" %}<p class="note-strength st-{{ f.status | replace(' ', '-') }}">{{ f.strength }}</p>{% endif %}
+      {% if full and f.said %}{% for said in f.said %}<blockquote class="note-said">{{ said }}</blockquote>{% endfor %}{% endif %}
+      <p class="note-quotes">{{ "Quote" if f.claims | length == 1 else "Quotes" }} {{ cite(f.claims) }}{% if f.against %} · Against: {{ cite(f.against) }}{% endif %}</p>
+    {%- endmacro %}
+    {% for node in nodes %}{% set st = notes[node.entity.ref] %}
+    <template id="note-{{ st.ref }}">
+      <p class="note-kind">{{ st.kind }} · <span class="note-tag{{ ' loose' if st.steps is none }}">{{ st.tag }}</span></p>
+      <h4>{{ st.name }}</h4>
+      {% if st.aliases %}<p class="note-aka">Also: {{ st.aliases[:3] | join("; ") }}{% if st.aliases | length > 3 %} and {{ st.aliases | length - 3 }} more{% endif %}</p>{% endif %}
+      {% if st.caution %}<p class="note-caution">{{ st.caution }}</p>{% endif %}
+      {% if st.connection %}<h5>How it connects to what you searched</h5>
+      <p class="note-connection{{ ' loose' if st.steps is none }}">{{ st.connection }}</p>{% endif %}
+      {% if st.why %}<h5>Why it is on the board</h5><p>{{ st.why }}</p>{% endif %}
+      {% if st.facts %}
+      <h5>Its strings</h5>
+      <ol class="note-facts">
+        {% for f in st.facts %}
+        <li><button type="button" class="note-link" data-link="{{ f.ref }}">{{ f.sentence }}</button>
+          {{ fact_body(f) }}</li>
+        {% endfor %}
+      </ol>
+      {% endif %}
+      <div class="note-mine" data-for="{{ st.ref }}"></div>
+      {% if st.aliases | length > 3 %}<details><summary>All {{ st.aliases | length }} other names</summary><p>{{ st.aliases | join("; ") }}</p></details>{% endif %}
+      <details class="note-expert"><summary>Reference numbers</summary>
+        <p>Card {{ st.ref }}{% if st.ids %} · {{ st.ids | join(", ") }}{% endif %}</p></details>
+    </template>
+    {% endfor %}
+    {% for link in inv.links %}{% set f = facts[link.ref] %}
+    <template id="note-{{ link.ref }}">
+      <p class="note-kind">String</p>
+      <h4>{{ f.sentence }}</h4>
+      {{ fact_body(f, full=True) }}
+      <p class="note-actions"><button type="button" class="note-button" data-string-down="{{ link.ref }}">Take this string down</button></p>
+      <p class="muted">Or drag a round handle at either end onto another card. The evidence stays as it is.</p>
+      <details class="note-expert"><summary>Reference numbers</summary>
+        <p>String {{ link.ref }} · {{ link.relation }} · {{ link.status }}{% if link.origins %} · {{ link.origins | join(", ") }}{% endif %}</p></details>
+    </template>
+    {% endfor %}
+    <script src="{{ asset('board.js') }}" defer></script>
+    <details class="links-table"><summary>All {{ inv.links | length }} strings as a table</summary>
     <div class="table-wrap">
     <table class="links">
       <thead><tr><th>Link</th><th>From</th><th>Relation</th><th>To</th><th>Status</th><th>Evidence</th></tr></thead>
@@ -265,18 +405,19 @@
       </tbody>
     </table>
     </div>
+    </details>
   </section>
   {% endif %}
 
-  <section>
-    <h2>Sources</h2>
+  <section class="block" id="sources">
+    <h2 class="block-title">Sources</h2>
     <div class="table-wrap">
     <table class="sources">
       <thead><tr><th>Ref</th><th>Page</th><th>Grade</th><th>Saved (UTC)</th><th>sha256</th></tr></thead>
       <tbody>
       {% for s in inv.sources %}
       <tr>
-        <td class="ref">{{ s.ref }}</td>
+        <td class="ref-cell">{{ s.ref }}</td>
         <td><a href="/investigations/{{ inv.id }}/sources/{{ s.ref }}">{{ s.title or s.domain }}</a>
           {% if s.kind == "post" %}<span class="badge">ground report</span>{% endif %}
           {% if s.kind == "record" %}<span class="badge">official record</span>{% endif %}
@@ -285,48 +426,42 @@
             · <a href="{{ s.url }}" rel="noopener noreferrer nofollow" target="_blank">original</a>
             {% if s.archive_url %}· <a href="{{ s.archive_url }}" rel="noopener noreferrer nofollow" target="_blank">Wayback copy, {{ s.archived_at.strftime("%d %b %Y") }}</a>{% endif %}</div></td>
         <td><span class="grade g-{{ s.reliability }}" title="{{ reliability[s.reliability] }}: {{ s.reliability_reason }}">{{ s.reliability }}</span></td>
-        <td>{{ s.fetched_at.strftime("%d %b %H:%M") }}</td>
-        <td><code title="{{ s.sha256 }}">{{ s.sha256[:12] }}…</code></td>
+        <td class="nowrap">{{ s.fetched_at.strftime("%d %b %H:%M") }}</td>
+        <td><code title="{{ s.sha256 }}">{{ s.sha256[:10] }}…</code></td>
       </tr>
       {% endfor %}
       </tbody>
     </table>
     </div>
-    <details class="explain" open>
+    <details class="explain">
       <summary>What the grades and fingerprints mean</summary>
-      <p><b>Grade</b> is how reliable the website usually is, on the Admiralty scale used by
-        intelligence analysts. It comes from a fixed list, not from the AI:</p>
+      <p><b>Grade</b> is how reliable the website usually is (the Admiralty scale), from a fixed list, not from AI:</p>
       <ul>
-        <li><b>A</b> Completely reliable — reserved for authoritative official records.</li>
-        <li><b>B</b> Usually reliable — government and international bodies, established news
-          organisations, universities.</li>
-        <li><b>C</b> Fairly reliable — reference works such as Wikipedia, used as background.</li>
-        <li><b>D</b> Not usually reliable — platforms where anyone can post, including social
-          media ground reports. Valuable first-hand, but unverified until others confirm them.</li>
-        <li><b>F</b> Cannot be judged — not on Lantern's list; unknown, not necessarily bad.</li>
+        <li><b>A</b> Completely reliable: official records.</li>
+        <li><b>B</b> Usually reliable: governments, international bodies, established news, universities.</li>
+        <li><b>C</b> Fairly reliable: reference works such as Wikipedia.</li>
+        <li><b>D</b> Not usually reliable: open platforms and social media. Useful first-hand, unverified alone.</li>
+        <li><b>F</b> Cannot be judged: not on Lantern's list. Unknown, not necessarily bad.</li>
       </ul>
-      <p><b>sha256</b> is a fingerprint of the exact copy Lantern saved. Changing even one
-        character of the copy would give a completely different fingerprint, so it shows the
-        evidence has not been altered since it was read.</p>
-      <p><b>Credibility</b> (shown on each claim, 1–6) says how well the claim is confirmed:
-        1 confirmed by three or more independent websites, 2 probably true (two websites),
-        3 possibly true (one website), 4 doubtful (contradicted), 6 not assessed.</p>
+      <p><b>sha256</b> is a fingerprint of the saved copy. Change one character and it changes completely,
+        so it proves the evidence was not altered.</p>
+      <p><b>Credibility</b> (on each claim, 1–6): 1 confirmed by three or more independent websites,
+        2 probably true (two), 3 possibly true (one), 4 doubtful (contradicted), 6 not assessed.</p>
     </details>
   </section>
 
   {% if inv.leads %}
   {% set post_leads = inv.leads | selectattr("kind", "equalto", "post") | list %}
   {% set page_leads = inv.leads | selectattr("kind", "equalto", "page") | list %}
-  <section>
-    <h2>Leads to check yourself</h2>
-    <p class="muted">Links Lantern found but did not read. They are <b>not evidence</b> in this
-      report; open them yourself to check what they say.</p>
+  <section class="block" id="leads">
+    <h2 class="block-title">Leads to check yourself</h2>
+    <p class="block-lede">Found but not read, so they are not evidence. Open them to check.</p>
     {% if post_leads %}
     <h4>Posts on sites that forbid automated reading</h4>
     <ul class="leads">
       {% for lead in post_leads %}
       <li><a href="{{ lead.url }}" rel="noopener noreferrer nofollow" target="_blank">Open on {{ lead.platform }}</a>
-        <span class="muted">post {{ loop.index }} · related to {{ lead.question_refs | join(", ") }}</span></li>
+        <span class="muted">post {{ loop.index }} · {{ lead.question_refs | join(", ") }}</span></li>
       {% endfor %}
     </ul>
     {% endif %}
@@ -342,36 +477,30 @@
   </section>
   {% endif %}
 
-  <section class="method">
-    <h2>How this was done</h2>
+  <section class="block method" id="method">
+    <h2 class="block-title">Method</h2>
     <ul>
       <li>Safety: {{ inv.safety }}</li>
       {% if inv.continued_at %}<li>Continued {{ inv.continued_at | length }} time{{ "" if inv.continued_at | length == 1 else "s" }} after the first pass.</li>{% endif %}
       {% if inv.usage.research_steps %}
       <li>{{ "Deep investigation" if inv.depth == "deep" else "Quick look" }}: a researcher agent took
         {{ inv.usage.research_steps }} step{{ "" if inv.usage.research_steps == 1 else "s" }} over
-        {{ inv.usage.rounds }} round{{ "" if inv.usage.rounds == 1 else "s" }}, choosing its own tool
-        calls for each key question; every call was checked by code before it ran.</li>
+        {{ inv.usage.rounds }} round{{ "" if inv.usage.rounds == 1 else "s" }}; code checked every tool call before it ran.</li>
       <li>Tools used: {% for name, count in inv.usage.tools | dictsort %}{{ name }} ({{ count }}){{ ", " if not loop.last }}{% endfor %}.</li>
       {% if inv.stopped_by %}<li>What ended research: {{ inv.stopped_by }}</li>{% endif %}
       {% else %}
       <li>{{ "Deep investigation" if inv.depth == "deep" else "Quick look" }}: {{ inv.usage.rounds }}
-        research round{{ "" if inv.usage.rounds == 1 else "s" }}; later rounds followed up on what
-        earlier rounds found.</li>
+        research round{{ "" if inv.usage.rounds == 1 else "s" }}.</li>
       {% endif %}
-      <li>{{ inv.usage.searches }} web and news searches; {{ inv.usage.pages_fetched }} pages saved,
+      <li>{{ inv.usage.searches }} searches; {{ inv.usage.pages_fetched }} pages saved,
         {{ inv.usage.pages_skipped }} skipped (robots.txt, errors or no readable text).</li>
-      <li>{{ inv.usage.posts_saved }} public social media posts saved as ground reports, from
-        Bluesky search and Mastodon hashtags. Only posts about the event are searched, never
-        anyone's account; authors' names are not stored, and each account counts once as a source.</li>
-      {% if inv.usage.archived %}<li>{{ inv.usage.archived }} page{{ "" if inv.usage.archived == 1 else "s" }} read from Internet
-        Archive (Wayback Machine) copies, because the site refused Lantern or could not be reached.
-        Archive copies are never used when a site's robots.txt says no.</li>{% endif %}
+      <li>{{ inv.usage.posts_saved }} public posts saved as ground reports (Bluesky, Mastodon). Only
+        posts about the event are searched, never anyone's account; authors' names are not stored.</li>
+      {% if inv.usage.archived %}<li>{{ inv.usage.archived }} page{{ "" if inv.usage.archived == 1 else "s" }} read from
+        Wayback Machine copies because the site refused Lantern or was down (never when robots.txt says no).</li>{% endif %}
       <li>{{ inv.claims | length }} claims anchored to exact quotes; {{ inv.usage.claims_dropped }}
-        proposed claims dropped because their quote was not found word for word.</li>
-      <li>Source grades use the Admiralty scale (A–F) from fixed rules. Likelihood uses the
-        seven ICD 203 terms. Confidence is set by code from independent websites, source
-        grades and disagreement, never by the AI.</li>
+        dropped because their quote was not found word for word.</li>
+      <li>Grades, likelihood words (ICD 203) and confidence are set by fixed rules, never by the AI.</li>
       <li>{{ inv.usage.llm_calls }} AI calls ({{ inv.usage.tokens_in + inv.usage.tokens_out }} tokens)
         via {{ inv.usage.providers | join(", ") or "none" }}.</li>
     </ul>
@@ -383,8 +512,9 @@
     <details><summary>Step log</summary><ol class="steps">
       {% for step in inv.steps %}<li>{{ step.message }}</li>{% endfor %}</ol></details>
   </section>
-</article>
 {% endif %}
+</div>
+</div>
 
 {% for claim in inv.claims %}
 {% set src = sources.get(claim.source_ref) %}
@@ -393,12 +523,11 @@
   <p class="card-statement">{{ claim.statement }}</p>
   <blockquote>“{{ claim.quote }}”</blockquote>
   {% if src %}
-  {% if src.archive_url %}<p class="muted">Read from the Wayback Machine copy captured {{ src.archived_at.strftime("%d %b %Y") }}, because the site refused Lantern or could not be reached.</p>{% endif %}
-  {% if src.kind == "post" %}<p class="muted">Ground report from a public social media post{% if src.published %}, posted {{ src.published[:16] | replace("T", " ") }} UTC{% endif %}. Unverified unless other sources confirm it.</p>{% endif %}
-  <p class="muted">{{ src.ref }} · {{ src.title or src.domain }} · {{ src.domain }} ·
-    grade {{ src.reliability }} ({{ reliability[src.reliability] }}) ·
+  {% if src.archive_url %}<p class="muted">From the Wayback Machine copy of {{ src.archived_at.strftime("%d %b %Y") }}: the site refused Lantern or was down.</p>{% endif %}
+  {% if src.kind == "post" %}<p class="muted">Ground report from a public post{% if src.published %}, {{ src.published[:16] | replace("T", " ") }} UTC{% endif %}. Unverified unless others confirm it.</p>{% endif %}
+  <p class="muted">{{ src.ref }} · {{ src.title or src.domain }} · grade {{ src.reliability }} ({{ reliability[src.reliability] }}) ·
     saved {{ src.fetched_at.strftime("%d %b %Y %H:%M") }} UTC</p>
-  <p><a href="/investigations/{{ inv.id }}/sources/{{ src.ref }}#{{ claim.ref }}">View in saved copy →</a></p>
+  <p><a href="/investigations/{{ inv.id }}/sources/{{ src.ref }}#{{ claim.ref }}">View in saved copy</a></p>
   {% endif %}
 </template>
 {% endfor %}

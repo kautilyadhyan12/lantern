@@ -1,6 +1,7 @@
 """Web app: ask a question, watch the investigation, read the cited report."""
 
 import asyncio
+import hashlib
 from collections.abc import Callable, Coroutine
 from pathlib import Path
 from typing import Any, Literal
@@ -18,7 +19,7 @@ from lantern.models import Claim, Investigation, Source, now
 from lantern.report import to_markdown
 from lantern.runtime import continue_investigation, missing_keys, run_investigation
 from lantern.store import Store
-from lantern.web import earthview, linkmap
+from lantern.web import board, earthview, linkmap
 
 HERE = Path(__file__).parent
 Runner = Callable[[Investigation, AppSettings, Store], Coroutine[Any, Any, Investigation]]
@@ -32,6 +33,21 @@ CSP = (
 class NewInvestigation(BaseModel):
     brief: str = Field(min_length=1, max_length=600)
     depth: Literal["quick", "deep"] = "deep"
+
+
+def asset_urls(folder: Path) -> Callable[[str], str]:
+    """A function giving each static file's URL with a short hash of its contents, so a
+    browser fetches a changed script or stylesheet instead of reusing an old copy."""
+    versions = {
+        path.relative_to(folder).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()[:12]
+        for path in folder.rglob("*")
+        if path.is_file()
+    }
+
+    def url(name: str) -> str:
+        return f"/static/{name}?v={versions[name]}"
+
+    return url
 
 
 def segments(text: str, claims: list[Claim]) -> list[tuple[str, str | None]]:
@@ -63,6 +79,7 @@ def create_app(  # noqa: PLR0915  # routes share one store and settings via clos
 
     app = FastAPI(title="Lantern", docs_url=None, redoc_url=None, openapi_url=None)
     templates = Jinja2Templates(directory=HERE / "templates")
+    templates.env.globals["asset"] = asset_urls(HERE / "static")
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 
     @app.middleware("http")
@@ -70,6 +87,8 @@ def create_app(  # noqa: PLR0915  # routes share one store and settings via clos
         response = await call_next(request)
         response.headers["Content-Security-Policy"] = CSP
         response.headers["X-Content-Type-Options"] = "nosniff"
+        if request.url.path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-cache"  # always check for a newer copy
         response.headers["Referrer-Policy"] = "no-referrer"
         return response
 
@@ -143,7 +162,10 @@ def create_app(  # noqa: PLR0915  # routes share one store and settings via clos
         item = load(investigation_id)
         report = item.report
         nodes, edges = linkmap.view(item)
+        notes, facts = board.stories(item)
         context = {
+            "notes": notes,
+            "facts": facts,
             "inv": item,
             "nodes": nodes,
             "edges": edges,

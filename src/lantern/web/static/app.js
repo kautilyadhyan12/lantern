@@ -3,6 +3,12 @@
 function startForm() {
   const form = document.getElementById("ask");
   if (!form) return;
+  const focusQuestion = () => document.getElementById("brief").focus({ preventScroll: false });
+  // After the page has loaded: the browser's jump to #ask would otherwise reset the focus.
+  if (window.location.hash === "#ask") window.addEventListener("load", focusQuestion);
+  document.querySelectorAll('a[href="/#ask"]').forEach((link) =>
+    link.addEventListener("click", () => window.setTimeout(() => document.getElementById("brief").focus(), 0)),
+  );
   const error = document.getElementById("ask-error");
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -112,20 +118,46 @@ function startMapFilters() {
       );
     const kinds = off("data-kind");
     const statuses = off("data-status");
+    const linkedOnly = filters.querySelector("input[data-linked-only]")?.checked;
+    const loose = (item) => linkedOnly && item.dataset.linked === "no";
     document.querySelectorAll(".linkmap .node").forEach((node) => {
-      node.classList.toggle("off", kinds.has(node.dataset.kind));
+      node.classList.toggle("off", kinds.has(node.dataset.kind) || loose(node));
     });
     document.querySelectorAll(".linkmap [data-kinds]").forEach((item) => {
       const hidden =
         statuses.has(item.dataset.status) ||
-        item.dataset.kinds.split(" ").some((kind) => kinds.has(kind));
+        item.dataset.kinds.split(" ").some((kind) => kinds.has(kind)) ||
+        loose(item);
       item.classList.toggle("off", hidden);
     });
   };
   filters.addEventListener("change", apply);
 }
 
+// Marks the section being read in the report's side menu.
+function startSectionMenu() {
+  const links = [...document.querySelectorAll('.side-nav a[href^="#"]')];
+  if (!links.length || !("IntersectionObserver" in window)) return;
+  const byId = new Map(links.map((link) => [link.getAttribute("href").slice(1), link]));
+  const sections = [...byId.keys()].map((id) => document.getElementById(id)).filter(Boolean);
+  const visible = new Set();
+  const mark = () => {
+    const current = sections.find((section) => visible.has(section)) || sections[0];
+    links.forEach((link) => link.setAttribute("aria-current", String(byId.get(current.id) === link)));
+  };
+  const watcher = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => (entry.isIntersecting ? visible.add(entry.target) : visible.delete(entry.target)));
+      mark();
+    },
+    { rootMargin: "-15% 0px -70% 0px" },
+  );
+  sections.forEach((section) => watcher.observe(section));
+  mark();
+}
+
 startForm();
+startSectionMenu();
 startContinue();
 startMapFilters();
 startPolling();

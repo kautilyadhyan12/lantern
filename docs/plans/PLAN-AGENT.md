@@ -549,3 +549,95 @@ Each stage is one pull request.
     against its published sha512 integrity; OSV lists no vulnerabilities for 1.9.4.
   - The CSP only adds `https://gibs.earthdata.nasa.gov` to `img-src`; scripts stay local.
   - The viewer is for exploring: the saved images remain the evidence the report cites.
+- 2026-11-06: the links map becomes an evidence board, at the owner's request.
+  - Index cards pinned to a cork board in a wooden frame (CSS gradients only, no images),
+    in four styles: manila folders for organisations, photo cards for people, sticky notes
+    for places, clippings for events. Each card has a fixed small tilt.
+  - Red string sags from pin to pin: solid when corroborated or from a record, dashed for a
+    single source, grey dotted for an assessment. Each string is labelled with its relation
+    and links to its evidence row.
+  - Cards can be dragged; their strings and pins follow (pointer events in `app.js`, SVG
+    attributes only, so the CSP is unchanged).
+  - The layout gains a pull towards the middle, so separate groups do not drift to the
+    corners, and an overlap pass that keeps cards apart (ties push sideways). The board
+    shows at most 30 cards.
+- 2026-11-06: evidence board usability, after the owner found it hard to use:
+  - Selecting a card or a string opens floating "Case notes" over the board: the card's
+    names, identifiers and every attached string with claim buttons that open the quotes,
+    or a string's status, origins and evidence for and against. Strings no longer jump the
+    page down to the table, which now folds away under "All strings as a table".
+  - Selection focuses the board (connected cards and strings stay bright, the rest fades),
+    hovering a card thickens its strings, and a short press is a click, never a drag.
+  - Strings run under the cards with a wide invisible click area; pins stay on top.
+  - Zoom in or out, Fit, Tidy up (cards back where they started), drag the cork to pan,
+    Ctrl+wheel to zoom, Escape to clear.
+  - Long name lists show 8 names with "show all", and overlapping same-name groups are
+    listed once.
+  - Checked in headless Chromium: clicks select without moving cards, the panel opens and
+    closes, the quote dialog opens from the notes, the page does not jump, zoom changes the
+    view box, drag then Tidy up restores positions, and there are no page errors.
+- 2026-11-06: the owner's browser kept an old `app.js` (the server log showed it never asked
+  for the new one), so the new board code did not run there. Static URLs now carry a short
+  hash of each file's contents (`asset()` in the templates), and `/static/` responses send
+  `Cache-Control: no-cache`, so a changed script or stylesheet always reaches the browser.
+- 2026-11-06: evidence board, second round of owner feedback:
+  - The mouse wheel zooms towards the pointer, and dragging the cork pans.
+  - Strings can be moved and taken down. A selected string shows round end handles: drop
+    one on another card to move the string, or on bare cork to take it down. Dragging from
+    a pin to another card ties the reader's own string.
+  - Evidence is never edited. Moving an evidence string hides it and ties a blue string
+    labelled "(your guess)". The reader's strings are blue, can be relabelled, carry notes
+    and can be removed. "Put back" restores taken-down strings and "Reset board" undoes
+    everything.
+  - Positions, the reader's strings and taken-down strings are kept in the browser's
+    localStorage per investigation. They are a reader's workspace, not part of the evidence
+    or the report.
+  - Case notes are written in plain language by code (`web/board.py`): what the card is,
+    one sentence per connection, how sure the evidence is in words (official record /
+    N independent sources / only one source, treat with caution / Lantern's own inference),
+    where it comes from by name, and what the sources say. Record codes (OFAC, SDN, FTO,
+    SDGT, LEI, GLIDE, GDACS…) are explained in brackets the first time they appear.
+    Identifiers move to a "Reference numbers (for experts)" fold.
+  - The notes open on the side away from the selection. If the selection would still sit
+    under them, the view moves (zooming out only if needed) to show it in the free part.
+    Checked in headless Chromium: both handles of every string stay reachable.
+  - The board script moves to `web/static/board.js`, loaded only on pages with a board.
+- 2026-11-06: the board says why each card is there, after owner feedback: a board mixing
+  unrelated subjects means nothing (the earlier preview was a mash-up of test lookups; it
+  was deleted and rebuilt around one question).
+  - The investigation's subject is the card whose name or alias is written in the research
+    question, or else the best connected card. It sits in the middle with a gold border
+    and a SUBJECT stamp.
+  - A case card pinned at the top shows the research question.
+  - Each card's foot says how far it is from the subject (by strings) or that there is no
+    link to it yet. A filter shows only what is linked to the subject.
+  - The case notes add "Why it is on the board" (the key questions whose evidence names it,
+    with claim counts and sources) and "How it connects to what you searched" (the chain of
+    plain sentences to the subject, or a warning that relevance is unconfirmed).
+  - Chains end at, but never pass through, a list keeper (`designated_by`) or an outlet
+    (`reported_by`): sharing a sanctions list is not a connection.
+  - The UN note "Associated with NAME (QDi.263)" now adds a `linked_to` record link from
+    that UN-numbered entry to the listed organisation.
+  - Wikidata-backed links read "a reference work says this … not proof on its own" instead
+    of "an official record".
+- 2026-11-06: new look for the web app (bold yellow and black style with thick borders and
+  hard shadows; Space Grotesk and Space Mono fonts served by Lantern, OFL-1.1).
+  - Home page: the question box, then the two depths as large choice cards (Deep
+    investigation, Quick look), a six-step "How it works" strip and investigations as cards.
+  - Report page: a sticky side menu (Overview, Key findings, Satellite, Evidence board,
+    Sources, Leads, How it was done) that marks the section being read; an opening block with
+    status, depth, downloads, five stat tiles and the bottom line; numbered section panels;
+    one card per key question.
+  - Saved-copy page: a header card and a facts card. All pages fit a phone screen.
+- 2026-11-06: calmer design and less text.
+  - One accent colour (yellow) with black and white; colour only where it means something
+    (status, grades, confidence). Shadows only on things you can press.
+  - Shorter wording on every page; long explanations moved into closed "Help" or
+    "What the grades mean" panels.
+  - Evidence board redesigned as a dark case wall: flat white index cards with a black kind
+    strip (red for events, pale yellow for places), the subject card casts a yellow shadow,
+    red pins and strings. Zoom, Fit, Tidy, Reset, Filter and Help sit in one bar above the
+    wall, with a legend for the string styles below it.
+  - Case notes are shorter: each string shows a short tag ("Official record",
+    "2 independent sources", "One source only", "Lantern's inference") with its sources and
+    quote buttons; the long sentence appears only when it is a warning.

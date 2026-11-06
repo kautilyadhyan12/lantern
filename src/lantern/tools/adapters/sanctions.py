@@ -222,6 +222,10 @@ def record(entry: Entry, listing: Listing) -> SourceDraft:
 
 
 LISTERS = {"OFAC": "US Treasury OFAC", "UN": "UN Security Council"}
+# "Associated with Hafiz Muhammad Saeed (QDi.263)": a name and its UN reference number.
+ASSOCIATED = re.compile(
+    r"(?:with|and|,)\s+([A-Z][\w'.-]*(?:\s[\w'.-]+){0,6}?)\s\(([A-Z]{2}[ie]\.\d+)\)"
+)
 
 
 def _relations(entry: Entry, claims: list[str]) -> tuple[tuple[int, Triple], ...]:
@@ -238,6 +242,12 @@ def _relations(entry: Entry, claims: list[str]) -> tuple[tuple[int, Triple], ...
         index = claims.index(f"The list links {entry.name} to {link}.")
         target = {"name": link, "kind": "organisation"}
         found.append((index, {"subject": subject, "relation": "linked_to", "object": target}))
+    if entry.reason:  # the UN note names associated entries by their reference numbers
+        index = claims.index(f"The UN listing of {entry.name} notes: {entry.reason}")
+        for name, ref in ASSOCIATED.findall(entry.reason):
+            kind = "person_public_role" if ref[2] == "i" else "organisation"
+            other = {"name": name.strip(), "kind": kind, "ids": [f"un:{ref}"]}
+            found.append((index, {"subject": other, "relation": "linked_to", "object": subject}))
     return tuple(
         (index, Triple.model_validate({**data, "claim_refs": [], "basis": "record"}))
         for index, data in found

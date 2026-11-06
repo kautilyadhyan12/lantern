@@ -4,18 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Lantern{% endblock %}</title>
-  <link rel="stylesheet" href="/static/style.css">
-  <script src="/static/app.js" defer></script>
+  <link rel="stylesheet" href="{{ asset('style.css') }}">
+  <script src="{{ asset('app.js') }}" defer></script>
 </head>
 <body{% block body_attrs %}{% endblock %}>
   <header class="top">
     <a class="brand" href="/"><span class="mark" aria-hidden="true"></span>Lantern</a>
     <span class="tag">Public-evidence investigations</span>
+    <a class="new-button" href="/#ask">+ New investigation</a>
   </header>
-  <main>{% block main %}{% endblock %}</main>
+  <main{% block main_attrs %}{% endblock %}>{% block main %}{% endblock %}</main>
   <footer class="foot">
-    Lantern uses public web pages only. Reports are produced with automated assistance;
-    review them before publishing or acting on them.
+    <p>Public sources only. Reports are made with automated help: check them before you act on them.</p>
   </footer>
 </body>
 </html>
