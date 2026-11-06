@@ -267,3 +267,10 @@ The office rules stay exactly as they are:
     claim instructions now say never to guess a link.
   - A token budget used up just before the verdict now leaves the report and an "unproven"
     verdict instead of failing the run.
+- 2026-11-06: second small live run after the fixes, same claim and limits: 26,980 tokens.
+  Verdict: misleading, very likely, moderate confidence. All four key questions answered
+  (Q1 was unanswerable in the first run). Factly's rating is now reported as "misleading",
+  as its page says. The model's verdict sentence said "almost certain" where two
+  independent sources allow "very likely", so the sentence was removed and the stamp shows
+  the allowed likelihood. The researcher again guessed one AFP link, which the gateway
+  refused; one AFP page also yielded claims about an unrelated fact-check on the same page.
