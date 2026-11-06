@@ -561,3 +561,18 @@ Each stage is one pull request.
   - The layout gains a pull towards the middle, so separate groups do not drift to the
     corners, and an overlap pass that keeps cards apart (ties push sideways). The board
     shows at most 30 cards.
+- 2026-11-06: evidence board usability, after the owner found it hard to use:
+  - Selecting a card or a string opens floating "Case notes" over the board: the card's
+    names, identifiers and every attached string with claim buttons that open the quotes,
+    or a string's status, origins and evidence for and against. Strings no longer jump the
+    page down to the table, which now folds away under "All strings as a table".
+  - Selection focuses the board (connected cards and strings stay bright, the rest fades),
+    hovering a card thickens its strings, and a short press is a click, never a drag.
+  - Strings run under the cards with a wide invisible click area; pins stay on top.
+  - Zoom in or out, Fit, Tidy up (cards back where they started), drag the cork to pan,
+    Ctrl+wheel to zoom, Escape to clear.
+  - Long name lists show 8 names with "show all", and overlapping same-name groups are
+    listed once.
+  - Checked in headless Chromium: clicks select without moving cards, the panel opens and
+    closes, the quote dialog opens from the notes, the page does not jump, zoom changes the
+    view box, drag then Tidy up restores positions, and there are no page errors.

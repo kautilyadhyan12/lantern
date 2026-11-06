@@ -196,6 +196,12 @@ def namesakes(entities: list[Entity]) -> list[tuple[str, int]]:
         if entity.kind == "person_public_role":
             for name in (entity.name, *entity.aliases):
                 holders.setdefault(name_key(name), set()).add(entity.ref)
-    groups = {frozenset(refs) for refs in holders.values() if len(refs) > 1}
+    groups: list[set[str]] = []
+    for refs in holders.values():  # names that overlap make one group, listed once
+        if len(refs) < 2:
+            continue
+        touching = [group for group in groups if group & refs]
+        merged = set(refs).union(*touching)
+        groups = [group for group in groups if not group & refs] + [merged]
     shown = {entity.ref: entity.name for entity in entities}
     return sorted((shown[min(group, key=lambda ref: int(ref[1:]))], len(group)) for group in groups)

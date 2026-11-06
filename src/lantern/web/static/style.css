@@ -285,3 +285,32 @@ blockquote {
 .board .string-label { font: 600 10px/1 system-ui, sans-serif; fill: #2b1a0e; text-anchor: middle;
   paint-order: stroke; stroke: #f3e2c0; stroke-width: 3px; stroke-linejoin: round; }
 .board .pin { stroke: #4a0d0d; stroke-width: 0.8; pointer-events: none; }
+
+/* Evidence board: tools, case notes, selection */
+.board-tools { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin: 0.4rem 0 0.6rem; }
+.board-tools button { min-width: 2.2rem; padding: 0.25rem 0.7rem; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); cursor: pointer; font-weight: 600; }
+.board-layout { position: relative; }
+.case-notes { position: absolute; top: 22px; right: 22px; width: min(340px, 45%); max-height: calc(100% - 44px); overflow: auto;
+  background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 0.7rem 1rem 0.9rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); z-index: 5; }
+.case-notes[hidden] { display: none; }
+@media (max-width: 760px) { .case-notes { position: static; width: auto; max-height: none; margin-top: 0.75rem; } }
+.case-head { display: flex; justify-content: space-between; align-items: center; }
+.case-notes h3 { margin: 0; }
+.case-close { border: none; background: none; font-size: 1.5rem; line-height: 1; cursor: pointer; color: var(--muted); padding: 0 0.25rem; }
+.links-table { margin-top: 0.75rem; }
+.links-table summary { cursor: pointer; color: var(--accent); }
+.case-notes h4 { margin: 0.2rem 0 0.5rem; }
+.case-notes .note-kind { margin: 0; font-size: 0.8rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.note-links { list-style: none; padding: 0; margin: 0; }
+.note-links li { padding: 0.45rem 0; border-top: 1px solid var(--line); }
+.note-link { display: block; text-align: left; background: none; border: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }
+.board { user-select: none; -webkit-user-select: none; cursor: grab; }
+.board.panning { cursor: grabbing; }
+.board .string-hit { fill: none; stroke: transparent; stroke-width: 16; pointer-events: stroke; }
+.board a.string { cursor: pointer; }
+.board .string.hover .string-line { stroke-width: 4.5; }
+.board .card.lit .card-paper { stroke: #b3121b; stroke-width: 2.5; }
+.board .string.lit .string-line { stroke-width: 4.5; }
+.board.focus .card:not(.lit), .board.focus .pin:not(.lit), .board.focus .string:not(.lit) { opacity: 0.22; }
+.board .card, .board .pin, .board .string { transition: opacity 0.15s ease; }

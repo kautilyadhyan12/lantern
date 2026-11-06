@@ -348,7 +348,9 @@ def test_the_map_renders_every_link_with_its_evidence_and_escapes_text(tmp_path)
     assert '<svg class="board"' in page
     assert "Evidence board" in page
     for link in inv.links:
-        assert f'<a href="#{link.ref}" class="edge string' in page  # each string opens its evidence
+        # each string opens its evidence: in the case notes, or as a link without scripts
+        assert f'<a href="#{link.ref}" data-ref="{link.ref}" class="edge string' in page
+        assert f'<template id="note-{link.ref}">' in page
         assert f'<tr id="{link.ref}"' in page
     assert 'data-ref="C1"' in page
     assert "Against: " in page
@@ -423,3 +425,12 @@ def test_cards_never_overlap_and_stay_on_the_board():
         and linkmap.MARGIN <= y <= linkmap.HEIGHT - linkmap.MARGIN
         for x, y in placed.values()
     )
+
+
+def test_overlapping_namesake_groups_are_listed_once():
+    entities = [
+        Entity(ref="E4", kind=PERSON, name="SAEED, Muhammad", aliases=["SAEED, Hafiz Muhammad"]),
+        Entity(ref="E5", kind=PERSON, name="HAFIZ MUHAMMAD SAEED"),
+        Entity(ref="E6", kind=PERSON, name="Muhammad Saeed"),
+    ]
+    assert linkmap.namesakes(entities) == [("SAEED, Muhammad", 3)]
