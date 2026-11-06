@@ -9,9 +9,16 @@
     then restart the codespace.</p>
   {% endif %}
   <form id="ask" class="ask" autocomplete="off">
-    <label for="brief" class="sr">Research question</label>
+    <fieldset class="mode">
+      <legend class="sr">What to do</legend>
+      <label class="mode-tab"><input type="radio" name="mode" value="research" checked><span>Research a question</span></label>
+      <label class="mode-tab"><input type="radio" name="mode" value="claim"><span>Check a claim</span></label>
+    </fieldset>
+    <label for="brief" class="sr" id="brief-label">Research question</label>
     <textarea id="brief" name="brief" rows="3" maxlength="600" required
-      placeholder="What is publicly known about the 2026 monsoon floods in Assam?"></textarea>
+      placeholder="What is publicly known about the 2026 monsoon floods in Assam?"
+      data-research="What is publicly known about the 2026 monsoon floods in Assam?"
+      data-claim="Paste the claim, the post's text or a link. For example: This video shows Guwahati flooding yesterday."></textarea>
     <fieldset class="depth">
       <legend class="sr">How thorough</legend>
       <label class="choice">
@@ -35,7 +42,7 @@
     </fieldset>
     <div class="ask-row">
       <p class="hint">{{ left }} left today. Questions about private people or minors are refused.</p>
-      <button type="submit" {% if missing or not left %}disabled{% endif %}>Investigate</button>
+      <button type="submit" data-research="Investigate" data-claim="Check the claim" {% if missing or not left %}disabled{% endif %}>Investigate</button>
     </div>
     <p id="ask-error" class="error" hidden></p>
   </form>
@@ -63,7 +70,8 @@
         <span class="case-tile-brief">{{ item.brief }}</span>
         <span class="case-tile-foot">
           {% if item.status != "done" %}<span class="status s-{{ item.status }}">{{ item.status }}</span>{% endif %}
-          <span>{{ "Deep" if item.depth == "deep" else "Quick" }} · {{ item.sources | length }} sources</span>
+          <span>{% if item.mode == "claim" %}Claim check · {% endif %}{{ "Deep" if item.depth == "deep" else "Quick" }} · {{ item.sources | length }} sources</span>
+          {% if item.verdict %}<span class="verdict-chip v-{{ item.verdict.label }}">{{ item.verdict.label | capitalize }}</span>{% endif %}
           <time>{{ item.created_at.strftime("%d %b, %H:%M") }}</time>
         </span>
       </a>

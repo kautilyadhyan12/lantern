@@ -11,11 +11,12 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Res
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import RequestResponseEndpoint
 
 from lantern.assessment import CREDIBILITY, LIKELIHOOD, RELIABILITY
 from lantern.config import AppSettings
-from lantern.models import Claim, Investigation, Source, now
+from lantern.models import Claim, Investigation, Mode, Source, now
 from lantern.report import to_markdown
 from lantern.runtime import continue_investigation, missing_keys, run_investigation
 from lantern.store import Store
@@ -33,6 +34,7 @@ CSP = (
 class NewInvestigation(BaseModel):
     brief: str = Field(min_length=1, max_length=600)
     depth: Literal["quick", "deep"] = "deep"
+    mode: Mode = "research"
 
 
 def asset_urls(folder: Path) -> Callable[[str], str]:
@@ -92,6 +94,18 @@ def create_app(  # noqa: PLR0915  # routes share one store and settings via clos
         response.headers["Referrer-Policy"] = "no-referrer"
         return response
 
+    @app.exception_handler(StarletteHTTPException)
+    async def problem(request: Request, error: StarletteHTTPException) -> Response:
+        """Pages answer with a readable page; the API keeps answering in JSON."""
+        if request.url.path.startswith("/api/"):
+            return JSONResponse({"detail": error.detail}, error.status_code, error.headers)
+        missing = error.status_code == 404
+        message = str(error.detail)
+        if message in {"Not Found", "Method Not Allowed"}:
+            message = "There is no page at this address. Check the link, or start from the list."
+        context = {"title": "Not found" if missing else "Something went wrong", "message": message}
+        return templates.TemplateResponse(request, "error.html", context, error.status_code)
+
     def load(investigation_id: str) -> Investigation:
         investigation = store.load(investigation_id)
         if investigation is None:
@@ -122,7 +136,9 @@ def create_app(  # noqa: PLR0915  # routes share one store and settings via clos
     async def start(body: NewInvestigation) -> JSONResponse:
         if refusal := blocked():
             return refusal
-        investigation = Investigation(id=store.new_id(), brief=body.brief.strip(), depth=body.depth)
+        investigation = Investigation(
+            id=store.new_id(), brief=body.brief.strip(), depth=body.depth, mode=body.mode
+        )
         store.save(investigation)
         launch(investigation, runner)
         return JSONResponse({"id": investigation.id}, 201)

@@ -70,6 +70,37 @@ _ESTABLISHED = {
     "oecd.org",
     "reliefweb.int",
 }
+# Signatories of the International Fact-Checking Network's Code of Principles (checked
+# 2026-11-06 against the IFCN's public assessments where they could be found; Logically
+# Facts was left out because its site no longer answers). Every listed site allowed
+# Lantern in its robots.txt that day.
+FACT_CHECKERS: tuple[str, ...] = (
+    # India
+    "altnews.in",
+    "boomlive.in",
+    "factly.in",
+    "newschecker.in",
+    "vishvasnews.com",
+    "factcrescendo.com",
+    "newsmobile.in",
+    "newsmeter.in",
+    "digiteye.in",
+    "factchecker.in",
+    "thequint.com",
+    # Elsewhere
+    "factcheck.afp.com",
+    "snopes.com",
+    "politifact.com",
+    "factcheck.org",
+    "fullfact.org",
+    "leadstories.com",
+    "africacheck.org",
+    "chequeado.com",
+    "maldita.es",
+    "correctiv.org",
+    "rappler.com",
+    "misbar.com",
+)
 _BACKGROUND = {"wikipedia.org", "britannica.com"}
 _USER_CONTENT = {
     "reddit.com",
@@ -106,8 +137,13 @@ def rate_source(url: str) -> tuple[str, str]:
     labels = host.split(".")
     if host.endswith(_OFFICIAL_SUFFIXES) or "gov" in labels[-3:-1] or "mil" in labels[-3:-1]:
         return "B", "Official government or intergovernmental website"
-    if domain in _ESTABLISHED:
-        return "B", "Established news organisation or international body"
+    if fact_checker(url) or domain in _ESTABLISHED:
+        known = (
+            "fact-checker (IFCN signatory)"
+            if fact_checker(url)
+            else "news organisation or international body"
+        )
+        return "B", f"Established {known}"
     if host.endswith(".edu") or "ac" in labels[-3:-1] or "edu" in labels[-3:-1]:
         return "B", "Academic institution"
     if domain in _BACKGROUND:
@@ -115,6 +151,12 @@ def rate_source(url: str) -> tuple[str, str]:
     if domain in _USER_CONTENT:
         return "D", "User-generated content platform"
     return "F", "No track record known to Lantern"
+
+
+def fact_checker(url: str) -> bool:
+    """Whether a link is on the site of an established fact-checker."""
+    host = (urlsplit(url).hostname or "").lower()
+    return any(host == site or host.endswith(f".{site}") for site in FACT_CHECKERS)
 
 
 def independent_domains(urls: Iterable[str]) -> list[str]:

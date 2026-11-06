@@ -70,6 +70,21 @@ You ask a question. Lantern:
    up to two more rounds and 16 more pages on the same investigation, skipping searches and pages already done, keeping
    everything found, and rewriting the report.
 
+11. **Checks a claim.** Choose "Check a claim" and paste a claim, a post's text or a link.
+   The key questions are fixed: where and when it first appeared, what independent sources
+   say, whether fact-checkers have already assessed it, and whether genuine material is
+   shown out of context. Two extra tools help: a search of established fact-checkers' sites
+   (signatories of the International Fact-Checking Network, graded B) and the Wayback
+   Machine's earliest saved copy of a link, which shows it existed no later than that day.
+   For posts on X, Facebook and similar sites, only the archive's date is read, never the
+   post (X posts are looked up under twitter.com too). Searches can also be limited to
+   before or after a date, to find the same material before the claimed day. The check ends
+   with a verdict: supported, false, misleading or unproven. The AI proposes it; code
+   decides whether the cited evidence carries it (for example, "false" needs a published
+   fact-check or two independent sources rated B or better), and anything else becomes
+   unproven. The verdict sentence is checked like every report sentence. Images and videos
+   are not analysed.
+
 To compare finished investigations side by side (answers, items, corroboration, pages,
 posts, records, links, tokens, minutes), with no network or AI calls:
 `uv run python -m scripts.compare_runs <id> <id> ...`.
@@ -89,6 +104,7 @@ Codespaces → Secrets) and then a codespace restart:
 uv sync --frozen
 uv run lantern serve                      # web app on http://127.0.0.1:8000
 uv run lantern run "What is publicly known about the 2026 Assam floods?"
+uv run lantern run --claim "This video shows Guwahati flooding yesterday"   # check a claim
 uv run lantern continue <id>                # dig further into a finished investigation
 ```
 

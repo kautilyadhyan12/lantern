@@ -28,7 +28,9 @@ def _quoted(texts: Iterable[str]) -> str:
 
 
 def brief_view(inv: Investigation, phrases: Sequence[str], hashtags: Sequence[str]) -> str:
-    lines = [f"Research question: {inv.brief}"]
+    lines = [f"{'Claim to check' if inv.mode == 'claim' else 'Research question'}: {inv.brief}"]
+    if inv.claimed_date:
+        lines.append(f"The claim dates the event to {inv.claimed_date}.")
     if inv.time_range:
         lines.append(f"Period: news from the past {inv.time_range}.")
     lines.append("Key questions:")

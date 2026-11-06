@@ -15,13 +15,27 @@ def strip_refs(text: str) -> str:
     return _INLINE.sub("", text).strip()
 
 
+_TERM = re.compile(
+    r"\b(" + "|".join(re.escape(t) for t in sorted(TERMS, key=len, reverse=True)) + r")\b"
+)
+
+
+def likelihood_terms(text: str) -> set[str]:
+    """The ICD 203 likelihood terms a sentence uses: "very likely" is one term, not two."""
+    return set(_TERM.findall(text.lower()))
+
+
 def _mixes_scales(text: str) -> bool:
     lowered = text.lower()
     has_term = any(re.search(rf"\b{re.escape(term)}\b", lowered) for term in TERMS)
     return has_term and any(word in lowered for word in CONFIDENCE_WORDS)
 
 
-def _check(sentence: SentenceOut, valid: set[str], removed: list[Removed]) -> Sentence | None:
+def check_sentence(
+    sentence: SentenceOut, valid: set[str], removed: list[Removed]
+) -> Sentence | None:
+    """The sentence with its citations when it cites only existing claims and keeps
+    likelihood and confidence apart; otherwise None, with the reason added to `removed`."""
     cites = list(sentence.cites)
     for match in _INLINE.finditer(sentence.text):
         cites += _REF.findall(match.group(1))
@@ -44,7 +58,7 @@ def verify(draft: ReportOut, investigation: Investigation) -> Report:
     valid = {claim.ref for claim in investigation.claims}
     answered = {item.question_ref for item in investigation.findings if item.status == "answered"}
     removed: list[Removed] = []
-    bottom = [item for s in draft.bottom_line if (item := _check(s, valid, removed))]
+    bottom = [item for s in draft.bottom_line if (item := check_sentence(s, valid, removed))]
     sections: dict[str, Section] = {}
     for section in draft.sections:
         if section.question_ref not in answered:
@@ -52,7 +66,9 @@ def verify(draft: ReportOut, investigation: Investigation) -> Report:
         target = sections.setdefault(
             section.question_ref, Section(question_ref=section.question_ref)
         )
-        target.sentences += [item for s in section.sentences if (item := _check(s, valid, removed))]
+        target.sentences += [
+            item for s in section.sentences if (item := check_sentence(s, valid, removed))
+        ]
     gaps = [gap.strip() for gap in draft.gaps if gap.strip()]
     for finding in investigation.findings:
         question = investigation.question(finding.question_ref)
@@ -72,6 +88,7 @@ def to_markdown(investigation: Investigation) -> str:
     lines = [f"# {investigation.brief}", "", f"Status: {investigation.status}.", ""]
     if investigation.status == "refused":
         return "\n".join([*lines, f"Refused: {investigation.safety}", ""])
+    lines += _verdict_lines(investigation)
     lines += ["## Bottom line", "", *(_cited(s) for s in report.bottom_line), ""]
     for finding in investigation.findings:
         lines += _finding_lines(investigation, report, finding)
@@ -129,6 +146,24 @@ def to_markdown(investigation: Investigation) -> str:
         "",
     ]
     return "\n".join(lines)
+
+
+def _verdict_lines(investigation: Investigation) -> list[str]:
+    """A claim check's verdict: the label, its checked sentence, then confidence apart."""
+    verdict = investigation.verdict
+    if verdict is None:
+        return []
+    lines = ["## Verdict", "", f"**{verdict.label.capitalize()}.**", ""]
+    if verdict.likelihood:
+        lines += [f"Likelihood: {verdict.likelihood} ({dict(LIKELIHOOD)[verdict.likelihood]}).", ""]
+    if verdict.sentence:
+        lines += [_cited(verdict.sentence), ""]
+    if verdict.confidence:
+        lines += [f"{verdict.confidence.capitalize()} confidence: {verdict.confidence_reason}.", ""]
+    lines += [verdict.reason, ""]
+    if verdict.label != verdict.label_proposed:
+        lines += [f"The AI proposed “{verdict.label_proposed}”; Lantern's rules changed it.", ""]
+    return lines
 
 
 def _finding_lines(investigation: Investigation, report: Report, finding: Finding) -> list[str]:

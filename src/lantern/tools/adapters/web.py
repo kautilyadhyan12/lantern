@@ -8,15 +8,16 @@ read instead, but never when robots.txt says no.
 import asyncio
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import ClassVar, Protocol
+from datetime import date
+from typing import ClassVar, Protocol, Self
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from lantern.archive import ARCHIVABLE, Archive, Copy
 from lantern.assessment import registrable_domain
 from lantern.capture import extract
 from lantern.egress import FetchError, Page
-from lantern.search import Searcher, SearchError, TimeRange
+from lantern.search import Searcher, SearchError, TimeRange, Window
 from lantern.sites import POST_LINKS, canonical, post_lead, readable
 from lantern.tools.base import (
     SourceDraft,
@@ -37,10 +38,35 @@ class PageFetcher(Protocol):
 
 class QueryArgs(ToolArgs):
     query: str = Field(min_length=1, max_length=500)
+    after: date | None = None  # only results published on or after this day
+    before: date | None = None  # only results published on or before this day
+
+    @model_validator(mode="after")
+    def _in_order(self) -> Self:
+        if self.after and self.before and self.after > self.before:
+            msg = "after must be a day on or before before"
+            raise ValueError(msg)
+        return self
+
+    def dates(self) -> Window:
+        """The date window as search options; empty when none was given."""
+        window = Window()
+        if self.after:
+            window["after"] = self.after.isoformat()
+        if self.before:
+            window["before"] = self.before.isoformat()
+        return window
 
 
 class NewsArgs(QueryArgs):
     time_range: TimeRange | None = None
+
+    @model_validator(mode="after")
+    def _one_window(self) -> Self:
+        if self.time_range and (self.after or self.before):
+            msg = "give either time_range or the after and before dates, not both"
+            raise ValueError(msg)
+        return self
 
 
 class PhraseArgs(ToolArgs):
@@ -68,11 +94,18 @@ def _search_errors() -> Iterator[None]:
         raise ToolError(str(error)) from error
 
 
+def _window(args: QueryArgs) -> str:
+    """The date window of a search in words, for the log: " (before 2024-08-01)"."""
+    parts = [f"{name} {day}" for name, day in args.dates().items()]
+    return f" ({' and '.join(parts)})" if parts else ""
+
+
 class WebSearch:
     name: ClassVar[str] = "web_search"
     description: ClassVar[str] = (
-        "Search the web for background, official pages and lists. Results are leads to read, "
-        "not evidence."
+        "Search the web for background, official pages and lists. Optional after and before "
+        "dates (YYYY-MM-DD) keep only results published in that window. Results are leads to "
+        "read, not evidence."
     )
     args_model: ClassVar[type[BaseModel]] = QueryArgs
     kind: ClassVar[ToolKind] = "search"
@@ -84,15 +117,16 @@ class WebSearch:
 
     async def run(self, args: QueryArgs, _ctx: ToolContext) -> ToolResult:
         with _search_errors():
-            hits = await self._searcher.search(args.query, self._limit)
-        return ToolResult(hits, [], f"Searched the web: “{args.query}” ({len(hits)} results).")
+            hits = await self._searcher.search(args.query, self._limit, **args.dates())
+        summary = f"Searched the web: “{args.query}”{_window(args)} ({len(hits)} results)."
+        return ToolResult(hits, [], summary)
 
 
 class NewsSearch:
     name: ClassVar[str] = "news_search"
     description: ClassVar[str] = (
-        "Search news reports, optionally within the past day, week, month or year. Results are "
-        "leads to read, not evidence."
+        "Search news reports, optionally within the past day, week, month or year, or between "
+        "after and before dates (YYYY-MM-DD). Results are leads to read, not evidence."
     )
     args_model: ClassVar[type[BaseModel]] = NewsArgs
     kind: ClassVar[ToolKind] = "search"
@@ -105,9 +139,10 @@ class NewsSearch:
     async def run(self, args: NewsArgs, _ctx: ToolContext) -> ToolResult:
         with _search_errors():
             hits = await self._searcher.search(
-                args.query, self._limit, news=True, time_range=args.time_range
+                args.query, self._limit, news=True, time_range=args.time_range, **args.dates()
             )
-        return ToolResult(hits, [], f"Searched the news: “{args.query}” ({len(hits)} results).")
+        summary = f"Searched the news: “{args.query}”{_window(args)} ({len(hits)} results)."
+        return ToolResult(hits, [], summary)
 
 
 class PostLinks:

@@ -33,7 +33,8 @@
 {% block main_attrs %} class="wide"{% endblock %}
 {% block main %}
 {% set images = inv.sources | selectattr("kind", "equalto", "image") | list %}
-<div class="case-layout">
+<div class="case-layout{{ '' if inv.report else ' no-nav' }}">
+{% if inv.report %}
 <nav class="side-nav" aria-label="Sections of this report">
   <p class="nav-title">On this page</p>
   <ol>
@@ -48,9 +49,11 @@
     {% endif %}
   </ol>
 </nav>
+{% endif %}
 <div class="case-main">
 <header class="case-hero" id="overview">
   <p class="crumb"><a href="/">← All investigations</a></p>
+  {% if inv.mode == "claim" %}<p class="kicker">Claim check</p>{% endif %}
   <h1 class="brief">{{ inv.brief }}</h1>
   <p class="meta">
     <span class="status s-{{ inv.status }}">{{ inv.status }}</span>
@@ -69,6 +72,18 @@
     <li><b>{{ inv.links | length }}</b> strings</li>
     <li><b>{{ "{:,}".format(inv.usage.tokens_in + inv.usage.tokens_out) }}</b> AI tokens</li>
   </ul>
+  {% endif %}
+  {% if inv.verdict %}
+  {% set v = inv.verdict %}
+  <section class="verdict v-{{ v.label }}" aria-labelledby="verdict-label">
+    <p class="verdict-kicker">Verdict</p>
+    <p class="verdict-label" id="verdict-label">{{ v.label | capitalize }}</p>
+    {% if v.likelihood %}<p class="verdict-likelihood">{{ v.likelihood | capitalize }} <span class="muted">{{ ranges.get(v.likelihood, "") }}</span></p>{% endif %}
+    {% if v.sentence %}<p class="verdict-sentence">{{ sentence(v.sentence) }}</p>{% endif %}
+    {% if v.confidence %}<p class="verdict-why">{{ v.confidence | capitalize }} confidence: {{ v.confidence_reason }}.</p>{% endif %}
+    <p class="verdict-why">{{ v.reason }}</p>
+    {% if v.label != v.label_proposed %}<p class="verdict-why">The AI proposed “{{ v.label_proposed }}”; Lantern's rules changed it.</p>{% endif %}
+  </section>
   {% endif %}
   {% if inv.report %}
   <div class="bottom-line">

@@ -37,6 +37,7 @@ from lantern.tools.gateway import Outcome, describe
 
 SEARCHES = {"web_search", "news_search"}
 LEADS_ONLY = {"post_links"}
+COUNTED = SEARCHES | LEADS_ONLY | {"fact_checks"}  # calls counted as searches made
 SWEEP = 8  # calls the opening sweep may make (post links and social posts), on top of the budget
 
 
@@ -243,9 +244,10 @@ class Agent(Investigator):
             ]
         )
         try:
+            claim = f"\n{prompts.CLAIM_STEPS}" if self.inv.mode == "claim" else ""
             step, wrong = await next_actions(
                 self._model("think"),
-                self._dated(prompts.RESEARCH),
+                self._dated(prompts.RESEARCH + claim),
                 user,
                 self.gateway.registry,
                 allowed,
@@ -329,7 +331,9 @@ class Agent(Investigator):
             query = str(call.args.get("query", "")).strip()
             self._searched.append(query)
             self._searched_keys.add(query.casefold())
-        if call.tool in SEARCHES | LEADS_ONLY:
+        if call.tool == "fact_checks":
+            self._searched.append(f"fact-checkers: {str(call.args.get('query', '')).strip()}")
+        if call.tool in COUNTED:
             self.inv.usage.searches += 1
         if call.tool != "read_page":
             self._searches.append(result.summary)
@@ -353,7 +357,8 @@ class Agent(Investigator):
         for draft in result.sources:
             if draft.kind != "page":
                 continue
-            self._attempted.add(canonical(draft.url))
+            if call.tool != "earliest_copy":  # an old copy leaves the live page to read
+                self._attempted.add(canonical(draft.url))
             source = self._page_source(
                 draft, Candidate(Hit(url=draft.url, title="", rank=0), {ref})
             )

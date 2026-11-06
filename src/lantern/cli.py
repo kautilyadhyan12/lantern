@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from lantern.config import AppSettings, Settings
 from lantern.db.migrate import MigrationError, upgrade
-from lantern.models import Investigation, now
+from lantern.models import Investigation, Mode, now
 from lantern.report import to_markdown
 from lantern.runtime import continue_investigation, run_investigation
 from lantern.store import Store
@@ -31,7 +31,13 @@ def _database() -> int:
     return 0
 
 
-def _run(brief: str | None, depth: Literal["quick", "deep"], resume: str | None = None) -> int:
+def _run(
+    brief: str | None,
+    depth: Literal["quick", "deep"],
+    resume: str | None = None,
+    *,
+    mode: Mode = "research",
+) -> int:
     settings = AppSettings()
     store = Store(settings.data_dir)
     if resume is not None:
@@ -42,7 +48,7 @@ def _run(brief: str | None, depth: Literal["quick", "deep"], resume: str | None 
         investigation = found
         investigation.continued_at.append(now())
     else:
-        investigation = Investigation(id=store.new_id(), brief=brief or "", depth=depth)
+        investigation = Investigation(id=store.new_id(), brief=brief or "", depth=depth, mode=mode)
     store.save(investigation)
     seen = len(investigation.steps)
 
@@ -77,6 +83,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     run.add_argument(
         "--quick", action="store_true", help="One round of up to 10 pages instead of a deep run"
     )
+    run.add_argument(
+        "--claim", action="store_true", help="Check the text as a claim and give a verdict"
+    )
     again = commands.add_parser("continue", help="Continue a finished investigation")
     again.add_argument("id", help="The investigation id (from the web app or var/)")
     serve = commands.add_parser("serve", help="Start the web app")
@@ -86,7 +95,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     database.add_subparsers(dest="operation", required=True).add_parser("upgrade")
     arguments = parser.parse_args(argv)
     if arguments.command == "run":
-        return _run(arguments.brief, "quick" if arguments.quick else "deep")
+        mode: Mode = "claim" if arguments.claim else "research"
+        return _run(arguments.brief, "quick" if arguments.quick else "deep", mode=mode)
     if arguments.command == "continue":
         return _run(None, "deep", resume=arguments.id)
     if arguments.command == "serve":

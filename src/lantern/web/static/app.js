@@ -10,10 +10,22 @@ function startForm() {
     link.addEventListener("click", () => window.setTimeout(() => document.getElementById("brief").focus(), 0)),
   );
   const error = document.getElementById("ask-error");
+  const brief = document.getElementById("brief");
+  const submit = form.querySelector('button[type="submit"]');
+  const label = document.getElementById("brief-label");
+  const mode = () => (form.querySelector('input[name="mode"]:checked') || {}).value || "research";
+  const showMode = () => {
+    const chosen = mode();
+    brief.placeholder = brief.dataset[chosen];
+    submit.textContent = submit.dataset[chosen];
+    label.textContent = chosen === "claim" ? "Claim to check" : "Research question";
+  };
+  form.querySelectorAll('input[name="mode"]').forEach((input) => input.addEventListener("change", showMode));
+  showMode();
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const button = form.querySelector("button");
-    const brief = document.getElementById("brief").value.trim();
+    const button = submit;
+    const text = brief.value.trim();
     const choice = form.querySelector('input[name="depth"]:checked');
     const depth = choice ? choice.value : "deep";
     error.hidden = true;
@@ -22,7 +34,7 @@ function startForm() {
       const response = await fetch("/api/investigations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brief, depth }),
+        body: JSON.stringify({ brief: text, depth, mode: mode() }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not start the investigation.");

@@ -20,8 +20,8 @@ from pydantic import BaseModel
 
 from lantern import assessment, prompts
 from lantern.archive import Archive
-from lantern.core import graph
-from lantern.llm import Model, ModelError, QuotaError, TokenBudget
+from lantern.core import graph, verdict
+from lantern.llm import BudgetError, Model, ModelError, QuotaError, TokenBudget
 from lantern.models import (
     Claim,
     Finding,
@@ -30,18 +30,22 @@ from lantern.models import (
     Lead,
     Mention,
     Question,
+    Removed,
     Report,
+    Sentence,
     Source,
     Triple,
+    Verdict,
     now,
 )
-from lantern.report import strip_refs, verify
+from lantern.report import check_sentence, likelihood_terms, strip_refs, verify
 from lantern.safety import check_brief
 from lantern.search import Hit, Searcher, SearchError, TimeRange
 from lantern.sites import canonical, post_lead, readable
 from lantern.social import SocialSearch
 from lantern.store import Store
 from lantern.text import find_quote, name_words, normalise, relevant_chunks, topic_words
+from lantern.tools.adapters.claims import ARCHIVE_ORIGIN, EarliestCopy, FactChecks
 from lantern.tools.adapters.social import SocialArgs, SocialPosts
 from lantern.tools.adapters.web import NewsSearch, PageFetcher, PostLinks, ReadPage, WebSearch
 from lantern.tools.base import RunBudget, SourceDraft, Tool, ToolCall, ToolContext
@@ -192,6 +196,10 @@ class Investigator:
             registry.register(SocialPosts(tools.social, self.limits.posts_per_query))
         for tool in tools.records:
             registry.register(tool)
+        if self.inv.mode == "claim":
+            registry.register(FactChecks(tools.searcher, limit))
+            if tools.archive is not None:
+                registry.register(EarliestCopy(tools.archive))
         return registry
 
     def _budget(self) -> RunBudget:
@@ -325,6 +333,8 @@ class Investigator:
         await self._assess()
         self._map()
         await self._write()
+        if self.inv.mode == "claim":
+            await self._verdict()
         self.inv.status = "done"
         self.note("Finished.")
 
@@ -377,6 +387,9 @@ class Investigator:
         return True
 
     async def _plan(self) -> None:
+        if self.inv.mode == "claim":
+            await self._plan_claim()
+            return
         self.note("Planning key questions and searches.")
         system = prompts.PLAN.format(
             count=f"2 to {self.limits.max_questions}", queries=self.limits.queries_per_question
@@ -398,6 +411,24 @@ class Investigator:
             f"Planned {len(self.inv.questions)} key questions ({lists} asking for a full "
             f"list){window}."
         )
+
+    async def _plan_claim(self) -> None:
+        """A claim check has the four fixed key questions of the verify_claim playbook; the
+        model only plans their searches, phrases and hashtags, and reads the claimed date."""
+        self.note("Planning the claim check: origin, support, earlier fact-checks, context.")
+        system = prompts.CLAIM_PLAN.format(queries=self.limits.queries_per_question)
+        plan = await self._ask(system, f"Claim to check: {self.inv.brief}", prompts.ClaimPlanOut)
+        for number, (text, field) in enumerate(prompts.CLAIM_QUESTIONS, start=1):
+            question = Question(ref=f"Q{number}", text=text)
+            self.inv.questions.append(question)
+            queries = [query.strip() for query in getattr(plan, field) if query.strip()]
+            self._planned[question.ref] = queries[: self.limits.queries_per_question]
+        self._news = self.inv.news = plan.news
+        self.inv.claimed_date = (plan.claimed_date or "").strip() or None
+        self._hashtags = [tag.strip().lstrip("#") for tag in plan.hashtags if tag.strip()][:3]
+        self._phrases = [phrase.strip() for phrase in plan.social_phrases if phrase.strip()][:3]
+        if self.inv.claimed_date:
+            self.note(f"The claim dates the event to {self.inv.claimed_date}.")
 
     def _opening(self) -> list[Query]:
         """First round: each key question's planned searches. The first is a general web
@@ -1176,6 +1207,102 @@ class Investigator:
                     bool(finding.contradicting),
                     claim.ref in finding.supporting,
                 )
+
+    async def _verdict(self) -> None:
+        """The verdict of a claim check: proposed by the model from the findings, decided
+        by the rules of core/verdict.py, and its sentence checked like any report sentence."""
+        answered = [f for f in self.inv.findings if f.status == "answered"]
+        if not answered:
+            reason = verdict.NEEDS["unproven"]
+            self.inv.verdict = Verdict(label="unproven", label_proposed="unproven", reason=reason)
+            return
+        self.note("Weighing the verdict.")
+        parts = []
+        for finding in answered:
+            question = self.inv.question(finding.question_ref)
+            parts.append(
+                f"{finding.question_ref}: {question.text if question else ''}\n"
+                f"  Answer: {finding.answer}\n  Likelihood: {finding.likelihood}"
+            )
+        refs = {ref for f in answered for ref in f.supporting + f.contradicting}
+        claims = [self._claim_line(c) for c in self.inv.claims if c.ref in refs]
+        user = (
+            f"Claim to check: {self.inv.brief}\nClaimed date: {self.inv.claimed_date or 'none'}"
+            "\n\nFindings:\n" + "\n".join(parts) + "\n\nClaims:\n" + "\n".join(claims)
+        )
+        try:
+            out = await self._ask(prompts.VERDICT, user, prompts.VerdictOut)
+        except BudgetError as error:  # this run's own limit: the findings and report stand
+            reason = f"No verdict was weighed: {error}"
+            self.inv.verdict = Verdict(label="unproven", label_proposed="unproven", reason=reason)
+            return
+        except QuotaError:
+            raise
+        except ModelError as error:
+            reason = f"The verdict step failed: {error}"
+            self.inv.verdict = Verdict(label="unproven", label_proposed="unproven", reason=reason)
+            return
+        valid = {claim.ref for claim in self.inv.claims}
+        cites = [r for r in dict.fromkeys(c.strip().upper() for c in out.cites) if r in valid]
+        against = [r for r in dict.fromkeys(c.strip().upper() for c in out.against) if r in valid]
+        against = [ref for ref in against if ref not in cites]
+        context = any(f.question_ref == "Q4" for f in answered)
+        ruling = verdict.decide(
+            out.label,
+            out.likelihood,
+            [self._cited(ref) for ref in cites],
+            [self._cited(ref) for ref in against],
+            context=context,
+        )
+        self.inv.verdict = Verdict(
+            label=ruling.label,
+            label_proposed=out.label,
+            reason=ruling.reason,
+            likelihood=ruling.likelihood,
+            likelihood_proposed=out.likelihood or None,
+            confidence=ruling.confidence,
+            confidence_reason=ruling.confidence_reason,
+            cites=cites if ruling.label != "unproven" else [],
+            sentence=self._verdict_sentence(out, ruling, cites, valid),
+        )
+        self.note(f"Verdict: {ruling.label}. {ruling.reason}")
+
+    def _verdict_sentence(
+        self, out: prompts.VerdictOut, ruling: verdict.Ruling, cites: list[str], valid: set[str]
+    ) -> Sentence | None:
+        """The verdict sentence when it states the decided label, uses no likelihood but the
+        allowed one (shown on its own beside the label anyway), and passes the citation
+        check; otherwise None, and it is listed as removed."""
+        text = strip_refs(out.sentence)
+        if not text:
+            return None
+        report = self.inv.report or Report()
+        reason = ""
+        if ruling.label != out.label:
+            reason = f"It states “{out.label}”, which the evidence does not carry."
+        elif (used := likelihood_terms(text)) and used != {ruling.likelihood}:
+            reason = (
+                f"It uses a likelihood the evidence does not allow ({ruling.likelihood})."
+                if ruling.likelihood
+                else "An unproven verdict has no likelihood, but the sentence uses one."
+            )
+        if reason:
+            report.removed.append(Removed(text=text, reason=reason))
+            return None
+        return check_sentence(prompts.SentenceOut(text=text, cites=cites), valid, report.removed)
+
+    def _cited(self, ref: str) -> verdict.Cited:
+        claim = self.inv.claim(ref)
+        source = self.inv.source(claim.source_ref) if claim else None
+        if source is None:
+            return verdict.Cited(ref=ref, origin=ref, grade="F")
+        return verdict.Cited(
+            ref=ref,
+            origin=source.origin or source.domain,
+            grade=source.reliability,
+            fact_check=source.kind == "page" and assessment.fact_checker(source.url),
+            archive=source.origin == ARCHIVE_ORIGIN,
+        )
 
     async def _write(self) -> None:
         answered = [f for f in self.inv.findings if f.status == "answered"]
