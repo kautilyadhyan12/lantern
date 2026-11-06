@@ -345,9 +345,10 @@ def test_the_map_renders_every_link_with_its_evidence_and_escapes_text(tmp_path)
     inv = mapped(tmp_path)
     settings = AppSettings(data_dir=str(tmp_path), tavily_api_key="t", groq_api_key="g")
     page = TestClient(create_app(settings)).get(f"/investigations/{inv.id}").text
-    assert '<svg class="map"' in page
+    assert '<svg class="board"' in page
+    assert "Evidence board" in page
     for link in inv.links:
-        assert f'<a href="#{link.ref}" class="edge"' in page  # each line opens its evidence
+        assert f'<a href="#{link.ref}" class="edge string' in page  # each string opens its evidence
         assert f'<tr id="{link.ref}"' in page
     assert 'data-ref="C1"' in page
     assert "Against: " in page
@@ -393,3 +394,32 @@ def test_a_page_without_links_has_no_map(tmp_path):
     assert "Links map" not in TestClient(create_app(settings)).get(f"/investigations/{inv.id}").text
     assert "## Links" not in to_markdown(inv)
     assert fakes.PAGES  # the shared fakes stay importable here
+
+
+def test_cards_wrap_names_tilt_slightly_and_strings_sag():
+    assert linkmap.card_lines("Lashkar-e-Taiba") == ("Lashkar-e-Taiba",)
+    assert linkmap.card_lines("TATA MOTORS PASSENGER VEHICLES LIMITED") == (
+        "TATA MOTORS PASSENGER",
+        "VEHICLES LIMITED",
+    )
+    assert linkmap.card_lines("HAFIZ MUHAMMAD SAEED", 16) == ("HAFIZ MUHAMMAD", "SAEED")
+    assert all(len(line) <= 22 for line in linkmap.card_lines("A" * 40 + " B " + "C" * 40))
+    assert {linkmap.tilt(f"E{n}") for n in range(1, 50)} <= set(range(-4, 5))
+    path, (_, my) = linkmap.string((100.0, 100.0), (300.0, 100.0))
+    assert path.startswith("M100.0,100.0 Q200.0,")
+    assert my > 100  # the string hangs below its pins
+
+
+def test_cards_never_overlap_and_stay_on_the_board():
+    refs = [f"E{n}" for n in range(1, 13)]
+    crowded = {ref: [600.0, 380.0] for ref in refs}  # every card on the same spot
+    placed = linkmap.separate(refs, crowded)
+    for i, a in enumerate(refs):
+        for b in refs[i + 1 :]:
+            (ax, ay), (bx, by) = placed[a], placed[b]
+            assert abs(ax - bx) >= linkmap.CARD_W or abs(ay - by) >= linkmap.CARD_H
+    assert all(
+        linkmap.MARGIN <= x <= linkmap.WIDTH - linkmap.MARGIN
+        and linkmap.MARGIN <= y <= linkmap.HEIGHT - linkmap.MARGIN
+        for x, y in placed.values()
+    )

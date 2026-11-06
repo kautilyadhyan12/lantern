@@ -213,11 +213,13 @@
 
   {% if nodes %}
   <section class="linkmap">
-    <h2>Links map</h2>
+    <h2>Evidence board</h2>
     <p class="muted">Drawn by code from claims anchored in saved sources and from official
       records. People are joined only through an anchor (an official ID, an explicit
       "also known as", the same source, or the same role in the same organisation), never on a
-      name alone. Select a line to see its evidence.</p>
+      name alone. Red string: solid when confirmed by two or more independent sources or an official
+      record, dashed when from one source only; grey dotted string is Lantern's own assessment.
+      Select a string to see its evidence, and drag cards to rearrange the board.</p>
     {% if namesakes %}<p class="muted">Shown as separate people because no official ID, "also
       known as" claim, shared source or shared role connects them, so they may or may not be the
       same person: {% for name, count in namesakes %}{{ name }} ({{ count }} people){{ "; " if not loop.last }}{% endfor %}.</p>{% endif %}
@@ -230,21 +232,45 @@
       <label><input type="checkbox" data-status="{{ status }}" checked> {{ status }}</label>
       {% endfor %}
     </div>
-    <svg class="map" viewBox="0 0 {{ map_size[0] }} {{ map_size[1] }}" role="img" aria-label="Links between the people, organisations, places and events found">
-      {% for edge in edges %}{% set link = edge.link %}
-      <a href="#{{ link.ref }}" class="edge" data-status="{{ link.status }}" data-kinds="{{ edge.kinds }}">
-        <title>{{ entity[link.subject].name }} — {{ link.relation | replace("_", " ") }} → {{ entity[link.object].name }} ({{ link.status }})</title>
-        <line class="st-{{ link.status | replace(' ', '-') }}" x1="{{ edge.x1 }}" y1="{{ edge.y1 }}" x2="{{ edge.x2 }}" y2="{{ edge.y2 }}"></line>
-      </a>
-      {% endfor %}
-      {% for node in nodes %}
-      <g class="node k-{{ node.entity.kind }}" data-kind="{{ node.entity.kind }}">
-        <title>{{ node.entity.ref }} {{ node.entity.name }}{% if node.entity.aliases %} (also: {{ node.entity.aliases[:5] | join("; ") }}){% endif %}</title>
-        <circle cx="{{ node.x }}" cy="{{ node.y }}" r="8"></circle>
-        <text x="{{ node.x + 11 }}" y="{{ node.y + 4 }}">{{ node.entity.name | truncate(28, True, "…") }}</text>
+    <div class="board-frame">
+    <svg class="board" viewBox="0 0 {{ map_size[0] }} {{ map_size[1] }}" role="img" aria-label="Evidence board: the people, organisations, places and events found, joined by string where the evidence links them">
+      <defs>
+        <filter id="card-shadow" x="-20%" y="-30%" width="140%" height="170%">
+          <feDropShadow dx="2" dy="5" stdDeviation="3" flood-color="#2b1a0e" flood-opacity="0.45"></feDropShadow>
+        </filter>
+        <radialGradient id="pin-head" cx="35%" cy="35%" r="70%">
+          <stop offset="0%" stop-color="#ff9e9e"></stop>
+          <stop offset="55%" stop-color="#d32f2f"></stop>
+          <stop offset="100%" stop-color="#6d1414"></stop>
+        </radialGradient>
+      </defs>
+      <g class="cards">
+      {% for node in nodes %}{% set e = node.entity %}
+      <g class="node card k-{{ e.kind }}" data-kind="{{ e.kind }}" data-ref="{{ e.ref }}" data-x="{{ node.x }}" data-y="{{ node.y }}" data-tilt="{{ node.tilt }}" transform="translate({{ node.x }} {{ node.y }}) rotate({{ node.tilt }})">
+        <title>{{ e.ref }} {{ e.name }}{% if e.aliases %} (also: {{ e.aliases[:5] | join("; ") }}){% endif %} — drag to move</title>
+        {% if e.kind == "organisation" %}<rect class="card-tab" x="-84" y="-43" width="64" height="14" rx="3"></rect>{% endif %}
+        <rect class="card-paper" x="-84" y="-33" width="168" height="66" rx="2" filter="url(#card-shadow)"></rect>
+        {% if e.kind == "person_public_role" %}<rect class="card-photo" x="-78" y="-25" width="34" height="44"></rect><circle class="card-head" cx="-61" cy="-11" r="7"></circle><path class="card-body" d="M-73,15 Q-61,-2 -49,15 Z"></path>{% endif %}
+        {% set left = -38 if e.kind == "person_public_role" else -76 %}
+        <text class="card-kind" x="{{ left }}" y="-15">{{ {"organisation": "ORGANISATION", "person_public_role": "PERSON", "place": "PLACE", "event": "EVENT"}[e.kind] }} · {{ e.ref }}</text>
+        {% for line in node.lines %}<text class="card-name" x="{{ left }}" y="{{ 3 + loop.index0 * 15 }}">{{ line }}</text>{% endfor %}
       </g>
       {% endfor %}
+      </g>
+      <g class="strings">
+      {% for edge in edges %}{% set link = edge.link %}
+      <a href="#{{ link.ref }}" class="edge string st-{{ link.status | replace(' ', '-') }}" data-status="{{ link.status }}" data-kinds="{{ edge.kinds }}" data-from="{{ link.subject }}" data-to="{{ link.object }}">
+        <title>{{ entity[link.subject].name }} — {{ link.relation | replace("_", " ") }} → {{ entity[link.object].name }} ({{ link.status }}): select to see the evidence</title>
+        <path class="string-line" d="{{ edge.path }}"></path>
+        <text class="string-label" x="{{ edge.label[0] }}" y="{{ edge.label[1] }}">{{ link.relation | replace("_", " ") }}</text>
+      </a>
+      {% endfor %}
+      </g>
+      <g class="pins">
+      {% for node in nodes %}<circle class="node pin" data-kind="{{ node.entity.kind }}" data-ref="{{ node.entity.ref }}" cx="{{ node.pin[0] }}" cy="{{ node.pin[1] }}" r="6.5" fill="url(#pin-head)"></circle>{% endfor %}
+      </g>
     </svg>
+    </div>
     <div class="table-wrap">
     <table class="links">
       <thead><tr><th>Link</th><th>From</th><th>Relation</th><th>To</th><th>Status</th><th>Evidence</th></tr></thead>

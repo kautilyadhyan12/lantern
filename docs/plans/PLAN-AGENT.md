@@ -549,3 +549,15 @@ Each stage is one pull request.
     against its published sha512 integrity; OSV lists no vulnerabilities for 1.9.4.
   - The CSP only adds `https://gibs.earthdata.nasa.gov` to `img-src`; scripts stay local.
   - The viewer is for exploring: the saved images remain the evidence the report cites.
+- 2026-11-06: the links map becomes an evidence board, at the owner's request.
+  - Index cards pinned to a cork board in a wooden frame (CSS gradients only, no images),
+    in four styles: manila folders for organisations, photo cards for people, sticky notes
+    for places, clippings for events. Each card has a fixed small tilt.
+  - Red string sags from pin to pin: solid when corroborated or from a record, dashed for a
+    single source, grey dotted for an assessment. Each string is labelled with its relation
+    and links to its evidence row.
+  - Cards can be dragged; their strings and pins follow (pointer events in `app.js`, SVG
+    attributes only, so the CSP is unchanged).
+  - The layout gains a pull towards the middle, so separate groups do not drift to the
+    corners, and an overlap pass that keeps cards apart (ties push sideways). The board
+    shows at most 30 cards.

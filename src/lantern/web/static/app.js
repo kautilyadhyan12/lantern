@@ -125,8 +125,68 @@ function startMapFilters() {
   filters.addEventListener("change", apply);
 }
 
+function startBoard() {
+  // Drag cards on the evidence board; their strings and pins follow.
+  const svg = document.querySelector("svg.board");
+  if (!svg) return;
+  const cards = new Map([...svg.querySelectorAll(".card")].map((card) => [card.dataset.ref, card]));
+  const pins = new Map([...svg.querySelectorAll(".pin")].map((pin) => [pin.dataset.ref, pin]));
+  const strings = [...svg.querySelectorAll("a.string")];
+  const box = svg.viewBox.baseVal;
+  const pinOf = (card) => [Number(card.dataset.x), Number(card.dataset.y) - 26];
+  const restring = (string) => {
+    const [x1, y1] = pinOf(cards.get(string.dataset.from));
+    const [x2, y2] = pinOf(cards.get(string.dataset.to));
+    const mx = (x1 + x2) / 2;
+    const my = (y1 + y2) / 2 + 0.12 * Math.hypot(x2 - x1, y2 - y1) + 8;
+    string.querySelector("path").setAttribute("d", `M${x1},${y1} Q${mx},${my} ${x2},${y2}`);
+    const label = string.querySelector("text");
+    label.setAttribute("x", 0.25 * x1 + 0.5 * mx + 0.25 * x2);
+    label.setAttribute("y", 0.25 * y1 + 0.5 * my + 0.25 * y2);
+  };
+  const point = (event) => {
+    const p = svg.createSVGPoint();
+    p.x = event.clientX;
+    p.y = event.clientY;
+    return p.matrixTransform(svg.getScreenCTM().inverse());
+  };
+  let held = null;
+  svg.addEventListener("pointerdown", (event) => {
+    const card = event.target.closest(".card");
+    if (!card) return;
+    const p = point(event);
+    held = { card, dx: p.x - Number(card.dataset.x), dy: p.y - Number(card.dataset.y) };
+    card.parentNode.appendChild(card); // the card being moved goes on top
+    card.classList.add("lifted");
+    svg.setPointerCapture(event.pointerId);
+  });
+  svg.addEventListener("pointermove", (event) => {
+    if (!held) return;
+    const p = point(event);
+    const { card } = held;
+    const x = Math.min(Math.max(p.x - held.dx, 90), box.width - 90);
+    const y = Math.min(Math.max(p.y - held.dy, 50), box.height - 40);
+    card.dataset.x = x;
+    card.dataset.y = y;
+    card.setAttribute("transform", `translate(${x} ${y}) rotate(${card.dataset.tilt})`);
+    const pin = pins.get(card.dataset.ref);
+    pin.setAttribute("cx", x);
+    pin.setAttribute("cy", y - 26);
+    strings
+      .filter((s) => s.dataset.from === card.dataset.ref || s.dataset.to === card.dataset.ref)
+      .forEach(restring);
+  });
+  const drop = () => {
+    if (held) held.card.classList.remove("lifted");
+    held = null;
+  };
+  svg.addEventListener("pointerup", drop);
+  svg.addEventListener("pointercancel", drop);
+}
+
 startForm();
 startContinue();
 startMapFilters();
+startBoard();
 startPolling();
 startCitations();
