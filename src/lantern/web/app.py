@@ -15,7 +15,7 @@ from starlette.middleware.base import RequestResponseEndpoint
 
 from lantern.assessment import CREDIBILITY, LIKELIHOOD, RELIABILITY
 from lantern.config import AppSettings
-from lantern.models import Claim, Investigation, Source, now
+from lantern.models import Claim, Investigation, Mode, Source, now
 from lantern.report import to_markdown
 from lantern.runtime import continue_investigation, missing_keys, run_investigation
 from lantern.store import Store
@@ -33,6 +33,7 @@ CSP = (
 class NewInvestigation(BaseModel):
     brief: str = Field(min_length=1, max_length=600)
     depth: Literal["quick", "deep"] = "deep"
+    mode: Mode = "research"
 
 
 def asset_urls(folder: Path) -> Callable[[str], str]:
@@ -122,7 +123,9 @@ def create_app(  # noqa: PLR0915  # routes share one store and settings via clos
     async def start(body: NewInvestigation) -> JSONResponse:
         if refusal := blocked():
             return refusal
-        investigation = Investigation(id=store.new_id(), brief=body.brief.strip(), depth=body.depth)
+        investigation = Investigation(
+            id=store.new_id(), brief=body.brief.strip(), depth=body.depth, mode=body.mode
+        )
         store.save(investigation)
         launch(investigation, runner)
         return JSONResponse({"id": investigation.id}, 201)

@@ -1,11 +1,18 @@
 """Web search. Hits are transient: they pick pages to read and are never stored."""
 
 from dataclasses import dataclass
-from typing import Literal, Protocol
+from typing import Literal, Protocol, TypedDict
 
 import httpx
 
 TimeRange = Literal["day", "week", "month", "year"]
+
+
+class Window(TypedDict, total=False):
+    """A publication date window for one search, as YYYY-MM-DD days."""
+
+    after: str
+    before: str
 
 
 @dataclass(frozen=True)
@@ -20,7 +27,7 @@ class Hit:
 
 
 class Searcher(Protocol):
-    async def search(
+    async def search(  # noqa: PLR0913  # keyword-only filters mirror the search options
         self,
         query: str,
         limit: int,
@@ -28,6 +35,8 @@ class Searcher(Protocol):
         *,
         news: bool = False,
         time_range: TimeRange | None = None,
+        after: str | None = None,
+        before: str | None = None,
     ) -> list[Hit]: ...
 
 
@@ -48,7 +57,7 @@ class TavilySearch:
     async def close(self) -> None:
         await self._client.aclose()
 
-    async def search(
+    async def search(  # noqa: PLR0913  # keyword-only filters mirror the search options
         self,
         query: str,
         limit: int,
@@ -56,7 +65,11 @@ class TavilySearch:
         *,
         news: bool = False,
         time_range: TimeRange | None = None,
+        after: str | None = None,
+        before: str | None = None,
     ) -> list[Hit]:
+        """`after` and `before` are YYYY-MM-DD dates (Tavily's `start_date` and `end_date`,
+        checked 2026-11-06); Tavily refuses them together with `time_range`."""
         body: dict[str, object] = {"query": query, "max_results": limit, "search_depth": "basic"}
         if domains:
             body["include_domains"] = domains
@@ -64,6 +77,10 @@ class TavilySearch:
             body["topic"] = "news"
         if time_range:
             body["time_range"] = time_range
+        if after:
+            body["start_date"] = after
+        if before:
+            body["end_date"] = before
         try:
             response = await self._client.post(self.endpoint, json=body)
         except httpx.HTTPError as error:

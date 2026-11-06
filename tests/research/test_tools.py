@@ -103,7 +103,8 @@ def test_the_menu_is_built_from_each_tools_args_model():
     budget = RunBudget(tool_calls=9, searches=3, pages=12, records=0)
     assert registry.menu(["news", "page", "missing"], budget).splitlines() == [
         (
-            '- news: Find things. Args: {"query":"string","time_range?":["day","week","month",'
+            '- news: Find things. Args: {"query":"string","after?":"string","before?":"string",'
+            '"time_range?":["day","week","month",'
             '"year"]}. Calls left: 3.'
         ),
         '- page: Find things. Args: {"url":"string"}. Calls left: 9.',

@@ -11,6 +11,8 @@ def now() -> datetime:
 
 
 Status = Literal["queued", "running", "done", "failed", "refused"]
+Mode = Literal["research", "claim"]  # research an open question, or check one claim
+VerdictLabel = Literal["supported", "false", "misleading", "unproven"]
 
 
 class Step(BaseModel):
@@ -193,6 +195,21 @@ class Report(BaseModel):
     removed: list[Removed] = Field(default_factory=list)
 
 
+class Verdict(BaseModel):
+    """The answer to a claim check. The model proposes the label and likelihood; code
+    decides what the evidence allows (core/verdict.py), and both values are kept."""
+
+    label: VerdictLabel
+    label_proposed: VerdictLabel
+    reason: str  # why code kept or changed the label, in plain words
+    likelihood: str | None = None
+    likelihood_proposed: str | None = None
+    confidence: Literal["low", "moderate", "high"] | None = None
+    confidence_reason: str = ""
+    cites: list[str] = Field(default_factory=list)  # the claims the verdict rests on
+    sentence: Sentence | None = None  # kept only when it passed the citation check
+
+
 class Usage(BaseModel):
     searches: int = 0
     pages_fetched: int = 0
@@ -216,6 +233,8 @@ class Investigation(BaseModel):
     finished_at: AwareDatetime | None = None
     status: Status = "queued"
     depth: Literal["quick", "deep"] = "deep"
+    mode: Mode = "research"
+    claimed_date: str | None = None  # claim checks: when the claim says it happened
     news: bool = False
     time_range: str | None = None
     searched: list[str] = Field(default_factory=list)  # queries made, never their results
@@ -235,6 +254,7 @@ class Investigation(BaseModel):
     links: list[Link] = Field(default_factory=list)
     findings: list[Finding] = Field(default_factory=list)
     report: Report | None = None
+    verdict: Verdict | None = None  # claim checks only
     usage: Usage = Field(default_factory=Usage)
 
     def log(self, message: str) -> None:

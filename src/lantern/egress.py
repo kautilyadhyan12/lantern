@@ -228,6 +228,14 @@ class Fetcher:
                 await asyncio.sleep(wait)
             self._last[host] = loop.time()
 
+    async def allowed(self, url: str) -> bool:
+        """Whether the site's robots.txt lets Lantern read `url`; False when it cannot be
+        checked. Used before reading an archived copy of a page."""
+        try:
+            return await self._allowed(url)
+        except FetchError:
+            return False
+
     async def _allowed(self, url: str) -> bool:
         parts = urlsplit(url)
         key = f"{parts.scheme}://{parts.netloc}"

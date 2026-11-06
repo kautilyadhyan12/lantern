@@ -477,3 +477,29 @@ blockquote { border-left-color: var(--orange); }
   .side-nav a:hover, .explain[open] { background: #3a2a10; }
   .finding .ref { color: #111; }
 }
+
+/* Claim checks: the mode switch on the start form and the verdict stamp */
+.mode { border: 0; margin: 0; padding: 0; display: flex; border-bottom: 3px solid var(--line); }
+.mode-tab { flex: 1; position: relative; cursor: pointer; }
+.mode-tab + .mode-tab { border-left: 3px solid var(--line); }
+.mode-tab input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.mode-tab span { display: block; padding: 0.7rem 1rem; font: 700 1rem/1.3 var(--sans); text-align: center; }
+.mode-tab:hover span { background: var(--tint); }
+.mode-tab input:checked + span { background: var(--yellow); color: #111; }
+.mode-tab input:focus-visible + span { outline: 3px solid #1d5bd6; outline-offset: -5px; }
+.kicker { margin: 0 0 0.3rem; font: 700 0.85rem/1.4 var(--mono); color: var(--orange); }
+.verdict { margin-top: 1.4rem; padding: 1rem 1.25rem 1.1rem; border: 3px solid var(--line); background: var(--paper); box-shadow: 6px 6px 0 var(--orange); }
+.verdict-kicker { margin: 0; font: 700 0.8rem/1.4 var(--mono); color: var(--muted); }
+.verdict-label { display: inline-block; margin: 0.2rem 0 0.6rem; padding: 0.1rem 0.7rem; font: 700 2rem/1.2 var(--sans); border: 3px solid currentColor; transform: rotate(-2deg); }
+.verdict-sentence { margin: 0 0 0.5rem; font-size: 1.15rem; }
+.verdict-why { margin: 0.2rem 0 0; font-size: 0.92rem; color: var(--muted); }
+.v-supported .verdict-label { color: var(--good); }
+.v-false .verdict-label { color: var(--bad); }
+.v-misleading .verdict-label { color: var(--orange); }
+.v-unproven .verdict-label { color: var(--muted); }
+.verdict-chip { font: 700 0.75rem/1.45 var(--mono); padding: 0 0.4rem; border: 2px solid currentColor; }
+.verdict-chip.v-supported { color: var(--good); }
+.verdict-chip.v-false { color: var(--bad); }
+.verdict-chip.v-misleading { color: #b04a00; }
+.verdict-chip.v-unproven { color: var(--muted); }
+@media (max-width: 560px) { .mode { flex-direction: column; } .mode-tab + .mode-tab { border-left: 0; border-top: 3px solid var(--line); } }

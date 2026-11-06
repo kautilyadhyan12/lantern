@@ -57,7 +57,9 @@ EXTRACT = (
     "EXACTLY, character for character, from the page (one sentence or a short passage, 15 to "
     "300 characters, no ellipses, no changes); and the refs of the key questions it helps "
     "answer. If the page says something is alleged or claimed by someone, the statement "
-    "must say who claims it. When the page reports several separate people, incidents or "
+    "must say who claims it. On a fact-check article, the statement names the fact-checker "
+    "and its rating (for example 'Alt News rated the claim false: the video is from 2022'). "
+    "When the page reports several separate people, incidents or "
     "events, give each its own claim with its name, date and place. Skip opinions, adverts "
     "and navigation text. Return no claims if nothing is relevant. When a claim states that "
     "two named organisations, public figures in their public role, places or events are "
@@ -144,6 +146,65 @@ WRITE = (
 )
 
 
+# The seed questions of the verify_claim playbook (03 §3), written by code, with the name of
+# the plan field that holds each one's searches.
+CLAIM_QUESTIONS = (
+    ("Where and when did this claim first appear publicly, and who published it first?", "origin"),
+    ("What do independent, reliable sources say about whether the claim is true?", "support"),
+    (
+        "Have established fact-checkers already assessed this claim or a close variant?",
+        "prior_checks",
+    ),
+    (
+        "Is genuine material being presented out of context (a different time, place or event)?",
+        "context",
+    ),
+)
+
+CLAIM_PLAN = (
+    f"{COMMON}\nYou are planning the check of one claim, the way a verification journalist "
+    "would. The key questions are fixed: Q1 origin, where and when the claim first appeared "
+    "and who published it; Q2 support, what independent, reliable sources say; Q3 "
+    "prior_checks, whether fact-checkers have assessed it or a close variant; Q4 context, "
+    "whether genuine material (a photo, video or quote) is shown out of context. For each, "
+    "give up to {queries} varied web search queries (keywords, not sentences), in the local "
+    "language of the place too where useful. origin queries look for the earliest posts and "
+    "reports; support queries look for official statements and independent reporting; "
+    "prior_checks queries are short phrasings a fact-check headline would use, such as "
+    "'old video' or 'fact check'; context queries describe what the material shows, the "
+    "place and similar earlier events, without the claimed date. Set claimed_date to the "
+    "date the claim says the event happened (YYYY-MM-DD, YYYY-MM or YYYY), or null. Set news "
+    "to true when the claim is about a reported event. Also give up to three hashtags "
+    "(without #) and up to two short everyday phrases (two to four words, no dates) that "
+    "people would write when posting about it; each phrase must contain the place or "
+    "subject name."
+)
+
+CLAIM_STEPS = (
+    "This investigation checks one claim. Use fact_checks early, with short phrasings of the "
+    "claim, and read the fact-check articles it finds. Use earliest_copy on links given in "
+    "the claim and on the earliest posts and pages found, to learn when they were first "
+    "saved. When the claim gives a date, search for the same material before that date with "
+    "the before argument of news_search or web_search: an earlier copy shows the material "
+    "is older than claimed. Not finding an earlier copy never proves that one is the "
+    "original."
+)
+
+VERDICT = (
+    f"{COMMON}\nGive the verdict of a claim check, using ONLY the findings and claims below. "
+    "Choose label: supported (independent, reliable sources confirm the claim), false "
+    "(reliable sources or fact-checkers show it is untrue), misleading (genuine material "
+    "shown with the wrong time, place or event, or a true fact used for a false conclusion) "
+    "or unproven (the evidence does not settle it). Choose the likelihood that the label is "
+    "correct from: almost no chance, very unlikely, unlikely, roughly even chance, likely, "
+    "very likely, almost certain. In cites give the refs of the claims the verdict rests "
+    "on, and in against the refs of claims that point the other way. sentence is one "
+    "sentence stating the verdict with that likelihood term, for example 'It is very likely "
+    "that the video shows an earlier flood.' Attribute fact-checkers' ratings to them. Never "
+    "mention confidence. An archive record shows only that material existed by its date."
+)
+
+
 class GateOut(BaseModel):
     allowed: bool
     reason: str = ""
@@ -159,6 +220,17 @@ class PlanOut(BaseModel):
     questions: list[PlannedQuestion] = Field(min_length=1)
     news: bool = False
     time_range: str | None = None
+    hashtags: list[str] = Field(default_factory=list)
+    social_phrases: list[str] = Field(default_factory=list)
+
+
+class ClaimPlanOut(BaseModel):
+    origin: list[str] = Field(default_factory=list)
+    support: list[str] = Field(default_factory=list)
+    prior_checks: list[str] = Field(default_factory=list)
+    context: list[str] = Field(default_factory=list)
+    claimed_date: str | None = Field(default=None, max_length=40)
+    news: bool = True
     hashtags: list[str] = Field(default_factory=list)
     social_phrases: list[str] = Field(default_factory=list)
 
@@ -325,3 +397,11 @@ class ResearchStep(BaseModel):
 class TriageStep(BaseModel):
     read: list[str] = Field(default_factory=list)
     spotted: list[Spotted] = Field(default_factory=list)
+
+
+class VerdictOut(BaseModel):
+    label: Literal["supported", "false", "misleading", "unproven"]
+    likelihood: str = ""
+    sentence: str = Field(default="", max_length=600)
+    cites: list[str] = Field(default_factory=list)
+    against: list[str] = Field(default_factory=list)
