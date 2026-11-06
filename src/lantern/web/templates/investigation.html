@@ -33,7 +33,8 @@
 {% block main_attrs %} class="wide"{% endblock %}
 {% block main %}
 {% set images = inv.sources | selectattr("kind", "equalto", "image") | list %}
-<div class="case-layout">
+<div class="case-layout{{ '' if inv.report else ' no-nav' }}">
+{% if inv.report %}
 <nav class="side-nav" aria-label="Sections of this report">
   <p class="nav-title">On this page</p>
   <ol>
@@ -48,6 +49,7 @@
     {% endif %}
   </ol>
 </nav>
+{% endif %}
 <div class="case-main">
 <header class="case-hero" id="overview">
   <p class="crumb"><a href="/">← All investigations</a></p>

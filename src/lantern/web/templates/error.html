@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · Lantern{% endblock %}
+{% block main %}
+<section class="panel failed error-page">
+  <h1>{{ title }}</h1>
+  <p>{{ message }}</p>
+  <p><a href="/">← All investigations</a></p>
+</section>
+{% endblock %}

@@ -767,3 +767,28 @@ def test_fact_checkers_ratings_keep_their_own_words():
     assert "rating in the article's own word" in prompts.EXTRACT
     assert "the label is misleading" in prompts.VERDICT
     assert "Never guess a link" in prompts.CLAIM_STEPS
+
+
+def test_wrong_links_get_a_readable_page_but_the_api_stays_json(tmp_path):
+    client = TestClient(create_app(AppSettings(data_dir=str(tmp_path), _env_file=None)))
+    page = client.get("/investigations/nope")
+    assert page.status_code == 404
+    assert "text/html" in page.headers["content-type"]
+    assert "<h1>Not found</h1>" in page.text
+    assert "No investigation with this id." in page.text
+    anywhere = client.get("/no-such-page")
+    assert anywhere.status_code == 404
+    assert "There is no page at this address." in anywhere.text
+    api = client.get("/api/investigations/nope")
+    assert api.status_code == 404
+    assert api.json() == {"detail": "No investigation with this id."}
+
+
+def test_an_unfinished_investigation_has_no_section_menu(tmp_path):
+    store = Store(tmp_path)
+    inv = Investigation(id="feedc0ffee00", brief="A claim", mode="claim", status="running")
+    store.save(inv)
+    client = TestClient(create_app(AppSettings(data_dir=str(tmp_path), _env_file=None)))
+    page = client.get(f"/investigations/{inv.id}").text
+    assert 'class="side-nav"' not in page
+    assert 'class="case-layout no-nav"' in page
