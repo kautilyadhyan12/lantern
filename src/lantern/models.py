@@ -29,7 +29,8 @@ class Source(BaseModel):
     ref: str
     url: str
     domain: str
-    kind: Literal["page", "post", "record"] = "page"  # record: an official list or reference entry
+    # record: an official list or reference entry; image: a satellite image saved as is
+    kind: Literal["page", "post", "record", "image"] = "page"
     origin: str = ""
     title: str | None = None
     published: str | None = None

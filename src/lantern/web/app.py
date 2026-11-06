@@ -174,6 +174,15 @@ def create_app(  # noqa: PLR0915  # routes share one store and settings via clos
         }
         return templates.TemplateResponse(request, "source.html", context)
 
+    @app.get("/investigations/{investigation_id}/sources/{ref}/image")
+    async def image(investigation_id: str, ref: str) -> Response:
+        """A saved satellite image, served only for image sources and only as JPEG."""
+        source = load(investigation_id).source(ref)
+        body = store.blob(source.sha256) if source and source.kind == "image" else None
+        if body is None or not body.startswith(b"\xff\xd8"):
+            raise HTTPException(404, "This saved image does not exist.")
+        return Response(body, media_type="image/jpeg")
+
     @app.get("/investigations/{investigation_id}/report.md")
     async def markdown(investigation_id: str) -> PlainTextResponse:
         item = load(investigation_id)

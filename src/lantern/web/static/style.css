@@ -229,3 +229,9 @@ blockquote {
 .map text { font-size: 12px; fill: var(--ink); }
 .linkmap .off { display: none; }
 .links tr:target { background: var(--accent-soft); }
+
+/* Satellite views */
+.views { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+.views figure { margin: 0; }
+.views img { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line); }
+.views figcaption { font-size: 0.85rem; color: var(--muted); margin-top: 0.3rem; }

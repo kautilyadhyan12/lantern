@@ -152,6 +152,24 @@
   </section>
   {% endif %}
 
+  {% set images = inv.sources | selectattr("kind", "equalto", "image") | list %}
+  {% if images %}
+  <section class="satellite">
+    <h2>Satellite views</h2>
+    <p class="muted">Daily true-colour images from NASA (EOSDIS GIBS), with about 250–375 m detail.
+      Code chose the clearest day near each date; no AI reads the images. Areas from
+      OpenStreetMap (© OpenStreetMap contributors).</p>
+    <div class="views">
+      {% for s in images %}
+      <figure>
+        <img src="/investigations/{{ inv.id }}/sources/{{ s.ref }}/image" alt="{{ s.title }}" loading="lazy">
+        <figcaption>{{ s.title }} · <a href="{{ s.url }}" rel="noopener noreferrer nofollow" target="_blank">open in NASA Worldview</a> · {{ s.ref }}</figcaption>
+      </figure>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
   {% if nodes %}
   <section class="linkmap">
     <h2>Links map</h2>

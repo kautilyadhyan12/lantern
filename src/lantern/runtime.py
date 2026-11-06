@@ -19,6 +19,7 @@ from lantern.social import PublicSocial
 from lantern.store import Store
 from lantern.tools.adapters.companies import CompanyLookup
 from lantern.tools.adapters.domains import DomainLookup
+from lantern.tools.adapters.earth import DisasterEvents, Places, SatelliteViews
 from lantern.tools.adapters.sanctions import SanctionsSearch
 from lantern.tools.adapters.wiki import WikiLookup
 from lantern.tools.base import Tool
@@ -89,11 +90,14 @@ def record_tools(settings: AppSettings, fetcher: Fetcher) -> tuple[Tool, ...]:
     if not settings.records_enabled:
         return ()
     lists = Path(settings.data_dir) / "cache" / "lists"
+    places = Places(fetcher)
     return (
         SanctionsSearch(fetcher, lists),
         WikiLookup(fetcher),
         CompanyLookup(fetcher),
         DomainLookup(fetcher),
+        DisasterEvents(fetcher, places),
+        SatelliteViews(fetcher, places),
     )
 
 
